@@ -1,0 +1,30 @@
+extends SceneTree
+
+func _initialize() -> void:
+	var model := StationModel.new()
+	assert(model.modules.size() == 1 and model.power_balance() == 1)
+	assert(not model.build(Vector2.ZERO, "solar").is_empty())
+	assert(not model.build(Vector2(174, 174), "solar").is_empty())
+	assert(not model.build(Vector2(290, 0), "solar").is_empty())
+	assert(not model.build(Vector2(58, 0), "habitat").is_empty())
+	assert(model.materials == 40 and model.modules.size() == 1)
+	assert(model.build(Vector2(58, 0), "solar").is_empty())
+	assert(model.materials == 20 and model.power_balance() == 6)
+	assert(not model.build(Vector2(0, 58), "storage").is_empty())
+	assert(model.collect(1000) == 80 and model.materials == 100)
+	assert(model.collect(10) == 0)
+	assert(model.build(Vector2(0, 58), "storage").is_empty())
+	assert(model.capacity == 175 and model.power_balance() == 5)
+	assert(model.collect(1000) == 100)
+	assert(model.build(Vector2(-58, 0), "habitat").is_empty())
+	assert(model.build(Vector2(0, -58), "solar").is_empty())
+	assert(model.level == 2)
+	for cell: Vector2 in [Vector2(58, 58), Vector2(-58, 58), Vector2(58, -58), Vector2(-58, -58)]:
+		model.collect(100)
+		assert(model.build(cell, "solar").is_empty())
+	assert(model.level == 3 and model.modules.size() == 9)
+	var before: int = model.materials
+	model.tick()
+	assert(model.ticks == 1 and model.materials == before)
+	print("PASS: economy, placement atomicity, solar bootstrap, capacity and nine-module goal")
+	quit(0)

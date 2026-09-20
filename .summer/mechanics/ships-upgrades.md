@@ -1,0 +1,13 @@
+# Phase 2 — Ships and upgrades
+
+Constraints: Runtime stays entirely 2D. Do not edit space_backdrop.gd (Earth/orbit rendering); baseline SHA256 8e0ad4e005111c623d9e6a03afc1eb1fe6cb1c34969e835b28325b1ce386669f. Preserve original module prices, salvage, mining docks, power and colony thresholds.
+
+Ships: separate ships.json catalog and model.ships ID map; buy immediately using Materials and available Power, never grid placement or colony-level credit. Miner costs 45 Materials / 2 Power, mines 18 Minerals per eight ticks repeatedly on its assigned asteroid until depleted. Scout costs 35 Materials / 1 Power, surveys the next unrevealed adjacent sector in five ticks. Sector reveals are persistent within the session and introduce a 54-Mineral asteroid; no travel/exploration simulation. The Phase 1 Mining Ship module stays available and uses its original one-shot behavior.
+
+Controls: Modules, Ships and Upgrade tabs in existing right panel. Ships page contains purchase buttons, roster and a command for each ship. Miner assignment arms an asteroid click; chosen ship is explicit. Scout command starts a survey. Cancel clears placement and assignment. Without explicit assignment, clicking an asteroid retains the original idle-miner dispatch shortcut. Busy/reserved/missing-target actions explain failure and spend nothing.
+
+Upgrades: module_tiers stores one-based tier separately from existing kind strings. Each definition has an ordered upgrades array of cost, description and stat overrides; calculations use the effective definition. Only one upgrade per module currently, but future tiers require additional data entries. Habitat costs 20 M / 6 Minerals and adds 25 material capacity. Solar costs 30 M / 8 Minerals and raises gross generation 6 -> 10. Storage costs 25 M / 6 Minerals and raises bonus capacity 75 -> 150. Refinery costs 35 M / 10 Minerals and reduces cycle 3s -> 2s. No extra power use. Failed/repeated upgrades never spend resources.
+
+Feedback: docked 2D ship silhouettes, ship roster state, assignment path and repeating countdown, survey sector count, T1/T2 badges, selected-module outline, before/after stats and upgrade button with both costs. Earth remains unchanged.
+
+Verification: model tests for purchases, power/no-grid effects, auto-repeat, reservations, scout reveal once, all four upgrades and future-tier data. Mouse playthrough earns resources, buys/assigns Miner, observes two timed deliveries without further clicks, upgrades Solar and checks exact power/cost, surveys with Scout and confirms reveal. Rerun MVP and Phase 1 suites. Inspect runtime tree for 3D nodes and compare Earth hash.

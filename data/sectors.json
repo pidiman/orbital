@@ -1,0 +1,19 @@
+[
+  {
+    "id": "home",
+    "name": "Home orbit",
+    "revealed": true
+  },
+  {
+    "id": "dawn",
+    "name": "Dawn arc",
+    "revealed": false,
+    "minerals": 54
+  },
+  {
+    "id": "twilight",
+    "name": "Twilight arc",
+    "revealed": false,
+    "minerals": 54
+  }
+]

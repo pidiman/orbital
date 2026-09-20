@@ -1,0 +1,29 @@
+{
+  "duration_ms": 2712,
+  "errors_seen": [],
+  "finished": true,
+  "frame_warnings": [],
+  "frames": [
+    "start.jpg",
+    "colony.jpg"
+  ],
+  "reports": {
+    "checks": {
+      "clock_ticking": true,
+      "debris_collection": true,
+      "disconnected_no_spend": true,
+      "goal_reached": true,
+      "habitat_placed": true,
+      "materials_rejection_no_spend": true,
+      "occupied_no_spend": true,
+      "power_rejection_no_spend": true,
+      "solar_placed": true,
+      "storage_placed": true
+    },
+    "end_frame": 315,
+    "materials": 4,
+    "module_count": 9,
+    "power_balance": 28,
+    "start_frame": 3
+  }
+}

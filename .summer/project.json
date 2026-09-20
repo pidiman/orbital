@@ -1,0 +1,9 @@
+{
+  "template": {
+    "id": "template/empty",
+    "version": "1.1.0",
+    "builtin": true
+  },
+  "toolkit_version": "3.1.0",
+  "created_at": "2026-09-20T08:50:54.555Z"
+}

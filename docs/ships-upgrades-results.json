@@ -1,0 +1,98 @@
+{
+  "duration_ms": 4992,
+  "errors_seen": [],
+  "finished": true,
+  "frame_warnings": [],
+  "frames": [
+    "miner_assigned.jpg",
+    "upgrade_before.jpg",
+    "upgrade_after.jpg"
+  ],
+  "reports": {
+    "checks": {
+      "assigned_target_reserved": true,
+      "assignment_retained": true,
+      "debris_collection": true,
+      "explicit_miner_selected": true,
+      "first_cycle_credited": true,
+      "independent_miner_purchased": true,
+      "module_inspector_opens": true,
+      "no_upgrade_module_count_bonus": true,
+      "not_instant_mining": true,
+      "runtime_entirely_2d": true,
+      "scout_purchased": true,
+      "scout_reveals_rich_asteroid": true,
+      "scout_reveals_sector": true,
+      "scout_survey_started": true,
+      "second_cycle_without_click": true,
+      "ship_uses_power_not_grid": true,
+      "ships_have_separate_page": true,
+      "tier_and_max_shown": true,
+      "upgrade_applies_stats": true,
+      "upgrade_cost_visible": true,
+      "upgrade_pays_both_costs": true
+    },
+    "timeline": [
+      {
+        "frame": 3,
+        "label": "fresh game",
+        "materials": 40,
+        "mined": 0,
+        "minerals": 0,
+        "modules": 1,
+        "power": 1,
+        "ships": 0
+      },
+      {
+        "frame": 21,
+        "label": "miner purchased",
+        "materials": 1,
+        "mined": 0,
+        "minerals": 0,
+        "modules": 2,
+        "power": 4,
+        "ships": 1
+      },
+      {
+        "frame": 269,
+        "label": "assigned rich asteroid",
+        "materials": 32,
+        "mined": 0,
+        "minerals": 0,
+        "modules": 2,
+        "power": 3,
+        "ships": 2
+      },
+      {
+        "frame": 423,
+        "label": "first automatic cycle",
+        "materials": 32,
+        "mined": 18,
+        "minerals": 18,
+        "modules": 2,
+        "power": 3,
+        "ships": 2
+      },
+      {
+        "frame": 583,
+        "label": "second cycle without input",
+        "materials": 32,
+        "mined": 36,
+        "minerals": 36,
+        "modules": 2,
+        "power": 3,
+        "ships": 2
+      },
+      {
+        "frame": 591,
+        "label": "solar upgraded",
+        "materials": 2,
+        "mined": 36,
+        "minerals": 28,
+        "modules": 2,
+        "power": 7,
+        "ships": 2
+      }
+    ]
+  }
+}
