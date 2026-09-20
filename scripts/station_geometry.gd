@@ -15,3 +15,9 @@ static func connected(a: Vector2, b: Vector2) -> bool:
 
 static func contains_center(point: Vector2) -> bool:
 	return point.is_finite() and absf(point.x) <= BUILD_EXTENT and absf(point.y) <= BUILD_EXTENT
+
+static func touches_any(point: Vector2, positions: Array) -> bool:
+	for existing: Vector2 in positions:
+		if connected(point, existing):
+			return true
+	return false

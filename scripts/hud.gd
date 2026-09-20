@@ -21,6 +21,9 @@ var goal_bar: ProgressBar
 var tabs: TabContainer
 var ship_buttons: Dictionary = {}
 var command_buttons: Dictionary = {}
+var sell_buttons: Dictionary = {}
+var ship_entries: Dictionary = {}
+var demolish_button: Button
 var ship_rows: VBoxContainer
 var sector_label: Label
 var upgrade_title: Label
@@ -317,6 +320,13 @@ func _buy_ship(kind: String) -> void:
 	message("%s #%d ready. Use its command below." % [model.ship_catalog[kind].name, model.next_ship_id])
 
 func _refresh_ships() -> void:
+	for removed_id: int in command_buttons.keys():
+		if not model.ships.has(removed_id):
+			ship_entries[removed_id].hide()
+			ship_entries[removed_id].queue_free()
+			ship_entries.erase(removed_id)
+			command_buttons.erase(removed_id)
+			sell_buttons.erase(removed_id)
 	sector_label.text = "SECTORS  %d / %d revealed" % [fleet.revealed_count(), fleet.sectors.size()]
 	for ship_id: int in model.ships:
 		var definition: Dictionary = model.ship_catalog[model.ships[ship_id]]
@@ -329,8 +339,19 @@ func _refresh_ships() -> void:
 			button.add_theme_stylebox_override("normal", _style(Color("172738"), Color("304557")))
 			button.add_theme_stylebox_override("hover", _style(Color("20374a"), CYAN))
 			button.pressed.connect(func() -> void: _command_ship(ship_id))
-			ship_rows.add_child(button)
+			var entry := VBoxContainer.new()
+			ship_rows.add_child(entry)
+			entry.add_child(button)
+			ship_entries[ship_id] = entry
 			command_buttons[ship_id] = button
+			var sell := Button.new()
+			sell.custom_minimum_size.y = 28
+			sell.add_theme_font_size_override("font_size", 12)
+			sell.text = "Decommission · +%d M" % model.ship_refund(ship_id)
+			sell.tooltip_text = "Cancels active missions; frees power. Refund is retained even above storage capacity."
+			sell.pressed.connect(func() -> void: _sell_ship(ship_id))
+			entry.add_child(sell)
+			sell_buttons[ship_id] = sell
 		var command: String = "Assign asteroid" if definition.has("mining") else "Survey sector"
 		if fleet.jobs.has(ship_id):
 			var target: int = fleet.jobs[ship_id].target
@@ -368,6 +389,11 @@ func _build_upgrade_page() -> void:
 	upgrade_button.add_theme_stylebox_override("hover", _style(Color("31534a"), CYAN))
 	upgrade_button.pressed.connect(_upgrade_selected)
 	page.add_child(upgrade_button)
+	demolish_button = Button.new()
+	demolish_button.custom_minimum_size.y = 38
+	demolish_button.add_theme_font_size_override("font_size", 13)
+	demolish_button.pressed.connect(_demolish_selected)
+	page.add_child(demolish_button)
 	var hint := _label(page, "Inspect mode: click any station module to see its tier and available upgrade.", 12, MUTED)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
@@ -378,6 +404,10 @@ func inspect_module(world_position: Vector2) -> void:
 	_refresh_upgrade()
 
 func _refresh_upgrade() -> void:
+	var demolition_error: String = model.demolition_error(selected_position)
+	demolish_button.disabled = not demolition_error.is_empty()
+	demolish_button.text = "Demolish · +%d M" % model.module_refund(selected_position)
+	demolish_button.tooltip_text = demolition_error if not demolition_error.is_empty() else "Frees position and power; cancels dock missions. Remaining modules stay operational. Stock and refund are retained above capacity."
 	if not model.modules.has(selected_position):
 		upgrade_title.text = "Select a module"
 		upgrade_stats.text = "Use Inspect, then click a station module."
@@ -405,3 +435,13 @@ func _refresh_upgrade() -> void:
 func _upgrade_selected() -> void:
 	var error: String = model.upgrade_module(selected_position)
 	message("Module upgraded to Tier %d." % model.tier_at(selected_position) if error.is_empty() else error, not error.is_empty())
+
+func _demolish_selected() -> void:
+	var refund: int = model.module_refund(selected_position)
+	var error: String = model.demolish_module(selected_position)
+	message("Module decommissioned. +%d Materials; position freed." % refund if error.is_empty() else error, not error.is_empty())
+
+func _sell_ship(ship_id: int) -> void:
+	var refund: int = model.ship_refund(ship_id)
+	var error: String = model.decommission_ship(ship_id)
+	message("Ship decommissioned. +%d Materials; power freed." % refund if error.is_empty() else error, not error.is_empty())

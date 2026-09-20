@@ -2,6 +2,8 @@ class_name StationModel
 extends RefCounted
 const Geometry = preload("res://scripts/station_geometry.gd")
 
+signal module_removed(world_position: Vector2)
+signal ship_removed(ship_id: int)
 signal changed
 signal ship_built(ship_id: int)
 signal module_upgraded(world_position: Vector2)
@@ -10,6 +12,7 @@ signal refined(amount: int)
 signal module_built(world_position: Vector2, kind: String)
 signal level_reached(level: int)
 
+var decommission_rules: Dictionary = {}
 var catalog: Dictionary = {}
 var ship_catalog: Dictionary = {}
 var ships: Dictionary = {}
@@ -29,6 +32,7 @@ var level: int = 1
 var ticks: int = 0
 
 func _init() -> void:
+	decommission_rules = JSON.parse_string(FileAccess.get_file_as_string("res://data/decommission.json"))
 	catalog = JSON.parse_string(FileAccess.get_file_as_string("res://data/modules.json"))
 	ship_catalog = JSON.parse_string(FileAccess.get_file_as_string("res://data/ships.json"))
 	recalculate()
@@ -61,13 +65,10 @@ func placement_error(world_position: Vector2, kind: String) -> String:
 		return "Choose a module first."
 	if not Geometry.contains_center(world_position):
 		return "Build inside the station grid."
-	var connected: bool = false
 	for existing: Vector2 in modules:
 		if Geometry.overlaps(world_position, existing):
 			return "This cell already has a module."
-		if Geometry.connected(world_position, existing):
-			connected = true
-	if not connected:
+	if not Geometry.touches_any(world_position, modules.keys()):
 		return "Connect to an existing module's edge."
 	var definition: Dictionary = catalog[kind]
 	if materials < int(definition.cost):
@@ -91,7 +92,7 @@ func build(world_position: Vector2, kind: String) -> String:
 	return ""
 
 func collect(amount: int) -> int:
-	var received: int = mini(maxi(amount, 0), capacity - materials)
+	var received: int = mini(maxi(amount, 0), maxi(0, capacity - materials))
 	materials += received
 	if received > 0:
 		changed.emit()
@@ -194,5 +195,59 @@ func buy_ship(kind: String) -> String:
 	ships[next_ship_id] = kind
 	recalculate()
 	ship_built.emit(next_ship_id)
+	changed.emit()
+	return ""
+
+func module_refund(world_position: Vector2) -> int:
+	if not modules.has(world_position):
+		return 0
+	var definition: Dictionary = catalog[modules[world_position]]
+	var invested: int = int(definition.cost)
+	if decommission_rules.refund_upgrade_materials:
+		var upgrades: Array = definition.get("upgrades", [])
+		for index in range(mini(tier_at(world_position) - 1, upgrades.size())):
+			invested += int(upgrades[index].cost.materials)
+	return int(floor(invested * float(definition.get("refund_ratio", decommission_rules.materials_refund_ratio))))
+
+func demolition_error(world_position: Vector2) -> String:
+	if not modules.has(world_position):
+		return "Select a placed module."
+	if decommission_rules.protect_starting_habitat and world_position == Vector2.ZERO:
+		return "The starting habitat is your permanent colony core."
+	var definition: Dictionary = definition_at(world_position)
+	if power_balance() - int(definition.power_output) + int(definition.power_use) < 0:
+		return "Decommission power consumers first, or add generation."
+	return ""
+
+func demolish_module(world_position: Vector2) -> String:
+	var error: String = demolition_error(world_position)
+	if not error.is_empty():
+		return error
+	var refund: int = module_refund(world_position)
+	modules.erase(world_position)
+	module_tiers.erase(world_position)
+	refinery_progress.erase(world_position)
+	recalculate()
+	# Keep existing stock and the full refund, even after removing Storage.
+	# Above-capacity stock can be spent; salvage/refining pause until there is room.
+	materials += refund
+	module_removed.emit(world_position)
+	changed.emit()
+	return ""
+
+func ship_refund(ship_id: int) -> int:
+	if not ships.has(ship_id):
+		return 0
+	var definition: Dictionary = ship_catalog[ships[ship_id]]
+	return int(floor(int(definition.cost) * float(definition.get("refund_ratio", decommission_rules.materials_refund_ratio))))
+
+func decommission_ship(ship_id: int) -> String:
+	if not ships.has(ship_id):
+		return "This ship has already been decommissioned."
+	var refund: int = ship_refund(ship_id)
+	ships.erase(ship_id)
+	recalculate()
+	materials += refund
+	ship_removed.emit(ship_id)
 	changed.emit()
 	return ""

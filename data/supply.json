@@ -1,0 +1,32 @@
+{
+  "step_seconds": 0.05,
+  "debris": {
+    "initial_count": 5,
+    "spawn_seconds": 3.0,
+    "max_count": 12,
+    "amount_min": 8,
+    "amount_max": 14,
+    "initial_x_min": 0.0722222,
+    "initial_x_max": 1.0,
+    "entry_x": -0.0333333,
+    "exit_x": 1.0444444,
+    "min_y": -0.05454545,
+    "max_y": 1.0495868,
+    "speed_x_min": 0.0144444,
+    "speed_x_max": 0.0255556,
+    "speed_y_min": -0.00826446,
+    "speed_y_max": 0.00826446
+  },
+  "asteroids": {
+    "initial_count": 1,
+    "spawn_seconds": 12.0,
+    "max_count": 3,
+    "minerals": 18,
+    "initial_x": 0.17777778,
+    "entry_x": -0.0533333,
+    "exit_x": 1.0022222,
+    "speed_min": 0.01,
+    "speed_max": 0.0144444,
+    "spacing": 0.0977778
+  }
+}

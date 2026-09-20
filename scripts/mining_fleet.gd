@@ -17,6 +17,8 @@ var next_discovery_id: int = -1000 # Keep -1 reserved for no-selection sentinels
 
 func _init(station: StationModel) -> void:
 	model = station
+	model.module_removed.connect(cancel_unit)
+	model.ship_removed.connect(cancel_unit)
 	sectors = JSON.parse_string(FileAccess.get_file_as_string("res://data/sectors.json"))
 
 func register_asteroid(asteroid_id: int, amount: int) -> void:
@@ -174,4 +176,14 @@ func tick() -> void:
 		if job.remaining <= 0:
 			survey_jobs.erase(ship_id)
 			_reveal(job.sector_id)
+	changed.emit()
+
+func cancel_unit(unit: Variant) -> void:
+	if jobs.has(unit):
+		var target: int = jobs[unit].target
+		if asteroids.has(target):
+			asteroids[target].claimed = false
+		jobs.erase(unit)
+	if unit is int:
+		survey_jobs.erase(unit)
 	changed.emit()

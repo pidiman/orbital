@@ -3,14 +3,13 @@ const Fleet = preload("res://scripts/mining_fleet.gd")
 signal notice(text: String, error: bool)
 signal minerals_delivered(amount: int, point: Vector2)
 
-@export var spawn_interval: float = 12.0
-@export var max_asteroids: int = 3
-@export var asteroid_minerals: int = 18
+const Supply = preload("res://scripts/sector_supply.gd")
+var supply: Supply
 var fleet: Fleet
 var board: Node2D
 var rocks: Dictionary = {}
-var next_id: int = 0
-var spawn_elapsed: float = 0.0
+var next_id: int:
+	get: return supply.next_home_id
 var asteroid_count: int = 0
 var selected_ship: int = -1
 var font: Font = ThemeDB.fallback_font
@@ -19,43 +18,30 @@ const ORE := Color("baa1f5")
 func _ready() -> void:
 	fleet.completed.connect(_on_completed)
 	fleet.surveyed.connect(_on_surveyed)
-	_spawn(true)
+	fleet.model.ship_removed.connect(func(ship_id: int) -> void:
+		if selected_ship == ship_id:
+			selected_ship = -1)
+	_sync_view()
 
-func _spawn(initial: bool = false) -> void:
+func _process(_delta: float) -> void:
+	_sync_view()
+	queue_redraw()
+
+func _sync_view() -> void:
 	var area: Vector2 = get_viewport_rect().size
-	next_id += 1
-	var upper_lane: bool = next_id % 2 == 1
-	var point := Vector2(160.0 if initial else -48.0, 150.0 if upper_lane else area.y - 126.0)
-	rocks[next_id] = {"point": point, "speed": randf_range(9.0, 13.0), "angle": randf_range(0.0, TAU)}
-	fleet.register_asteroid(next_id, asteroid_minerals)
-	asteroid_count = rocks.size()
-
-func _process(delta: float) -> void:
-	spawn_elapsed += delta
-	if spawn_elapsed >= spawn_interval:
-		spawn_elapsed = 0.0
-		if home_asteroid_count() < max_asteroids:
-			_spawn()
-	var edge: float = get_viewport_rect().size.x - 378.0
 	for asteroid_id: int in rocks.keys():
 		if not fleet.asteroids.has(asteroid_id):
 			rocks.erase(asteroid_id)
+	for asteroid_id: int in supply.home_asteroids:
+		if not fleet.asteroids.has(asteroid_id):
 			continue
-		var rock: Dictionary = rocks[asteroid_id]
-		if not fleet.asteroids[asteroid_id].claimed:
-			var next_x: float = rock.point.x + float(rock.speed) * delta
-			for other_id: int in rocks:
-				if other_id == asteroid_id:
-					continue
-				var other: Vector2 = rocks[other_id].point
-				if absf(other.y - rock.point.y) < 65 and other.x > rock.point.x:
-					next_x = minf(next_x, maxf(rock.point.x, other.x - 88))
-			rock.point.x = next_x
-		rock.angle += delta * 0.06
-		if rock.point.x > edge and fleet.remove_asteroid(asteroid_id):
-			rocks.erase(asteroid_id)
+		var source: Dictionary = supply.home_asteroids[asteroid_id]
+		rocks[asteroid_id] = {"point": Vector2(source.position.x * (area.x - 380.0), 150.0 + source.position.y * (area.y - 276.0)), "angle": fmod(asteroid_id * 2.399, TAU) + supply.elapsed * 0.06}
+	# Reconstruct discovered markers from model state, even after recreating the view.
+	for asteroid_id: int in fleet.asteroids:
+		if fleet.asteroids[asteroid_id].get("persistent", false) and not rocks.has(asteroid_id):
+			_add_discovery_marker(asteroid_id)
 	asteroid_count = rocks.size()
-	queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
@@ -127,26 +113,22 @@ func home_position(unit: Variant) -> Vector2:
 	return Vector2(get_viewport_rect().size.x - 410.0 - int(index / 7.0) * 62, 235 + (index % 7) * 63)
 
 func _on_surveyed(sector: Dictionary) -> void:
-	for asteroid_id: int in sector.get("asteroid_ids", []):
-		var point := Vector2(650, 150)
-		var best_gap: float = -1.0
-		for lane_y: float in [230.0, get_viewport_rect().size.y - 206.0]:
-			for lane_x: float in [300.0, 450.0, 600.0, 750.0]:
-				var candidate := Vector2(lane_x, lane_y)
-				var gap: float = 10000.0
-				for existing: Dictionary in rocks.values():
-					gap = minf(gap, candidate.distance_to(existing.point))
-				if gap > best_gap:
-					point = candidate
-					best_gap = gap
-		# A projected discovery marker stays available; it is not a drifting home rock.
-		rocks[asteroid_id] = {"point": point, "speed": 0.0, "angle": 0.2}
-	asteroid_count = rocks.size()
+	_sync_view()
 	notice.emit("%s revealed. Open Sector map for the discovery report." % sector.name, false)
 
+func _add_discovery_marker(asteroid_id: int) -> void:
+	var point := Vector2(650, 230)
+	var best_gap: float = -1.0
+	for lane_y: float in [230.0, get_viewport_rect().size.y - 206.0]:
+		for lane_x: float in [300.0, 450.0, 600.0, 750.0]:
+			var candidate := Vector2(lane_x, lane_y)
+			var gap: float = 10000.0
+			for existing: Dictionary in rocks.values():
+				gap = minf(gap, candidate.distance_to(existing.point))
+			if gap > best_gap:
+				point = candidate
+				best_gap = gap
+	rocks[asteroid_id] = {"point": point, "angle": 0.2}
+
 func home_asteroid_count() -> int:
-	var count: int = 0
-	for asteroid_id: int in rocks:
-		if asteroid_id > 0:
-			count += 1
-	return count
+	return supply.home_asteroids.size()

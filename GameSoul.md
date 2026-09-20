@@ -39,3 +39,7 @@ Module centers are continuous Vector2 world coordinates, never locked grid indic
 ## Phase 3: nearby exploration
 
 A sector map lists reachable destinations from Home orbit. Owned Scouts reveal a selected sector after a travel timer: persistent mineable asteroid deposits, anomaly records (placeholder only), or empty space. Miners can be assigned directly from the discovery report. Sector routes, times and contents are data-driven. Existing colony systems, continuous Vector2 coordinates, 2D rendering and Earth remain intact.
+
+## Recovery and resource supply contract
+
+Placed modules and owned ships can be decommissioned for partial Materials refunds, freeing power and positions. The initial habitat is protected; no connectivity restriction may trap recovery. Removed busy units release missions without rewards. Resource supply is simulation-owned and presentation-independent: a RefCounted model controls spawning, lifecycle and salvage amounts in sector coordinates; Node2D fields are views/input adapters only. Earth/orbit art remains unchanged.

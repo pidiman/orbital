@@ -1,4 +1,6 @@
 extends Node2D
+const Supply = preload("res://scripts/sector_supply.gd")
+var supply: Supply
 const Backdrop = preload("res://scripts/space_backdrop.gd")
 const Board = preload("res://scripts/station_board.gd")
 const Debris = preload("res://scripts/debris_field.gd")
@@ -22,6 +24,7 @@ func _ready() -> void:
 	model = StationModel.new()
 	fleet = Fleet.new(model)
 	model.ticked.connect(fleet.tick)
+	supply = Supply.new(model, fleet)
 	var background := Backdrop.new()
 	background.name = "SpaceBackdrop"
 	add_child(background)
@@ -31,16 +34,18 @@ func _ready() -> void:
 	add_child(board)
 	debris = Debris.new()
 	debris.name = "DebrisField"
-	debris.model = model
+	debris.supply = supply
 	add_child(debris)
 	asteroids = Asteroids.new()
 	asteroids.name = "AsteroidField"
+	asteroids.supply = supply
 	asteroids.fleet = fleet
 	asteroids.board = board
 	add_child(asteroids)
 	var clock := Clock.new()
 	clock.name = "ResourceClock"
 	clock.model = model
+	clock.supply = supply
 	add_child(clock)
 	hud = HUD.new()
 	hud.name = "HUD"

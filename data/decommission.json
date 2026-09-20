@@ -1,0 +1,5 @@
+{
+  "materials_refund_ratio": 0.5,
+  "refund_upgrade_materials": true,
+  "protect_starting_habitat": true
+}

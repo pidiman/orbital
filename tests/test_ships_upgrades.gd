@@ -108,6 +108,7 @@ func _initialize() -> void:
 	check(fleet.dispatch(101, miner).is_empty() and fleet.jobs.has(miner), "explicit assignment ignores legacy docks")
 	check(fleet.dispatch(102).is_empty() and fleet.jobs.has(Vector2(116, 0)), "legacy shortcut still dispatches dock")
 	model.ticked.disconnect(fleet.tick)
+	preload("res://tests/health_checks.gd").new().run(check)
 	check_continuous_positions()
 	preload("res://tests/exploration_checks.gd").new().run(check)
 	print("Ships/upgrades checks: %d passed / %d total" % [checks - failures.size(), checks])

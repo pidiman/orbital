@@ -1,0 +1,89 @@
+{
+  "duration_ms": 3827,
+  "errors_seen": [],
+  "finished": true,
+  "frame_warnings": [],
+  "frames": [
+    "mining_in_progress.jpg",
+    "minerals_delivered.jpg",
+    "refining_complete.jpg"
+  ],
+  "reports": {
+    "checks": {
+      "all_five_buttons_visible": true,
+      "asteroid_click_dispatches": true,
+      "asteroid_click_does_not_build": true,
+      "asteroid_requires_ship": true,
+      "asteroids_drift": true,
+      "debris_collection": true,
+      "depleted_asteroid_removed": true,
+      "duplicate_click_no_extra_mission": true,
+      "minerals_delivered": true,
+      "minerals_hud_updates": true,
+      "mining_is_timed": true,
+      "periodic_asteroids_spawn": true,
+      "refined_materials_hud_updates": true,
+      "refinery_built_and_powered": true,
+      "refining_converts_exact_resources": true,
+      "refining_is_timed": true,
+      "returned_ship_can_dispatch_again": true,
+      "ship_built_with_cost_and_power": true
+    },
+    "timeline": [
+      {
+        "frame": 3,
+        "jobs": 0,
+        "label": "fresh game",
+        "materials": 40,
+        "minerals": 0,
+        "modules": 1,
+        "refined": 0
+      },
+      {
+        "frame": 33,
+        "jobs": 0,
+        "label": "ship built",
+        "materials": 10,
+        "minerals": 0,
+        "modules": 3,
+        "refined": 0
+      },
+      {
+        "frame": 36,
+        "jobs": 1,
+        "label": "mission launched",
+        "materials": 10,
+        "minerals": 0,
+        "modules": 3,
+        "refined": 0
+      },
+      {
+        "frame": 184,
+        "jobs": 0,
+        "label": "mineral delivery",
+        "materials": 10,
+        "minerals": 18,
+        "modules": 3,
+        "refined": 0
+      },
+      {
+        "frame": 201,
+        "jobs": 0,
+        "label": "refinery built",
+        "materials": 3,
+        "minerals": 18,
+        "modules": 4,
+        "refined": 0
+      },
+      {
+        "frame": 242,
+        "jobs": 0,
+        "label": "first refined batch",
+        "materials": 9,
+        "minerals": 16,
+        "modules": 4,
+        "refined": 6
+      }
+    ]
+  }
+}

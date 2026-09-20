@@ -1,0 +1,30 @@
+{
+  "duration_ms": 1630,
+  "errors_seen": [],
+  "finished": true,
+  "frame_warnings": [],
+  "frames": [
+    "decommission_module.jpg",
+    "decommission_ship.jpg",
+    "full_station_recovered.jpg"
+  ],
+  "reports": {
+    "checks": {
+      "busy_miner_before_sale": true,
+      "debris_collection": true,
+      "demolish_action_available_at_zero_power": true,
+      "full_station_at_zero": true,
+      "full_station_ui_demolition": true,
+      "full_station_ui_recovered": true,
+      "runtime_2d": true,
+      "supply_advances_without_views": true,
+      "ui_busy_mission_release": true,
+      "ui_demolition_refund_and_space": true,
+      "ui_rebuild_solar_recovery": true,
+      "ui_scout_sale_releases_sector": true,
+      "ui_ship_sale": true,
+      "views_rehydrate_without_spawning": true,
+      "zero_power_reproduced": true
+    }
+  }
+}

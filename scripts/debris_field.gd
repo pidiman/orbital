@@ -1,35 +1,27 @@
 extends Node2D
 signal salvaged(amount: int, point: Vector2)
 signal full_storage
-var model: StationModel
+const Supply = preload("res://scripts/sector_supply.gd")
+var supply: Supply
+# Projected snapshots only; authority lives in SectorSupply.
 var pieces: Array[Dictionary] = []
-var spawn_elapsed: float = 0.0
-var next_id: int = 0
 var debris_count: int = 0
 
 func _ready() -> void:
-	for i in range(5):
-		_spawn(true)
+	_sync_view()
 
-func _spawn(initial: bool = false) -> void:
-	var area: Vector2 = get_viewport_rect().size
-	next_id += 1
-	pieces.append({"id": next_id, "point": Vector2(randf_range(65, area.x - 380) if initial else -30.0, randf_range(145, area.y - 110)), "velocity": Vector2(randf_range(13, 23), randf_range(-5, 5)), "angle": randf_range(0, TAU), "amount": randi_range(8, 14)})
-	debris_count = pieces.size()
-
-func _process(delta: float) -> void:
-	spawn_elapsed += delta
-	if spawn_elapsed >= 3.0:
-		spawn_elapsed -= 3.0
-		if pieces.size() < 12:
-			_spawn()
-	var area: Vector2 = get_viewport_rect().size
-	for piece: Dictionary in pieces:
-		piece.point += piece.velocity * delta
-		piece.angle += delta * 0.20
-	pieces = pieces.filter(func(p: Dictionary) -> bool: return p.point.x < area.x - 340 and p.point.y > 112 and p.point.y < area.y - 80)
-	debris_count = pieces.size()
+func _process(_delta: float) -> void:
+	_sync_view()
 	queue_redraw()
+
+func _sync_view() -> void:
+	pieces.clear()
+	var area: Vector2 = get_viewport_rect().size
+	for debris_id: int in supply.debris:
+		var source: Dictionary = supply.debris[debris_id]
+		var point := Vector2(source.position.x * (area.x - 380.0), 145.0 + source.position.y * (area.y - 255.0))
+		pieces.append({"id": debris_id, "point": point, "angle": fmod(debris_id * 2.399, TAU) + supply.elapsed * 0.2})
+	debris_count = pieces.size()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
@@ -37,15 +29,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	for i in range(pieces.size() - 1, -1, -1):
 		var piece: Dictionary = pieces[i]
 		if event.position.distance_to(piece.point) <= 27:
-			var collected: int = model.collect(piece.amount)
+			var collected: int = supply.salvage(int(piece.id))
 			if collected == 0:
 				full_storage.emit()
 			else:
-				piece.amount -= collected
 				salvaged.emit(collected, piece.point)
-				if piece.amount == 0:
-					pieces.remove_at(i)
-			debris_count = pieces.size()
+			_sync_view()
 			get_viewport().set_input_as_handled()
 			queue_redraw()
 			return

@@ -113,3 +113,9 @@ Use **Sector map / Exploration** beneath the build tabs. Select a destination an
 `data/sectors.json` defines IDs, home routes, travel times and typed contents. `data/ships.json` defines Scout travel speed; module definitions stay unchanged. Discovery targets are created by the fleet model, retain sector provenance and remain mineable until depleted. Home-orbit rocks still spawn/drift independently. The sector map is a separate 2D Control script; station coordinates and Earth rendering are unchanged.
 
 Verification: 72/72 combined model checks (including exploration, ships/upgrades and continuous positions), 29/29 Phase 1 model checks, and the station economy regression passed. Mouse-driven playthroughs: exploration 20/20, MVP 10/10, mining 18/18, ships/upgrades/positioning 25/25. Verified travel delay, hidden contents, discovery, Miner assignment, 18-Mineral payout, continued mining, anomaly/empty results, concurrency, duplicate rejection and depletion. Evidence: `docs/phase3-*-results.json` and `docs/exploration-*.jpg`.
+
+## Recovery and simulation-owned supply
+
+Inspect a module → **Demolish**, or Ships → **Decommission**, for a 50% Materials refund and released power/position. Busy missions are cancelled safely. The original habitat is protected; generator removal cannot cause a power deficit. Stock and refunds survive removal of Storage, even above capacity.
+
+Salvage and home-asteroid spawning/lifecycle now run in the RefCounted `SectorSupply`, independently of rendering. Tune `data/supply.json` and `data/decommission.json`; definitions may override refund ratios. See [health-fix architecture and verification](docs/health-fixes.md). Run `tests/test_ships_upgrades.gd` for the combined model suite, including renderer-free supply and recovery checks.
