@@ -1,4 +1,7 @@
 extends CanvasLayer
+const SectorMap = preload("res://scripts/sector_map.gd")
+var sector_map: PanelContainer
+var map_button: Button
 const Fleet = preload("res://scripts/mining_fleet.gd")
 signal tool_selected(kind: String)
 signal ship_assignment_requested(ship_id: int)
@@ -122,6 +125,11 @@ func _ready() -> void:
 		tool_buttons[kind] = button
 	_build_ships_page()
 	_build_upgrade_page()
+	map_button = Button.new()
+	map_button.text = "Sector map / Exploration"
+	map_button.custom_minimum_size.y = 34
+	map_button.pressed.connect(func() -> void: sector_map.open_map())
+	column.add_child(map_button)
 	var cancel := Button.new()
 	cancel.name = "CancelButton"
 	cancel.text = "Inspect / cancel command"
@@ -156,6 +164,10 @@ func _ready() -> void:
 	orbit_label.position = Vector2(42, 0)
 	orbit_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	orbit_label.position = Vector2(42, get_viewport().get_visible_rect().size.y - 124)
+	sector_map = SectorMap.new()
+	sector_map.hud = self
+	sector_map.fleet = fleet
+	root.add_child(sector_map)
 	model.changed.connect(refresh)
 	fleet.changed.connect(refresh)
 	model.level_reached.connect(_level_up)
@@ -293,7 +305,7 @@ func _build_ships_page() -> void:
 	ship_rows = VBoxContainer.new()
 	ship_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(ship_rows)
-	var hint := _label(page, "Assign a Miner, then click an asteroid. Scouts reveal nearby sector placeholders.", 11, MUTED)
+	var hint := _label(page, "Assign a Miner to ore. Open Sector map to choose a Scout destination.", 11, MUTED)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 func _buy_ship(kind: String) -> void:
@@ -321,7 +333,8 @@ func _refresh_ships() -> void:
 			command_buttons[ship_id] = button
 		var command: String = "Assign asteroid" if definition.has("mining") else "Survey sector"
 		if fleet.jobs.has(ship_id):
-			command = "Mining #%d · %ds" % [fleet.jobs[ship_id].target, fleet.jobs[ship_id].remaining]
+			var target: int = fleet.jobs[ship_id].target
+			command = "Mining · %ds" % fleet.jobs[ship_id].remaining if target < 0 else "Mining #%d · %ds" % [target, fleet.jobs[ship_id].remaining]
 		elif fleet.survey_jobs.has(ship_id):
 			command = "Surveying · %ds" % fleet.survey_jobs[ship_id].remaining
 		command_buttons[ship_id].text = "%s #%d · %s" % [definition.name, ship_id, command]
@@ -335,7 +348,7 @@ func _command_ship(ship_id: int) -> void:
 		message("Miner #%d selected. Click a violet asteroid; mining repeats until depleted." % ship_id, false, 8.0)
 	else:
 		var error: String = fleet.survey(ship_id)
-		message("Scout surveying. Nearby ore will be revealed shortly." if error.is_empty() else error, not error.is_empty())
+		message("Scout exploring the next sector. Open Sector map to view its destination." if error.is_empty() else error, not error.is_empty())
 
 func _build_upgrade_page() -> void:
 	var page := VBoxContainer.new()

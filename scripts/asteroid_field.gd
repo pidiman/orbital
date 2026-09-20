@@ -34,7 +34,7 @@ func _process(delta: float) -> void:
 	spawn_elapsed += delta
 	if spawn_elapsed >= spawn_interval:
 		spawn_elapsed = 0.0
-		if rocks.size() < max_asteroids:
+		if home_asteroid_count() < max_asteroids:
 			_spawn()
 	var edge: float = get_viewport_rect().size.x - 378.0
 	for asteroid_id: int in rocks.keys():
@@ -127,20 +127,26 @@ func home_position(unit: Variant) -> Vector2:
 	return Vector2(get_viewport_rect().size.x - 410.0 - int(index / 7.0) * 62, 235 + (index % 7) * 63)
 
 func _on_surveyed(sector: Dictionary) -> void:
-	# Revealed sectors have one rich deposit each; discovery is separate from periodic debris.
-	next_id += 1
-	var point := Vector2(650, 150)
-	var best_gap: float = -1.0
-	for lane_y: float in [150.0, get_viewport_rect().size.y - 126.0]:
-		for lane_x: float in [300.0, 450.0, 600.0, 750.0]:
-			var candidate := Vector2(lane_x, lane_y)
-			var gap: float = 10000.0
-			for existing: Dictionary in rocks.values():
-				gap = minf(gap, candidate.distance_to(existing.point))
-			if gap > best_gap:
-				point = candidate
-				best_gap = gap
-	rocks[next_id] = {"point": point, "speed": 9.0, "angle": 0.2}
-	fleet.register_asteroid(next_id, int(sector.minerals))
+	for asteroid_id: int in sector.get("asteroid_ids", []):
+		var point := Vector2(650, 150)
+		var best_gap: float = -1.0
+		for lane_y: float in [230.0, get_viewport_rect().size.y - 206.0]:
+			for lane_x: float in [300.0, 450.0, 600.0, 750.0]:
+				var candidate := Vector2(lane_x, lane_y)
+				var gap: float = 10000.0
+				for existing: Dictionary in rocks.values():
+					gap = minf(gap, candidate.distance_to(existing.point))
+				if gap > best_gap:
+					point = candidate
+					best_gap = gap
+		# A projected discovery marker stays available; it is not a drifting home rock.
+		rocks[asteroid_id] = {"point": point, "speed": 0.0, "angle": 0.2}
 	asteroid_count = rocks.size()
-	notice.emit("%s revealed: a %d-Mineral asteroid is now visible." % [sector.name, sector.minerals], false)
+	notice.emit("%s revealed. Open Sector map for the discovery report." % sector.name, false)
+
+func home_asteroid_count() -> int:
+	var count: int = 0
+	for asteroid_id: int in rocks:
+		if asteroid_id > 0:
+			count += 1
+	return count

@@ -35,3 +35,7 @@ Habitat, Solar Panel, Storage and Refinery support one upgrade from T1 to T2. In
 ## Positioning contract
 
 Module centers are continuous Vector2 world coordinates, never locked grid indices. The visible grid is a board/input snapping helper; world geometry handles placement and the board handles projection. Default snapping, 2D visuals, and Earth stay unchanged. See `docs/positioning.md`.
+
+## Phase 3: nearby exploration
+
+A sector map lists reachable destinations from Home orbit. Owned Scouts reveal a selected sector after a travel timer: persistent mineable asteroid deposits, anomaly records (placeholder only), or empty space. Miners can be assigned directly from the discovery report. Sector routes, times and contents are data-driven. Existing colony systems, continuous Vector2 coordinates, 2D rendering and Earth remain intact.

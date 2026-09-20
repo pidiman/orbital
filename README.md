@@ -98,3 +98,18 @@ The Earth source `scripts/space_backdrop.gd` is unchanged (SHA256 `8e0ad4e005111
 ### Continuous positions
 
 Module positions now use continuous `Vector2` world coordinates. Grid snapping is confined to the board/input layer and remains enabled by default. See [positioning architecture and verification](docs/positioning.md).
+
+## Phase 3 — Nearby exploration
+
+Use **Sector map / Exploration** beneath the build tabs. Select a destination and Scout, then **Send Scout**. The map shows unexplored, exploring (countdown/progress), and revealed states. Scouts return to idle after arrival. Select a Miner and **Mine deposit** in a revealed sector; the existing automatic mining loop credits Minerals until depletion. The Phase 2 quick-survey command remains available.
+
+| Sector | Travel (standard Scout) | Discovery |
+| --- | --- | --- |
+| Dawn arc | 5 seconds | 54-Mineral asteroid |
+| Twilight arc | 7 seconds | 54-Mineral asteroid |
+| Echo pocket | 6 seconds | Anomaly report; future-content placeholder |
+| Quiet reach | 4 seconds | Empty |
+
+`data/sectors.json` defines IDs, home routes, travel times and typed contents. `data/ships.json` defines Scout travel speed; module definitions stay unchanged. Discovery targets are created by the fleet model, retain sector provenance and remain mineable until depleted. Home-orbit rocks still spawn/drift independently. The sector map is a separate 2D Control script; station coordinates and Earth rendering are unchanged.
+
+Verification: 72/72 combined model checks (including exploration, ships/upgrades and continuous positions), 29/29 Phase 1 model checks, and the station economy regression passed. Mouse-driven playthroughs: exploration 20/20, MVP 10/10, mining 18/18, ships/upgrades/positioning 25/25. Verified travel delay, hidden contents, discovery, Miner assignment, 18-Mineral payout, continued mining, anomaly/empty results, concurrency, duplicate rejection and depletion. Evidence: `docs/phase3-*-results.json` and `docs/exploration-*.jpg`.

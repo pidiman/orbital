@@ -53,9 +53,13 @@ func _initialize() -> void:
 	model.tick()
 	check(fleet.revealed_count() == 2 and fleet.survey_jobs.is_empty(), "adjacent sector revealed")
 	check(fleet.survey(scout).is_empty(), "next sector can be surveyed")
-	for i in range(5):
+	for i in range(int(fleet.survey_jobs[scout].duration)):
 		model.tick()
-	check(fleet.revealed_count() == 3 and not fleet.survey(scout).is_empty(), "all sectors revealed once")
+	while fleet.revealed_count() < fleet.sectors.size():
+		check(fleet.survey(scout).is_empty(), "remaining sector survey")
+		for i in range(int(fleet.survey_jobs[scout].duration)):
+			model.tick()
+	check(fleet.revealed_count() == fleet.sectors.size() and not fleet.survey(scout).is_empty(), "all sectors revealed once")
 	var solar := Vector2(58, 0)
 	model.materials = 0
 	var mineral_snapshot: int = model.minerals
@@ -105,6 +109,7 @@ func _initialize() -> void:
 	check(fleet.dispatch(102).is_empty() and fleet.jobs.has(Vector2(116, 0)), "legacy shortcut still dispatches dock")
 	model.ticked.disconnect(fleet.tick)
 	check_continuous_positions()
+	preload("res://tests/exploration_checks.gd").new().run(check)
 	print("Ships/upgrades checks: %d passed / %d total" % [checks - failures.size(), checks])
 	for failure: String in failures:
 		printerr("FAIL: " + failure)

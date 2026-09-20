@@ -5,7 +5,7 @@
     "power_use": 2,
     "color": "b9a6f5",
     "description": "Assign an asteroid; repeats until depleted.",
-    "effect": "18 minerals / 8s · 2 power",
+    "effect": "18 minerals / 8s \u00b7 2 power",
     "mining": {
       "seconds": 8,
       "yield": 18,
@@ -18,10 +18,11 @@
     "cost": 35,
     "power_use": 1,
     "color": "8bcdf1",
-    "description": "Surveys an adjacent sector and reveals ore.",
-    "effect": "5s survey · 1 power",
+    "description": "Travel to nearby sectors and reveal discoveries.",
+    "effect": "Sector travel \u00b7 1 power",
     "survey": {
-      "seconds": 5
+      "seconds": 5,
+      "travel_speed": 1.0
     },
     "art": "scout"
   }

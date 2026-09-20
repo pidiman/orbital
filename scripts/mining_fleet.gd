@@ -13,6 +13,7 @@ var jobs: Dictionary = {}
 var survey_jobs: Dictionary = {}
 var sectors: Array = []
 var total_mined: int = 0
+var next_discovery_id: int = -1000 # Keep -1 reserved for no-selection sentinels.
 
 func _init(station: StationModel) -> void:
 	model = station
@@ -24,7 +25,7 @@ func register_asteroid(asteroid_id: int, amount: int) -> void:
 		changed.emit()
 
 func remove_asteroid(asteroid_id: int) -> bool:
-	if not asteroids.has(asteroid_id) or asteroids[asteroid_id].claimed:
+	if not asteroids.has(asteroid_id) or asteroids[asteroid_id].claimed or asteroids[asteroid_id].get("persistent", false):
 		return false
 	asteroids.erase(asteroid_id)
 	changed.emit()
@@ -68,22 +69,78 @@ func dispatch(asteroid_id: int, selected_ship: int = -1) -> String:
 		return ""
 	return "Selected Miner is busy." if selected_ship != -1 else "All Mining Ships are busy. Wait for a mission to finish."
 
-func survey(ship_id: int) -> String:
-	if not model.ships.has(ship_id) or not model.ship_catalog[model.ships[ship_id]].has("survey"):
-		return "Select a Scout ship."
-	if survey_jobs.has(ship_id):
-		return "This Scout is already surveying."
-	var reserved: Array = []
+func sector_by_id(sector_id: String) -> Dictionary:
+	for sector: Dictionary in sectors:
+		if sector.id == sector_id:
+			return sector
+	return {}
+
+func sector_state(sector_id: String) -> String:
+	var sector: Dictionary = sector_by_id(sector_id)
+	if sector.is_empty():
+		return "unknown"
+	if sector.revealed:
+		return "revealed"
+	return "exploring" if not sector_job(sector_id).is_empty() else "unexplored"
+
+func sector_job(sector_id: String) -> Dictionary:
 	for job: Dictionary in survey_jobs.values():
-		reserved.append(job.sector)
-	for index in range(sectors.size()):
-		if sectors[index].revealed or reserved.has(index):
-			continue
-		var duration: int = int(model.ship_catalog[model.ships[ship_id]].survey.seconds)
-		survey_jobs[ship_id] = {"sector": index, "remaining": duration, "duration": duration}
-		changed.emit()
-		return ""
-	return "All adjacent sectors are revealed or being surveyed."
+		if job.sector_id == sector_id:
+			return job
+	return {}
+
+func sector_reachable(sector_id: String) -> bool:
+	var sector: Dictionary = sector_by_id(sector_id)
+	return not sector.is_empty() and sector.get("reachable_from", []).has("home")
+
+func travel_duration(ship_id: int, sector_id: String) -> int:
+	var sector: Dictionary = sector_by_id(sector_id)
+	var capability: Dictionary = model.ship_catalog[model.ships[ship_id]].survey
+	return maxi(1, int(ceil(float(sector.get("travel_seconds", capability.seconds)) / float(capability.get("travel_speed", 1.0)))))
+
+func survey_error(ship_id: int, sector_id: String) -> String:
+	if not model.ships.has(ship_id) or not model.ship_catalog[model.ships[ship_id]].has("survey"):
+		return "Build and select a Scout ship."
+	if survey_jobs.has(ship_id):
+		return "This Scout is already exploring."
+	if not sector_reachable(sector_id):
+		return "That sector is not reachable from Home orbit."
+	if sector_state(sector_id) == "revealed":
+		return "This sector is already revealed."
+	if sector_state(sector_id) == "exploring":
+		return "A Scout is already exploring this sector."
+	return ""
+
+# The no-destination shortcut remains available for the Phase 2 ship command.
+func survey(ship_id: int, sector_id: String = "") -> String:
+	if sector_id.is_empty():
+		for sector: Dictionary in sectors:
+			if sector_state(sector.id) == "unexplored" and sector_reachable(sector.id):
+				sector_id = sector.id
+				break
+		if sector_id.is_empty():
+			return "All adjacent sectors are revealed or being explored."
+	var error: String = survey_error(ship_id, sector_id)
+	if not error.is_empty():
+		return error
+	var duration: int = travel_duration(ship_id, sector_id)
+	survey_jobs[ship_id] = {"sector_id": sector_id, "remaining": duration, "duration": duration}
+	changed.emit()
+	return ""
+
+func _reveal(sector_id: String) -> void:
+	var sector: Dictionary = sector_by_id(sector_id)
+	if sector.revealed:
+		return
+	sector.revealed = true
+	sector["asteroid_ids"] = []
+	for content: Dictionary in sector.get("contents", []):
+		if content.type == "asteroid" and int(content.get("minerals", 0)) > 0:
+			var asteroid_id: int = next_discovery_id
+			next_discovery_id -= 1
+			asteroids[asteroid_id] = {"minerals": int(content.minerals), "claimed": false, "persistent": true, "sector_id": sector_id, "name": content.get("name", "Deposit")}
+			sector.asteroid_ids.append(asteroid_id)
+	surveyed.emit(sector)
 
 func revealed_count() -> int:
 	var count: int = 0
@@ -115,7 +172,6 @@ func tick() -> void:
 		var job: Dictionary = survey_jobs[ship_id]
 		job.remaining -= 1
 		if job.remaining <= 0:
-			sectors[job.sector].revealed = true
 			survey_jobs.erase(ship_id)
-			surveyed.emit(sectors[job.sector])
+			_reveal(job.sector_id)
 	changed.emit()

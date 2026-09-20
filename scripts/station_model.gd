@@ -1,6 +1,6 @@
 class_name StationModel
 extends RefCounted
-const StationGeometry = preload("res://scripts/station_geometry.gd")
+const Geometry = preload("res://scripts/station_geometry.gd")
 
 signal changed
 signal ship_built(ship_id: int)
@@ -59,13 +59,13 @@ func tick() -> void:
 func placement_error(world_position: Vector2, kind: String) -> String:
 	if not catalog.has(kind):
 		return "Choose a module first."
-	if not StationGeometry.contains_center(world_position):
+	if not Geometry.contains_center(world_position):
 		return "Build inside the station grid."
 	var connected: bool = false
 	for existing: Vector2 in modules:
-		if StationGeometry.overlaps(world_position, existing):
+		if Geometry.overlaps(world_position, existing):
 			return "This cell already has a module."
-		if StationGeometry.connected(world_position, existing):
+		if Geometry.connected(world_position, existing):
 			connected = true
 	if not connected:
 		return "Connect to an existing module's edge."

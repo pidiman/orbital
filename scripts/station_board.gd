@@ -1,5 +1,5 @@
 extends Node2D
-const StationGeometry = preload("res://scripts/station_geometry.gd")
+const Geometry = preload("res://scripts/station_geometry.gd")
 signal requested_build(world_position: Vector2)
 signal module_selected(world_position: Vector2)
 var model: StationModel
@@ -7,7 +7,7 @@ var selected: String = ""
 var inspected_position: Vector2 = Vector2.INF
 const GRID_RADIUS: int = 4
 var snap_enabled: bool = true
-var snap_spacing: float = StationGeometry.MODULE_SIZE
+var snap_spacing: float = Geometry.MODULE_SIZE
 var cell_size: float = 55.0
 var center: Vector2 = Vector2.ZERO
 var hover_cell: Vector2i = Vector2i(99, 99)
@@ -73,7 +73,7 @@ func _draw() -> void:
 		var world_position: Vector2 = positions[index]
 		for other_index in range(index + 1, positions.size()):
 			var other: Vector2 = positions[other_index]
-			if StationGeometry.connected(world_position, other):
+			if Geometry.connected(world_position, other):
 				draw_line(world_to_screen(world_position), world_to_screen(other), Color("627c8d"), 8)
 	for world_position: Vector2 in model.modules:
 		ModuleArt.draw_module(self, world_to_screen(world_position), model.modules[world_position], cell_size / 58.0)
@@ -97,13 +97,13 @@ func _draw() -> void:
 
 # Presentation/input boundary: no viewport pixels or cell indices enter the model.
 func cell_to_world(cell: Vector2i) -> Vector2:
-	return Vector2(cell) * StationGeometry.MODULE_SIZE
+	return Vector2(cell) * Geometry.MODULE_SIZE
 
 func world_to_screen(world_position: Vector2) -> Vector2:
-	return center + world_position * (cell_size / StationGeometry.MODULE_SIZE)
+	return center + world_position * (cell_size / Geometry.MODULE_SIZE)
 
 func screen_to_world(screen_position: Vector2) -> Vector2:
-	return (screen_position - center) * (StationGeometry.MODULE_SIZE / cell_size)
+	return (screen_position - center) * (Geometry.MODULE_SIZE / cell_size)
 
 func placement_position(screen_position: Vector2) -> Vector2:
 	var world_position: Vector2 = screen_to_world(screen_position)
@@ -115,6 +115,6 @@ func module_at_screen(screen_position: Vector2) -> Vector2:
 	var world_position: Vector2 = screen_to_world(screen_position)
 	for existing: Vector2 in model.modules:
 		var delta: Vector2 = (world_position - existing).abs()
-		if delta.x < StationGeometry.MODULE_SIZE * 0.5 and delta.y < StationGeometry.MODULE_SIZE * 0.5:
+		if delta.x < Geometry.MODULE_SIZE * 0.5 and delta.y < Geometry.MODULE_SIZE * 0.5:
 			return existing
 	return Vector2.INF
