@@ -87,6 +87,22 @@ Missing extensions default to idle ships and zero delivered counts. Validation r
 invalid cargo, foreign-region assignments, duplicate reservations and overlapping fleet
 missions before committing any state. Unknown extension fields remain preserved.
 
+### Bounded trade activity log
+
+The existing `extensions.alien_trade.history` retains the latest 256 completed or
+cancelled trades in recording order, including their original details. Older log
+entries are discarded; faction standing, goods inventory, processed anomaly flags,
+active jobs/escrow and the next trade ID remain independent and unchanged. Valid
+older saves with longer logs are validated in full, then trimmed on restore. The
+save schema stays v2 and the loader limit stays 8 MiB. Already oversized files
+remain subject to that limit.
+
+Regression test: 24,000 actual dispatches, alternating completion and cancellation,
+previously produced a 10,560,350-byte unloadable file. With the cap the same scenario
+retains 256 records and produces a 124,094-byte file, including an active trade, that
+round-trips exactly. Run `tests/trade_history_runner.gd`; these 13 checks also run
+in the existing ships/upgrades suite.
+
 ### Research and gate transport (v2 additive extensions)
 
 `extensions.research` schema 1 stores `researched` (technology IDs mapped to true)

@@ -277,6 +277,9 @@ func restore(document: Variant) -> String:
 		if not error.is_empty():
 			return error
 		_apply_fields(candidate_fleet.diplomacy, trade_data, Trade.FIELDS)
+	# Accept valid older logs, then bound them before committing the candidate.
+	# Validate first so trimming cannot hide corrupt records in the old prefix.
+	candidate_fleet.diplomacy.trim_history()
 	candidate_fleet.diplomacy.add_catalog_defaults()
 	# Old v2 saves have no extension. Add content without resetting discovered ore.
 	candidate_fleet.diplomacy.enrich_sectors(fleet_data.sectors)

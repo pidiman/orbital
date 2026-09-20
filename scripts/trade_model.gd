@@ -5,6 +5,7 @@ signal changed
 signal mission_started
 signal mission_completed(contact_id: String, offer_id: String)
 const FIELDS: Array[String] = ["factions", "contacts", "inventory", "jobs", "history", "processed_anomalies", "next_trade_id"]
+const HISTORY_LIMIT: int = 256
 var model: StationModel
 var faction_catalog: Dictionary
 var alien_catalog: Dictionary
@@ -132,6 +133,13 @@ func _record(job: Dictionary, result: String, standing_delta: int) -> void:
 	entry["tick"] = model.ticks
 	entry["standing_delta"] = standing_delta
 	history.append(entry)
+	trim_history()
+
+# History is only a recent activity log. Progression, one-time reward flags,
+# active escrow and the monotonic ID allocator are stored independently.
+func trim_history() -> void:
+	if history.size() > HISTORY_LIMIT:
+		history = history.slice(history.size() - HISTORY_LIMIT)
 
 func cost_text(cost: Dictionary) -> String:
 	var parts: Array[String] = []
