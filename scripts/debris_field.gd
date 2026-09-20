@@ -16,6 +16,9 @@ func _process(_delta: float) -> void:
 
 func _sync_view() -> void:
 	pieces.clear()
+	if not supply.fleet.regions.primary_station_visible():
+		debris_count = 0
+		return
 	var area: Vector2 = get_viewport_rect().size
 	for debris_id: int in supply.debris:
 		var source: Dictionary = supply.debris[debris_id]
@@ -24,6 +27,8 @@ func _sync_view() -> void:
 	debris_count = pieces.size()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not supply.fleet.regions.primary_station_visible():
+		return
 	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
 		return
 	for i in range(pieces.size() - 1, -1, -1):

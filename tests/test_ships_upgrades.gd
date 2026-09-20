@@ -110,6 +110,8 @@ func _initialize() -> void:
 	model.ticked.disconnect(fleet.tick)
 	preload("res://tests/health_checks.gd").new().run(check)
 	preload("res://tests/persistence_checks.gd").new().run(check)
+	preload("res://tests/trade_checks.gd").new().run(check)
+	preload("res://tests/region_checks.gd").new().run(check)
 	check_continuous_positions()
 	preload("res://tests/exploration_checks.gd").new().run(check)
 	print("Ships/upgrades checks: %d passed / %d total" % [checks - failures.size(), checks])

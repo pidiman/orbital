@@ -1,0 +1,27 @@
+{
+  "quiet_signal": {
+    "sector_id": "echo",
+    "name": "Quiet signal",
+    "description": "A shared relay answers: two alien envoys offer peaceful exchange.",
+    "contacts": {
+      "lumen_envoy": {
+        "name": "Archivist Iri",
+        "faction": "lumen"
+      },
+      "prism_envoy": {
+        "name": "Navigator Venn",
+        "faction": "concord"
+      }
+    },
+    "reward": {}
+  },
+  "ion_chorus": {
+    "sector_id": "twilight",
+    "name": "Ion chorus",
+    "description": "A natural resonance yields one Tech through spectral analysis.",
+    "contacts": {},
+    "reward": {
+      "tech": 1
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "spectral_archive": {
+    "name": "Spectral archive",
+    "description": "Decoded ancient emissions yield research records.",
+    "good": "tech",
+    "amount": [
+      1,
+      2
+    ]
+  },
+  "crystal_remnant": {
+    "name": "Crystal remnant",
+    "description": "A silent crystalline echo yields rare matter.",
+    "good": "xenocrystal",
+    "amount": [
+      1,
+      3
+    ]
+  }
+}

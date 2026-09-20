@@ -1,0 +1,47 @@
+{
+  "archive_data": {
+    "name": "Research exchange",
+    "faction": "lumen",
+    "cost": {
+      "minerals": 18
+    },
+    "goods": {
+      "tech": 1
+    },
+    "standing": 4,
+    "requires_standing": 0
+  },
+  "archive_gift": {
+    "name": "Supply the archive",
+    "faction": "lumen",
+    "cost": {
+      "materials": 20
+    },
+    "goods": {},
+    "standing": 8,
+    "requires_standing": 0
+  },
+  "prism_gift": {
+    "name": "Goodwill cargo",
+    "faction": "concord",
+    "cost": {
+      "materials": 20
+    },
+    "goods": {},
+    "standing": 8,
+    "requires_standing": 0
+  },
+  "prism_crystals": {
+    "name": "Crystal exchange",
+    "faction": "concord",
+    "cost": {
+      "minerals": 12,
+      "materials": 8
+    },
+    "goods": {
+      "xenocrystal": 2
+    },
+    "standing": 3,
+    "requires_standing": 8
+  }
+}

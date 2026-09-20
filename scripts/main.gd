@@ -6,6 +6,9 @@ var save_path: String = SaveStore.DEFAULT_PATH
 var verification_persistence: bool = false
 const Supply = preload("res://scripts/sector_supply.gd")
 var supply: Supply
+const RegionView = preload("res://scripts/region_view.gd")
+var region_view: Node2D
+var background: Node2D
 const Backdrop = preload("res://scripts/space_backdrop.gd")
 const Board = preload("res://scripts/station_board.gd")
 const Debris = preload("res://scripts/debris_field.gd")
@@ -41,9 +44,13 @@ func _ready() -> void:
 		resumed = resume_error.is_empty()
 	process_priority = 1000
 	get_tree().auto_accept_quit = false
-	var background := Backdrop.new()
+	background = Backdrop.new()
 	background.name = "SpaceBackdrop"
 	add_child(background)
+	region_view = RegionView.new()
+	region_view.name = "RegionView"
+	region_view.regions = fleet.regions
+	add_child(region_view)
 	board = Board.new()
 	board.name = "StationBoard"
 	board.model = model
@@ -82,6 +89,9 @@ func _ready() -> void:
 	persistence.failed.connect(_save_failure)
 	hud.save_requested.connect(_manual_save)
 	hud.load_requested.connect(_manual_load)
+	fleet.regions.location_changed.connect(_update_region_view)
+	fleet.regions.discovered.connect(_region_discovered)
+	_update_region_view()
 	_sync_readouts()
 	if resumed:
 		hud.message("Colony restored from your latest checkpoint.", false, 7.0)
@@ -135,6 +145,7 @@ func _restore_presentation() -> void:
 	asteroids._sync_view()
 	debris._sync_view()
 	hud.reset_after_load()
+	_update_region_view()
 	_sync_readouts()
 
 func _notification(what: int) -> void:
@@ -148,3 +159,25 @@ func _exit_tree() -> void:
 func _save_on_exit() -> void:
 	if persistence != null and persistence.enabled and not persistence.autosave_blocked:
 		persistence.save_game()
+
+func _update_region_view() -> void:
+	var home: bool = fleet.regions.primary_station_visible()
+	background.visible = home
+	region_view.visible = not home
+	region_view.queue_redraw()
+	board.visible = home
+	board.set_process_unhandled_input(home)
+	debris.visible = home
+	debris.set_process_unhandled_input(home)
+	board.selected = ""
+	board.inspected_position = Vector2.INF
+	asteroids.selected_ship = -1
+	asteroids.rocks.clear()
+	asteroids._sync_view()
+	debris._sync_view()
+	hud.choose("")
+	hud.selected_position = Vector2.INF
+	hud.refresh()
+
+func _region_discovered(region_id: String) -> void:
+	hud.message("%s surveyed. Jump unlocked; deposits and anomaly findings recorded." % fleet.regions.catalog[region_id].name, false, 8.0)

@@ -1,4 +1,5 @@
 extends Node2D
+const RegionView = preload("res://scripts/region_view.gd")
 const Fleet = preload("res://scripts/mining_fleet.gd")
 signal notice(text: String, error: bool)
 signal minerals_delivered(amount: int, point: Vector2)
@@ -30,16 +31,16 @@ func _process(_delta: float) -> void:
 func _sync_view() -> void:
 	var area: Vector2 = get_viewport_rect().size
 	for asteroid_id: int in rocks.keys():
-		if not fleet.asteroids.has(asteroid_id):
+		if not fleet.asteroids.has(asteroid_id) or fleet.asteroid_region(asteroid_id) != fleet.regions.current_region:
 			rocks.erase(asteroid_id)
 	for asteroid_id: int in supply.home_asteroids:
-		if not fleet.asteroids.has(asteroid_id):
+		if not fleet.asteroids.has(asteroid_id) or fleet.asteroid_region(asteroid_id) != fleet.regions.current_region:
 			continue
 		var source: Dictionary = supply.home_asteroids[asteroid_id]
 		rocks[asteroid_id] = {"point": Vector2(source.position.x * (area.x - 380.0), 150.0 + source.position.y * (area.y - 276.0)), "angle": fmod(asteroid_id * 2.399, TAU) + supply.elapsed * 0.06}
 	# Reconstruct discovered markers from model state, even after recreating the view.
 	for asteroid_id: int in fleet.asteroids:
-		if fleet.asteroids[asteroid_id].get("persistent", false):
+		if fleet.asteroids[asteroid_id].get("persistent", false) and fleet.asteroid_region(asteroid_id) == fleet.regions.current_region:
 			_add_discovery_marker(asteroid_id)
 	asteroid_count = rocks.size()
 
@@ -66,13 +67,18 @@ func _on_completed(unit: Variant, asteroid_id: int, amount: int) -> void:
 func _draw() -> void:
 	for ship_id: int in fleet.model.ships:
 		var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
-		if not fleet.jobs.has(ship_id):
+		if not fleet.jobs.has(ship_id) and fleet.regions.primary_station_visible():
 			var point: Vector2 = home_position(ship_id)
 			ModuleArt.draw_module(self, point, definition.get("art", "scout"), 0.55)
 			var text: String = "%s #%d" % [definition.name, ship_id]
-			if fleet.survey_jobs.has(ship_id):
+			if fleet.regions.survey_jobs.has(ship_id):
+				text = "Scouting %ds" % fleet.regions.survey_jobs[ship_id].remaining
+			elif fleet.survey_jobs.has(ship_id):
 				text = "Survey %ds" % fleet.survey_jobs[ship_id].remaining
 				draw_arc(point, 26, 0, TAU, 32, Color("8bcdf1"), 1.5, true)
+			elif fleet.diplomacy.jobs.has(ship_id):
+				text = "Trade %ds" % fleet.diplomacy.jobs[ship_id].remaining
+				draw_arc(point, 26, 0, TAU, 32, Color("eebd76"), 1.5, true)
 			draw_string(font, point + Vector2(-28, 30), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(definition.color))
 	for unit: Variant in fleet.jobs:
 		var job: Dictionary = fleet.jobs[unit]
@@ -88,7 +94,7 @@ func _draw() -> void:
 		draw_arc(target, 34.0, -PI / 2, -PI / 2 + TAU * maxf(0.01, progress), 48, ORE, 3.0, true)
 		draw_string(font, target + Vector2(-21, 51), "%ds" % job.remaining, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ORE)
 	for asteroid_id: int in rocks:
-		if not fleet.asteroids.has(asteroid_id):
+		if not fleet.asteroids.has(asteroid_id) or fleet.asteroid_region(asteroid_id) != fleet.regions.current_region:
 			continue
 		var rock: Dictionary = rocks[asteroid_id]
 		var point: Vector2 = rock.point
@@ -117,6 +123,9 @@ func _on_surveyed(sector: Dictionary) -> void:
 	notice.emit("%s revealed. Open Sector map for the discovery report." % sector.name, false)
 
 func _add_discovery_marker(asteroid_id: int) -> void:
+	if fleet.asteroids[asteroid_id].has("region_id"):
+		rocks[asteroid_id] = {"point": RegionView.project(fleet.asteroids[asteroid_id].position, get_viewport_rect().size), "angle": 0.2}
+		return
 	var logical: Vector2 = fleet.asteroids[asteroid_id].get("position", Fleet.discovery_position(asteroid_id))
 	var area: Vector2 = get_viewport_rect().size
 	rocks[asteroid_id] = {"point": Vector2(logical.x * (area.x - 380.0), 230.0 + logical.y * (area.y - 436.0)), "angle": 0.2}

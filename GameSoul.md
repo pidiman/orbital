@@ -47,3 +47,9 @@ Placed modules and owned ships can be decommissioned for partial Materials refun
 ## Persistence contract
 
 A versioned JSON checkpoint in user:// stores presentation-independent station, fleet and supply state, including continuous positions, tiers, resource/colony values, active jobs, discovery records, supply RNG and fractional timer phases. Save/Load are mouse controls; autosave follows meaningful actions and periodic progress, and startup resumes the latest checkpoint. Extensions preserve future Phase 4 data; incompatible/corrupt saves are rejected before mutation. No offline progress or transient UI-state persistence.
+
+## Phase 4: alien contacts and trade
+
+Echo pocket's Quiet signal reveals the Lumen Archive and Prism Concord, both initially neutral. Twilight's natural Ion chorus grants one Tech once. Trade Ships cost 50 Materials / 2 Power and carry paid cargo on seven-tick voyages. Research exchange costs 18 Minerals for one Tech and four standing; goodwill costs 20 Materials for eight standing; Concord's rare exchange requires eight standing and costs 12 Minerals + 8 Materials for two Xenocrystals and three standing. Standing caps at 100. Research/fabrication spending remains future scope.
+
+Faction, alien/anomaly, goods, offer and ship catalogs are JSON. AlienTradeModel owns contacts, standing, inventory, escrow/jobs, processed anomalies and history without rendering. HUD commands iterate supported capabilities; fleet-wide occupancy prevents hybrid double booking. Decommissioning refunds prepaid cargo. Save v2 adds extensions.alien_trade schema 1; old saves gain defaults and their already-discovered contacts, idempotently. Earth/orbit and 2D scene remain unchanged.

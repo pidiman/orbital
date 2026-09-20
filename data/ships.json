@@ -25,5 +25,17 @@
       "travel_speed": 1.0
     },
     "art": "scout"
+  },
+  "trader": {
+    "name": "Trade Ship",
+    "cost": 50,
+    "power_use": 2,
+    "color": "eebd76",
+    "description": "Carry cargo to alien contacts; earn goods and standing.",
+    "effect": "Contact trade \u00b7 2 power",
+    "trade": {
+      "seconds": 7
+    },
+    "art": "trader"
   }
 }

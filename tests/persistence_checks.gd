@@ -78,7 +78,7 @@ func run(check: Callable) -> void:
 	legacy.min_reader_version = 1
 	legacy.state.station.erase("tick_elapsed")
 	legacy.erase("extensions")
-	check.call(loaded.restore(legacy).is_empty() and loaded.model.tick_elapsed == 0 and loaded.snapshot().version == 2 and loaded.snapshot().extensions.is_empty(), "v1 to v2 migration adds clock phase and extensions")
+	check.call(loaded.restore(legacy).is_empty() and loaded.model.tick_elapsed == 0 and loaded.snapshot().version == 2 and loaded.snapshot().extensions.alien_trade.schema_version == 1, "v1 to v2 migration adds clock phase and extensions")
 	var intact: Dictionary = loaded.snapshot()
 	var incompatible: Dictionary = before.duplicate(true)
 	incompatible.version = 3

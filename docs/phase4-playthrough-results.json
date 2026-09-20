@@ -1,0 +1,353 @@
+{
+  "playthrough": {
+    "duration_ms": 1181,
+    "errors_seen": [],
+    "finished": true,
+    "frame_warnings": [],
+    "frames": [
+      "start.jpg",
+      "colony.jpg"
+    ],
+    "reports": {
+      "checks": {
+        "clock_ticking": true,
+        "debris_collection": true,
+        "disconnected_no_spend": true,
+        "goal_reached": true,
+        "habitat_placed": true,
+        "materials_rejection_no_spend": true,
+        "occupied_no_spend": true,
+        "power_rejection_no_spend": true,
+        "solar_placed": true,
+        "storage_placed": true
+      },
+      "end_frame": 337,
+      "materials": 7,
+      "module_count": 9,
+      "power_balance": 28,
+      "start_frame": 3
+    }
+  },
+  "mining_playthrough": {
+    "duration_ms": 1314,
+    "errors_seen": [],
+    "finished": true,
+    "frame_warnings": [],
+    "frames": [
+      "mining_in_progress.jpg",
+      "minerals_delivered.jpg",
+      "refining_complete.jpg"
+    ],
+    "reports": {
+      "checks": {
+        "all_five_buttons_visible": true,
+        "asteroid_click_dispatches": true,
+        "asteroid_click_does_not_build": true,
+        "asteroid_requires_ship": true,
+        "asteroids_drift": true,
+        "debris_collection": true,
+        "depleted_asteroid_removed": true,
+        "duplicate_click_no_extra_mission": true,
+        "minerals_delivered": true,
+        "minerals_hud_updates": true,
+        "mining_is_timed": true,
+        "periodic_asteroids_spawn": true,
+        "refined_materials_hud_updates": true,
+        "refinery_built_and_powered": true,
+        "refining_converts_exact_resources": true,
+        "refining_is_timed": true,
+        "returned_ship_can_dispatch_again": true,
+        "ship_built_with_cost_and_power": true
+      },
+      "timeline": [
+        {
+          "frame": 3,
+          "jobs": 0,
+          "label": "fresh game",
+          "materials": 40,
+          "minerals": 0,
+          "modules": 1,
+          "refined": 0
+        },
+        {
+          "frame": 33,
+          "jobs": 0,
+          "label": "ship built",
+          "materials": 5,
+          "minerals": 0,
+          "modules": 3,
+          "refined": 0
+        },
+        {
+          "frame": 36,
+          "jobs": 1,
+          "label": "mission launched",
+          "materials": 5,
+          "minerals": 0,
+          "modules": 3,
+          "refined": 0
+        },
+        {
+          "frame": 184,
+          "jobs": 0,
+          "label": "mineral delivery",
+          "materials": 5,
+          "minerals": 18,
+          "modules": 3,
+          "refined": 0
+        },
+        {
+          "frame": 204,
+          "jobs": 0,
+          "label": "refinery built",
+          "materials": 7,
+          "minerals": 18,
+          "modules": 4,
+          "refined": 0
+        },
+        {
+          "frame": 243,
+          "jobs": 0,
+          "label": "first refined batch",
+          "materials": 13,
+          "minerals": 16,
+          "modules": 4,
+          "refined": 6
+        }
+      ]
+    }
+  },
+  "ships_upgrades_playthrough": {
+    "duration_ms": 2027,
+    "errors_seen": [],
+    "finished": true,
+    "frame_warnings": [],
+    "frames": [
+      "miner_assigned.jpg",
+      "upgrade_before.jpg",
+      "upgrade_after.jpg"
+    ],
+    "reports": {
+      "checks": {
+        "assigned_target_reserved": true,
+        "assignment_retained": true,
+        "debris_collection": true,
+        "default_grid_snap_unchanged": true,
+        "explicit_miner_selected": true,
+        "first_cycle_credited": true,
+        "independent_miner_purchased": true,
+        "module_inspector_opens": true,
+        "no_upgrade_module_count_bonus": true,
+        "not_instant_mining": true,
+        "projection_resize_independent": true,
+        "runtime_entirely_2d": true,
+        "scout_purchased": true,
+        "scout_reveals_rich_asteroid": true,
+        "scout_reveals_sector": true,
+        "scout_survey_started": true,
+        "second_cycle_without_click": true,
+        "ship_uses_power_not_grid": true,
+        "ships_have_separate_page": true,
+        "snap_can_be_disabled": true,
+        "tier_and_max_shown": true,
+        "upgrade_applies_stats": true,
+        "upgrade_cost_visible": true,
+        "upgrade_pays_both_costs": true,
+        "world_projection_roundtrip": true
+      },
+      "timeline": [
+        {
+          "frame": 3,
+          "label": "fresh game",
+          "materials": 40,
+          "mined": 0,
+          "minerals": 0,
+          "modules": 1,
+          "power": 1,
+          "ships": 0
+        },
+        {
+          "frame": 24,
+          "label": "miner purchased",
+          "materials": 5,
+          "mined": 0,
+          "minerals": 0,
+          "modules": 2,
+          "power": 4,
+          "ships": 1
+        },
+        {
+          "frame": 331,
+          "label": "assigned rich asteroid",
+          "materials": 36,
+          "mined": 0,
+          "minerals": 0,
+          "modules": 2,
+          "power": 3,
+          "ships": 2
+        },
+        {
+          "frame": 483,
+          "label": "first automatic cycle",
+          "materials": 36,
+          "mined": 18,
+          "minerals": 18,
+          "modules": 2,
+          "power": 3,
+          "ships": 2
+        },
+        {
+          "frame": 643,
+          "label": "second cycle without input",
+          "materials": 36,
+          "mined": 36,
+          "minerals": 36,
+          "modules": 2,
+          "power": 3,
+          "ships": 2
+        },
+        {
+          "frame": 651,
+          "label": "solar upgraded",
+          "materials": 6,
+          "mined": 36,
+          "minerals": 28,
+          "modules": 2,
+          "power": 7,
+          "ships": 2
+        }
+      ]
+    }
+  },
+  "health_playthrough": {
+    "duration_ms": 894,
+    "errors_seen": [],
+    "finished": true,
+    "frame_warnings": [],
+    "frames": [
+      "decommission_module.jpg",
+      "decommission_ship.jpg",
+      "full_station_recovered.jpg"
+    ],
+    "reports": {
+      "checks": {
+        "busy_miner_before_sale": true,
+        "debris_collection": true,
+        "demolish_action_available_at_zero_power": true,
+        "full_station_at_zero": true,
+        "full_station_ui_demolition": true,
+        "full_station_ui_recovered": true,
+        "runtime_2d": true,
+        "supply_advances_without_views": true,
+        "ui_busy_mission_release": true,
+        "ui_demolition_refund_and_space": true,
+        "ui_rebuild_solar_recovery": true,
+        "ui_scout_sale_releases_sector": true,
+        "ui_ship_sale": true,
+        "views_rehydrate_without_spawning": true,
+        "zero_power_reproduced": true
+      }
+    }
+  },
+  "persistence_playthrough": {
+    "duration_ms": 1007,
+    "errors_seen": [],
+    "finished": true,
+    "frame_warnings": [],
+    "frames": [
+      "saved_active_jobs.jpg",
+      "loaded_active_jobs.jpg",
+      "resumed_jobs_complete.jpg"
+    ],
+    "reports": {
+      "checks": {
+        "active_jobs_before_save": true,
+        "build_autosaves": true,
+        "debris_collection": true,
+        "discovery_autosave_runs": true,
+        "entire_runtime_2d": true,
+        "fresh_start_auto_resumes_exact_state": true,
+        "graceful_exit_saves_last_state": true,
+        "load_button_restores_exact_state": true,
+        "load_refreshes_hud_and_views": true,
+        "load_restores_jobs_and_ids": true,
+        "restored_jobs_complete": true,
+        "resume_status_visible": true,
+        "save_button_feedback": true,
+        "session_changed_after_save": true,
+        "verification_isolated_from_player_save": true
+      }
+    }
+  },
+  "trade_playthrough": {
+    "duration_ms": 2849,
+    "errors_seen": [],
+    "finished": true,
+    "frame_warnings": [],
+    "frames": [
+      "trade_in_transit.jpg",
+      "alien_trade_complete.jpg"
+    ],
+    "reports": {
+      "checks": {
+        "active_trade_save_load_exact": true,
+        "alien_anomaly_reveals_contacts": true,
+        "anomaly_travel_timer": true,
+        "busy_button_prevents_double_spend": true,
+        "completed_trade_rewards": true,
+        "completed_trade_save_load_exact": true,
+        "completion_autosaved": true,
+        "contact_ui_visible_and_fits": true,
+        "debris_collection": true,
+        "entire_runtime_2d": true,
+        "hybrid_has_three_independent_commands": true,
+        "isolated_from_player_checkpoint": true,
+        "load_rebuilds_contacts_and_timer": true,
+        "mining_still_works": true,
+        "neutral_standing_visible": true,
+        "standing_inventory_history_visible": true,
+        "trade_has_own_action": true,
+        "trade_launch_spends_minerals": true,
+        "trader_built_cost_power": true,
+        "travel_ui_and_no_early_reward": true,
+        "version_remains_v2": true
+      }
+    }
+  },
+  "exploration_playthrough": {
+    "duration_ms": 1806,
+    "errors_seen": [],
+    "finished": true,
+    "frame_warnings": [],
+    "frames": [
+      "exploring.jpg",
+      "discovery.jpg",
+      "discovery_mining.jpg",
+      "anomaly.jpg"
+    ],
+    "reports": {
+      "checks": {
+        "anomaly_report": true,
+        "auto_mining_continues": true,
+        "debris_collection": true,
+        "discovered_ore_delivered": true,
+        "empty_report": true,
+        "exploring_state_and_timer": true,
+        "map_closes": true,
+        "map_open_and_fits": true,
+        "map_ore_updates": true,
+        "miner_assigned_discovery": true,
+        "miner_built": true,
+        "no_miner_button_disabled": true,
+        "revealed_report_and_target": true,
+        "runtime_entirely_2d": true,
+        "scout_and_travel_visible": true,
+        "scout_built": true,
+        "scout_returned_no_duplicate": true,
+        "selected_scout_launched": true,
+        "travel_not_instant": true,
+        "unexplored_contents_hidden": true
+      }
+    }
+  }
+}

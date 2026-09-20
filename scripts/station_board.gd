@@ -42,6 +42,8 @@ func _on_built(world_position: Vector2, _kind: String) -> void:
 	pulses.append({"position": world_position, "time": 0.0})
 
 func _unhandled_input(event: InputEvent) -> void:
+	if model.region_context != null and not model.region_context.primary_station_visible():
+		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if not selected.is_empty():
 			requested_build.emit(placement_position(event.position))

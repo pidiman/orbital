@@ -1,5 +1,7 @@
 class_name OrbitalSaveStore
 extends RefCounted
+const Regions = preload("res://scripts/region_model.gd")
+const Trade = preload("res://scripts/trade_model.gd")
 const Fleet = preload("res://scripts/mining_fleet.gd")
 const Supply = preload("res://scripts/sector_supply.gd")
 const VERSION: int = 2
@@ -36,6 +38,11 @@ func _init(station: StationModel, mining: Fleet, sector_supply: Supply) -> void:
 	fleet.survey_started.connect(request_autosave.unbind(2))
 	fleet.dispatched.connect(request_autosave.unbind(2))
 	fleet.completed.connect(request_autosave.unbind(3))
+	fleet.regions.survey_started.connect(request_autosave)
+	fleet.regions.location_changed.connect(request_autosave)
+	fleet.regions.discovered.connect(request_autosave.unbind(1))
+	fleet.diplomacy.mission_started.connect(request_autosave)
+	fleet.diplomacy.mission_completed.connect(request_autosave.unbind(2))
 
 func request_autosave() -> void:
 	dirty = true
@@ -54,6 +61,10 @@ func snapshot() -> Dictionary:
 	document["min_reader_version"] = int(document.get("min_reader_version", VERSION))
 	if not document.has("extensions"):
 		document["extensions"] = {}
+	_merge_fields(document.extensions, "regions", fleet.regions, Regions.FIELDS)
+	document.extensions.regions["schema_version"] = 1
+	_merge_fields(document.extensions, "alien_trade", fleet.diplomacy, Trade.FIELDS)
+	document.extensions.alien_trade["schema_version"] = 1
 	if not document.has("state"):
 		document["state"] = {}
 	_merge_fields(document.state, "station", model, STATION_FIELDS)
@@ -237,10 +248,52 @@ func restore(document: Variant) -> String:
 	candidate.recalculate()
 	if candidate.power_output != int(station_data.power_output) or candidate.power_use != int(station_data.power_use) or candidate.capacity != int(station_data.capacity) or candidate.level != int(station_data.level):
 		return "Saved economy disagrees with installed module/ship definitions."
+	var trade_data: Dictionary = {}
+	var extension: Variant = migrated.get("extensions", {}).get("alien_trade", {})
+	if not extension is Dictionary:
+		return "Invalid alien trade extension."
+	if migrated.get("extensions", {}).has("alien_trade"):
+		if extension.get("schema_version") != 1:
+			return "This alien trade extension requires a newer reader."
+		trade_data = _decode_fields(extension, Trade.FIELDS)
+		if not decode_error.is_empty():
+			return decode_error
+		error = _field_types(trade_data, candidate_fleet.diplomacy, Trade.FIELDS)
+		if not error.is_empty():
+			return error
+		error = candidate_fleet.diplomacy.validate(trade_data, station_data, fleet_data)
+		if not error.is_empty():
+			return error
+		_apply_fields(candidate_fleet.diplomacy, trade_data, Trade.FIELDS)
+	candidate_fleet.diplomacy.add_catalog_defaults()
+	# Old v2 saves have no extension. Add content without resetting discovered ore.
+	candidate_fleet.diplomacy.enrich_sectors(fleet_data.sectors)
+	for sector: Dictionary in fleet_data.sectors:
+		candidate_fleet.diplomacy.discover(sector)
+	var region_data: Dictionary = {}
+	if migrated.get("extensions", {}).has("regions"):
+		var region_extension: Variant = migrated.extensions.regions
+		if not region_extension is Dictionary or region_extension.get("schema_version") != 1:
+			return "Unsupported or invalid region extension."
+		region_data = _decode_fields(region_extension, Regions.FIELDS)
+		if not decode_error.is_empty():
+			return decode_error
+		error = _field_types(region_data, candidate_fleet.regions, Regions.FIELDS)
+		if not error.is_empty():
+			return error
+	else:
+		for field: String in Regions.FIELDS:
+			region_data[field] = candidate_fleet.regions.get(field)
+	error = candidate_fleet.regions.validate(region_data, station_data, fleet_data, candidate_fleet.diplomacy.jobs, candidate.ship_catalog)
+	if not error.is_empty():
+		return error
 	# Commit only after the whole graph has passed validation. Existing model references survive.
+	_apply_fields(fleet.regions, region_data, Regions.FIELDS)
 	_apply_fields(model, station_data, STATION_FIELDS)
 	_apply_fields(fleet, fleet_data, FLEET_FIELDS)
 	_apply_fields(supply, supply_data, SUPPLY_FIELDS)
+	for field: String in Trade.FIELDS:
+		fleet.diplomacy.set(field, candidate_fleet.diplomacy.get(field))
 	supply.rng.seed = int(supply_data.rng_seed)
 	supply.rng.state = int(supply_data.rng_state)
 	autosave_blocked = false
@@ -334,7 +387,7 @@ func _validate(station: Dictionary, mining: Dictionary, stock: Dictionary, defin
 			return "Invalid asteroid persistence flag."
 		if rock.has("position") and not _valid_vector(rock.position):
 			return "Invalid discovery position."
-		if rock.get("persistent", false):
+		if rock.get("persistent", false) and not rock.has("region_id"):
 			if not sector_ids.has(rock.get("sector_id")) or not sector_ids[rock.sector_id].revealed or not sector_ids[rock.sector_id].get("asteroid_ids", []).has(asteroid_id):
 				return "Discovery references an unrevealed sector."
 	var claimed: Dictionary = {}
@@ -359,6 +412,8 @@ func _validate(station: Dictionary, mining: Dictionary, stock: Dictionary, defin
 	var destinations: Dictionary = {}
 	for ship_id: Variant in mining.survey_jobs:
 		var job: Variant = mining.survey_jobs[ship_id]
+		if mining.jobs.has(ship_id):
+			return "Ship assigned to more than one mission."
 		if not station.ships.has(ship_id) or not definitions.ship_catalog[station.ships[ship_id]].has("survey") or not _valid_job(job):
 			return "Survey references a missing Scout or invalid timer."
 		if not job.get("sector_id") is String or not sector_ids.has(job.sector_id) or sector_ids[job.sector_id].revealed or destinations.has(job.sector_id):

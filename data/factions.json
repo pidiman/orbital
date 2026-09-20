@@ -1,0 +1,14 @@
+{
+  "lumen": {
+    "name": "Lumen Archive",
+    "description": "Patient signal-weavers collecting the knowledge of young colonies.",
+    "color": "8bcdf1",
+    "initial_standing": 0
+  },
+  "concord": {
+    "name": "Prism Concord",
+    "description": "Crystal-dwelling navigators who value reliable exchange.",
+    "color": "d2c1fa",
+    "initial_standing": 0
+  }
+}

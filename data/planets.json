@@ -1,0 +1,27 @@
+{
+  "earth": {
+    "name": "Earth",
+    "renderer": "existing_home"
+  },
+  "venus": {
+    "name": "Venus",
+    "surface": "715233",
+    "rim": "dfb778",
+    "bands": "b39163",
+    "background": "15121b"
+  },
+  "mars": {
+    "name": "Mars",
+    "surface": "703b35",
+    "rim": "df947d",
+    "bands": "9d5d4b",
+    "background": "160f19"
+  },
+  "pluto": {
+    "name": "Pluto",
+    "surface": "434458",
+    "rim": "aab9d9",
+    "bands": "787d97",
+    "background": "090e1e"
+  }
+}

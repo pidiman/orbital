@@ -7,6 +7,10 @@ signal completed(unit: Variant, asteroid_id: int, amount: int)
 signal surveyed(sector: Dictionary)
 signal survey_started(ship_id: int, sector_id: String)
 
+const Regions = preload("res://scripts/region_model.gd")
+var regions: Regions
+const Trade = preload("res://scripts/trade_model.gd")
+var diplomacy: Trade
 var model: StationModel
 var asteroids: Dictionary = {}
 # Vector2 keys are Phase 1 station docks; integer keys are independent ships.
@@ -18,9 +22,15 @@ var next_discovery_id: int = -1000 # Keep -1 reserved for no-selection sentinels
 
 func _init(station: StationModel) -> void:
 	model = station
+	regions = Regions.new()
+	model.region_context = regions
+	regions.changed.connect(changed.emit)
+	diplomacy = Trade.new(model)
+	diplomacy.changed.connect(changed.emit)
 	model.module_removed.connect(cancel_unit)
 	model.ship_removed.connect(cancel_unit)
 	sectors = JSON.parse_string(FileAccess.get_file_as_string("res://data/sectors.json"))
+	diplomacy.enrich_sectors(sectors)
 
 func register_asteroid(asteroid_id: int, amount: int) -> void:
 	if not asteroids.has(asteroid_id) and amount > 0:
@@ -47,7 +57,11 @@ func mining_units() -> Dictionary:
 	return units
 
 func idle_count() -> int:
-	return mining_units().size() - jobs.size()
+	var count: int = 0
+	for unit: Variant in mining_units():
+		if not unit_busy(unit):
+			count += 1
+	return count
 
 func dispatch(asteroid_id: int, selected_ship: int = -1) -> String:
 	if not asteroids.has(asteroid_id):
@@ -62,7 +76,7 @@ func dispatch(asteroid_id: int, selected_ship: int = -1) -> String:
 	for unit: Variant in units:
 		if selected_ship != -1 and (not unit is int or unit != selected_ship):
 			continue
-		if jobs.has(unit):
+		if unit_busy(unit):
 			continue
 		var capability: Dictionary = units[unit]
 		jobs[unit] = {"target": asteroid_id, "remaining": int(capability.seconds), "duration": int(capability.seconds), "yield": int(capability.yield), "repeat": bool(capability.get("repeat", false))}
@@ -94,7 +108,15 @@ func sector_job(sector_id: String) -> Dictionary:
 
 func sector_reachable(sector_id: String) -> bool:
 	var sector: Dictionary = sector_by_id(sector_id)
-	return not sector.is_empty() and sector.get("reachable_from", []).has("home")
+	if sector.is_empty():
+		return false
+	for origin: String in sector.get("reachable_from", []):
+		if regions.is_discovered(origin):
+			return true
+		var predecessor: Dictionary = sector_by_id(origin)
+		if not predecessor.is_empty() and predecessor.revealed:
+			return true
+	return false
 
 func travel_duration(ship_id: int, sector_id: String) -> int:
 	var sector: Dictionary = sector_by_id(sector_id)
@@ -104,10 +126,10 @@ func travel_duration(ship_id: int, sector_id: String) -> int:
 func survey_error(ship_id: int, sector_id: String) -> String:
 	if not model.ships.has(ship_id) or not model.ship_catalog[model.ships[ship_id]].has("survey"):
 		return "Build and select a Scout ship."
-	if survey_jobs.has(ship_id):
-		return "This Scout is already exploring."
+	if unit_busy(ship_id):
+		return "This ship is already on a mission."
 	if not sector_reachable(sector_id):
-		return "That sector is not reachable from Home orbit."
+		return "That sector has no discovered route."
 	if sector_state(sector_id) == "revealed":
 		return "This sector is already revealed."
 	if sector_state(sector_id) == "exploring":
@@ -144,6 +166,7 @@ func _reveal(sector_id: String) -> void:
 			next_discovery_id -= 1
 			asteroids[asteroid_id] = {"minerals": int(content.minerals), "claimed": false, "persistent": true, "sector_id": sector_id, "name": content.get("name", "Deposit"), "position": discovery_position(asteroid_id)}
 			sector.asteroid_ids.append(asteroid_id)
+	diplomacy.discover(sector)
 	surveyed.emit(sector)
 
 func revealed_count() -> int:
@@ -154,6 +177,8 @@ func revealed_count() -> int:
 	return count
 
 func tick() -> void:
+	diplomacy.tick()
+	_tick_regions()
 	for unit: Variant in jobs.keys():
 		var job: Dictionary = jobs[unit]
 		job.remaining -= 1
@@ -188,9 +213,70 @@ func cancel_unit(unit: Variant) -> void:
 		jobs.erase(unit)
 	if unit is int:
 		survey_jobs.erase(unit)
+		regions.survey_jobs.erase(unit)
+		diplomacy.cancel(unit)
 	changed.emit()
 
 # Logical marker coordinates, owned by the model so a checkpoint restores the same view.
 static func discovery_position(asteroid_id: int) -> Vector2:
 	var slots: Array[Vector2] = [Vector2(5.0 / 6.0, 1.0), Vector2(1.0 / 3.0, 0.0), Vector2(2.0 / 3.0, 0.0), Vector2(0.5, 1.0)]
 	return slots[posmod(-asteroid_id - 1000, slots.size())]
+
+func unit_busy(unit: Variant) -> bool:
+	return jobs.has(unit) or survey_jobs.has(unit) or diplomacy.jobs.has(unit) or regions.survey_jobs.has(unit)
+
+func trade_error(ship_id: int, contact_id: String, offer_id: String) -> String:
+	if unit_busy(ship_id):
+		return "This ship is already on a mission."
+	return diplomacy.trade_error(ship_id, contact_id, offer_id)
+
+func trade(ship_id: int, contact_id: String, offer_id: String) -> String:
+	var error: String = trade_error(ship_id, contact_id, offer_id)
+	if not error.is_empty():
+		return error
+	return diplomacy.dispatch(ship_id, contact_id, offer_id)
+
+func region_survey_error(ship_id: int, region_id: String) -> String:
+	if not model.ships.has(ship_id) or not model.ship_catalog[model.ships[ship_id]].has("survey"):
+		return "Build and select a Scout ship."
+	if unit_busy(ship_id):
+		return "This ship is already on a mission."
+	return regions.survey_error(region_id)
+
+func region_survey_duration(ship_id: int, region_id: String) -> int:
+	var capability: Dictionary = model.ship_catalog[model.ships[ship_id]].survey
+	return maxi(1, int(ceil(float(regions.catalog[region_id].survey_seconds) / float(capability.get("travel_speed", 1.0)))))
+
+func survey_region(ship_id: int, region_id: String) -> String:
+	var error: String = region_survey_error(ship_id, region_id)
+	if not error.is_empty():
+		return error
+	var duration: int = region_survey_duration(ship_id, region_id)
+	regions.begin_survey(ship_id, region_id, duration)
+	changed.emit()
+	return ""
+
+func _tick_regions() -> void:
+	for ship_id: int in regions.survey_jobs.keys():
+		var job: Dictionary = regions.survey_jobs[ship_id]
+		job.remaining -= 1
+		if job.remaining <= 0:
+			regions.survey_jobs.erase(ship_id)
+			_discover_region(job.region_id)
+
+func _discover_region(region_id: String) -> void:
+	if not regions.generate(region_id):
+		return
+	var record: Dictionary = regions.records[region_id]
+	for content: Dictionary in record.contents:
+		if content.type == "asteroid":
+			var asteroid_id: int = next_discovery_id
+			next_discovery_id -= 1
+			asteroids[asteroid_id] = {"minerals": int(content.minerals), "claimed": false, "persistent": true, "region_id": region_id, "name": content.name, "position": content.position}
+			record.asteroid_ids.append(asteroid_id)
+		elif content.type == "anomaly":
+			diplomacy.inventory[content.good] = int(diplomacy.inventory.get(content.good, 0)) + int(content.amount)
+	regions.announce_discovery(region_id)
+
+func asteroid_region(asteroid_id: int) -> String:
+	return str(asteroids.get(asteroid_id, {}).get("region_id", Regions.HOME))

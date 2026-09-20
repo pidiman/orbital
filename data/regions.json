@@ -1,0 +1,155 @@
+{
+  "home": {
+    "name": "Home",
+    "planet": "earth",
+    "coordinate": [
+      0,
+      0,
+      0
+    ],
+    "neighbors": [
+      "venus",
+      "mars"
+    ],
+    "survey_seconds": 0,
+    "visuals_hint": {
+      "accent": "72dbcb"
+    },
+    "structures": {
+      "primary_station": true,
+      "outposts_enabled": false
+    },
+    "content_rules": {
+      "asteroid_count": [
+        0,
+        0
+      ],
+      "minerals": [
+        0,
+        0
+      ],
+      "anomaly_count": [
+        0,
+        0
+      ],
+      "anomaly_pool": []
+    }
+  },
+  "venus": {
+    "name": "Venus",
+    "planet": "venus",
+    "coordinate": [
+      -0.72,
+      0.15,
+      0
+    ],
+    "neighbors": [
+      "home",
+      "mars"
+    ],
+    "survey_seconds": 6,
+    "visuals_hint": {
+      "accent": "eebd76"
+    },
+    "structures": {
+      "primary_station": false,
+      "outposts_enabled": false
+    },
+    "content_rules": {
+      "asteroid_count": [
+        2,
+        4
+      ],
+      "minerals": [
+        24,
+        48
+      ],
+      "anomaly_count": [
+        1,
+        2
+      ],
+      "anomaly_pool": [
+        "spectral_archive",
+        "crystal_remnant"
+      ]
+    }
+  },
+  "mars": {
+    "name": "Mars",
+    "planet": "mars",
+    "coordinate": [
+      1.52,
+      0.5,
+      0
+    ],
+    "neighbors": [
+      "home",
+      "venus",
+      "pluto"
+    ],
+    "survey_seconds": 7,
+    "visuals_hint": {
+      "accent": "e59b83"
+    },
+    "structures": {
+      "primary_station": false,
+      "outposts_enabled": false
+    },
+    "content_rules": {
+      "asteroid_count": [
+        2,
+        4
+      ],
+      "minerals": [
+        36,
+        72
+      ],
+      "anomaly_count": [
+        1,
+        2
+      ],
+      "anomaly_pool": [
+        "spectral_archive",
+        "crystal_remnant"
+      ]
+    }
+  },
+  "pluto": {
+    "name": "Pluto",
+    "planet": "pluto",
+    "coordinate": [
+      39.5,
+      -8,
+      0
+    ],
+    "neighbors": [
+      "mars"
+    ],
+    "survey_seconds": 9,
+    "visuals_hint": {
+      "accent": "b9b7ed"
+    },
+    "structures": {
+      "primary_station": false,
+      "outposts_enabled": false
+    },
+    "content_rules": {
+      "asteroid_count": [
+        2,
+        4
+      ],
+      "minerals": [
+        54,
+        90
+      ],
+      "anomaly_count": [
+        1,
+        2
+      ],
+      "anomaly_pool": [
+        "spectral_archive",
+        "crystal_remnant"
+      ]
+    }
+  }
+}

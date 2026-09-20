@@ -1,0 +1,10 @@
+{
+  "tech": {
+    "name": "Tech",
+    "description": "Alien research records, held for future research projects."
+  },
+  "xenocrystal": {
+    "name": "Xenocrystals",
+    "description": "Rare crystalline matter, held for future fabrication."
+  }
+}

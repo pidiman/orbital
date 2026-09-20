@@ -8,6 +8,7 @@ var target_buttons: Dictionary = {}
 var scout_picker: OptionButton
 var miner_picker: OptionButton
 var send_button: Button
+var contacts_button: Button
 var close_button: Button
 var title_label: Label
 var state_label: Label
@@ -18,7 +19,7 @@ var ship_signature: String = ""
 
 func _ready() -> void:
 	name = "SectorMap"
-	position = Vector2(40, 140)
+	position = Vector2(40, 156)
 	custom_minimum_size = Vector2(750, 450)
 	add_theme_stylebox_override("panel", hud._style(Color("101e2d"), Color("51828d")))
 	var margin := MarginContainer.new()
@@ -32,6 +33,8 @@ func _ready() -> void:
 	column.add_child(heading)
 	var label: Label = hud._label(heading, "SECTOR MAP  /  HOME ORBIT", 20, hud.CYAN)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	contacts_button = make_button(heading, "Contacts & trade")
+	contacts_button.pressed.connect(func() -> void: hud.trade_panel.open_contacts())
 	close_button = make_button(heading, "Close")
 	close_button.pressed.connect(hide)
 	var row := HBoxContainer.new()
@@ -122,7 +125,7 @@ func fill_picker(picker: OptionButton, capability: String) -> void:
 		if definition.has(capability):
 			picker.add_item("%s #%d" % [definition.name, ship_id], ship_id)
 	if picker.item_count == 0:
-		picker.add_item("Build a " + ("Scout" if capability == "survey" else "Miner"), -1)
+		picker.add_item("No ships with " + capability, -1)
 		picker.set_item_id(0, -1)
 	for index in range(picker.item_count):
 		if picker.get_item_id(index) == previous:
@@ -170,8 +173,8 @@ func refresh() -> void:
 			else:
 				reports.append("Discovery logged: " + str(content.get("name", content.type)))
 		result_label.text = "\n".join(reports) if not reports.is_empty() else "Empty sector. No mineable resources or anomalies detected."
-	for button: Button in target_buttons.values():
-		button.hide()
+	for asteroid_id: int in target_buttons:
+		target_buttons[asteroid_id].visible = selected.get("asteroid_ids", []).has(asteroid_id)
 	for asteroid_id: int in selected.get("asteroid_ids", []):
 		if not target_buttons.has(asteroid_id):
 			var new_button: Button = make_button(target_rows, "")
@@ -181,7 +184,7 @@ func refresh() -> void:
 		button.show()
 		var asteroid: Dictionary = fleet.asteroids.get(asteroid_id, {})
 		var miner_id: int = miner_picker.get_selected_id()
-		button.disabled = asteroid.is_empty() or bool(asteroid.get("claimed", false)) or miner_id < 0 or fleet.jobs.has(miner_id)
+		button.disabled = asteroid.is_empty() or bool(asteroid.get("claimed", false)) or miner_id < 0 or fleet.unit_busy(miner_id)
 		button.text = "Deposit depleted" if asteroid.is_empty() else "%s · %d Minerals" % ["Mining" if asteroid.claimed else "Mine deposit", asteroid.minerals]
 		button.tooltip_text = "Choose an idle Miner. Mining repeats until this deposit is depleted."
 

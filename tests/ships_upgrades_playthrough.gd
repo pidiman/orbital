@@ -35,7 +35,7 @@ func _ready() -> void:
 	await click(game.board.cell_position(Vector2i(1, 0)))
 	await gather(45)
 	await page(1)
-	checks["ships_have_separate_page"] = game.hud.tabs.current_tab == 1 and game.hud.ship_buttons.size() == 2
+	checks["ships_have_separate_page"] = game.hud.tabs.current_tab == 1 and game.hud.ship_buttons.size() == game.model.ship_catalog.size() and game.hud.ship_buttons.has("trader")
 	var materials_before: int = game.model.materials
 	await click(game.hud.ship_buttons.miner.get_global_rect().get_center())
 	var miner: int = game.model.next_ship_id

@@ -33,6 +33,13 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 		canvas.draw_colored_polygon(ship, ink)
 		canvas.draw_rect(Rect2(-4, -5, 8, 9), violet)
 		canvas.draw_line(Vector2(-4, 17), Vector2(4, 17), cyan, 3)
+	elif kind == "trader":
+		var hull := PackedVector2Array([Vector2(0, -22), Vector2(13, -8), Vector2(13, 18), Vector2(-13, 18), Vector2(-13, -8)])
+		canvas.draw_colored_polygon(hull, ink)
+		for x in [-23, 13]:
+			canvas.draw_rect(Rect2(x, -5, 10, 23), gold)
+		canvas.draw_rect(Rect2(-5, -12, 10, 9), cyan)
+		canvas.draw_line(Vector2(-7, 22), Vector2(7, 22), gold, 3)
 	elif kind == "scout":
 		var blue := Color(0.55, 0.81, 0.96, opacity)
 		var hull := PackedVector2Array([Vector2(0, -21), Vector2(22, 15), Vector2(0, 6), Vector2(-22, 15)])

@@ -13,7 +13,7 @@ Open `project.godot` in Summer Engine and press Play, or run `summer run /path/t
 - Use **Inspect / cancel command** to clear the build tool. Right-click also cancels.
 - Reach 9 modules for level 3 and the **Colony established** milestone. Continue building afterward.
 
-The HUD explains rejected builds; no resources are spent on invalid placement. Debris remains collectible while a build tool is selected. Mouse-first landscape layout; touch is mapped to mouse input. No keyboard is required. Sessions are not saved in this MVP.
+The HUD explains rejected builds; no resources are spent on invalid placement. Debris remains collectible while a build tool is selected. Mouse-first landscape layout; touch is mapped to mouse input. No keyboard is required. Sessions automatically resume from the latest checkpoint; Save and Load are in the header.
 
 ## Files
 
@@ -29,7 +29,7 @@ The HUD explains rejected builds; no resources are spent on invalid placement. D
 - `scripts/hud.gd`: resource HUD, build buttons and feedback.
 - `scripts/main.gd`: scene composition and event wiring.
 
-Mining is implemented. Exploration, alien trade and event systems remain deferred.
+Mining, exploration, alien contacts/trade and save/load are implemented. Narrative events and deeper research remain deferred.
 
 ## Verification
 
@@ -125,3 +125,16 @@ Salvage and home-asteroid spawning/lifecycle now run in the RefCounted `SectorSu
 The resource header now has **Save** and **Load**. Both manual and automatic saves use the latest checkpoint at `user://orbital-save.json`; startup resumes it. Autosaves follow builds, decommissioning, upgrades and mission/discovery changes, every 10 seconds, and on graceful exit.
 
 All current model state, jobs, fractional clocks and supply RNG are restored. The JSON v2 envelope includes migrations and preserved `extensions` for future relations/trade data. See [save format, native location, compatibility and limitations](docs/save-format.md).
+
+## Phase 4: Alien life and trade
+
+1. Build a Scout and use **Sector map → Echo pocket → Send Scout**. Its six-second survey reveals a shared alien relay: **Lumen Archive** and **Prism Concord**.
+2. Build a **Trade Ship** in Ships: **50 Materials / 2 Power**, no grid cell.
+3. Open **Contacts & trade** from the Sector map, or use the Trade Ship's command. Choose a contact, ship and exchange. Cargo is paid at departure; a **seven-second** mission delivers rewards.
+4. Trade **18 Minerals → 1 Tech + 4 standing** with Lumen, or **20 Materials → 8 standing** with either faction. At **8 Concord standing**, trade **12 Minerals + 8 Materials → 2 Xenocrystals + 3 standing**.
+
+Standing, inventory, in-flight countdowns and recent trade history appear in the contact panel. Decommissioning a busy Trade Ship returns its full cargo plus the normal hull refund. Tech and Xenocrystals are retained for future research/fabrication; goodwill already unlocks the rare exchange. Twilight's natural Ion chorus anomaly grants one Tech on survey, once.
+
+All definitions are JSON: `data/factions.json`, `data/aliens.json`, `data/trade_goods.json`, `data/trade_offers.json` and `data/ships.json`. HUD actions compose per declared mining/survey/trade capability; all roles share one busy check.
+
+Save format remains **v2**, with optional `extensions.alien_trade` (schema 1). Old saves receive neutral faction defaults and contacts for already surveyed alien anomalies, without replaying ore rewards. Active cargo, rewards, mission timers, standing, inventory and history all persist. See [trade architecture and verification](docs/phase4-trade.md) and [save format](docs/save-format.md).

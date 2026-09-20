@@ -12,6 +12,8 @@ signal refined(amount: int)
 signal module_built(world_position: Vector2, kind: String)
 signal level_reached(level: int)
 
+# This model always owns the primary station at Earth; region structures are separate.
+var region_context: RefCounted
 var decommission_rules: Dictionary = {}
 var catalog: Dictionary = {}
 var ship_catalog: Dictionary = {}
@@ -62,6 +64,8 @@ func tick() -> void:
 	changed.emit()
 
 func placement_error(world_position: Vector2, kind: String) -> String:
+	if region_context != null and not region_context.primary_station_visible():
+		return "Station construction is Home-only. Jump back to Earth."
 	if not catalog.has(kind):
 		return "Choose a module first."
 	if not Geometry.contains_center(world_position):
