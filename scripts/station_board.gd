@@ -78,7 +78,7 @@ func _draw() -> void:
 			if Geometry.connected(world_position, other):
 				draw_line(world_to_screen(world_position), world_to_screen(other), Color("627c8d"), 8)
 	for world_position: Vector2 in model.modules:
-		ModuleArt.draw_module(self, world_to_screen(world_position), model.modules[world_position], cell_size / 58.0)
+		ModuleArt.draw_module(self, world_to_screen(world_position), model.catalog[model.modules[world_position]].get("art", model.modules[world_position]), cell_size / 58.0)
 	for world_position: Vector2 in model.modules:
 		if model.catalog[model.modules[world_position]].has("upgrades"):
 			var point: Vector2 = world_to_screen(world_position) + Vector2(12, -19)
@@ -93,7 +93,7 @@ func _draw() -> void:
 		draw_rect(rect, color * Color(1, 1, 1, 0.12))
 		draw_rect(rect, color, false, 1.5)
 		if not model.modules.has(placement_position(get_global_mouse_position())):
-			ModuleArt.draw_module(self, world_to_screen(placement_position(get_global_mouse_position())), selected, cell_size / 58.0, 0.55)
+			ModuleArt.draw_module(self, world_to_screen(placement_position(get_global_mouse_position())), model.catalog[selected].get("art", selected), cell_size / 58.0, 0.55)
 	for pulse: Dictionary in pulses:
 		draw_circle(world_to_screen(pulse.position), 30 + pulse.time * 55, Color(0.45, 0.9, 0.8, (1.0 - pulse.time / 0.65) * 0.65), false, 2, true)
 

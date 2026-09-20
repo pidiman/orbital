@@ -75,3 +75,14 @@ Not persisted: transient hover/build selections, selected tabs/open panels, floa
 `tests/persistence_playthrough.gd` presses real Save/Load buttons, checks build/discovery autosaves, restores active jobs and readouts, tears down the scene and constructs a fresh session through the normal startup loader, resumes jobs to completion, and verifies graceful-exit saving: 15/15 checks. Existing MVP, mining, ships/upgrades/positions, exploration and recovery playthroughs also pass (88 checks). Disposable verification instances disable the player slot by default; persistence probes explicitly use and clean up isolated test files.
 
 Phase 4 adds `tests/trade_playthrough.gd`: 21 live checks for survey/contact discovery, paid travel, duplicate-click protection, standing/goods/history UI, autosave, active and completed trade Save/Load, and composed hybrid commands. The six existing playthroughs still pass (103 checks). See [Phase 4](phase4-trade.md).
+
+### Material collection (v2 additive extension)
+
+`extensions.material_collection` has `schema_version: 1`, `jobs` keyed by ship ID,
+and `depots` keyed by continuous module position, using the existing tagged map/vector encoding.
+Jobs save Home assignment, logical position, debris target, depot destination, cargo,
+waiting flag and status. Depots save their cumulative delivered material count; their
+installed module, tier and economy remain in the existing station fields.
+Missing extensions default to idle ships and zero delivered counts. Validation rejects
+invalid cargo, foreign-region assignments, duplicate reservations and overlapping fleet
+missions before committing any state. Unknown extension fields remain preserved.

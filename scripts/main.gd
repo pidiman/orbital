@@ -65,6 +65,11 @@ func _ready() -> void:
 	asteroids.fleet = fleet
 	asteroids.board = board
 	add_child(asteroids)
+	var collectors := preload("res://scripts/material_ship_view.gd").new()
+	collectors.name = "MaterialShips"
+	collectors.supply = supply
+	collectors.board = board
+	add_child(collectors)
 	var clock := Clock.new()
 	clock.name = "ResourceClock"
 	clock.model = model
@@ -75,6 +80,7 @@ func _ready() -> void:
 	hud.model = model
 	hud.fleet = fleet
 	add_child(hud)
+	supply.collection.notice.connect(hud.message)
 	hud.tool_selected.connect(_select_tool)
 	hud.ship_assignment_requested.connect(func(ship_id: int) -> void: asteroids.selected_ship = ship_id)
 	board.module_selected.connect(hud.inspect_module)

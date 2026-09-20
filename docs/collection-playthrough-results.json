@@ -1,0 +1,26 @@
+{
+  "duration_ms": 2740,
+  "errors_seen": [],
+  "finished": true,
+  "frame_warnings": [],
+  "frames": [
+    "collection_delivering.jpg",
+    "collection_storage_full.jpg",
+    "collection_resumed.jpg"
+  ],
+  "reports": {
+    "checks": {
+      "bottom_message": true,
+      "debris_collection": true,
+      "deployed": true,
+      "depot_built": true,
+      "no_depot_message": true,
+      "only_2d": true,
+      "repeated_delivery": true,
+      "restored_ui": true,
+      "resume_after_purchase": true,
+      "roundtrip": true,
+      "waiting_with_one": true
+    }
+  }
+}

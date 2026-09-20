@@ -11,6 +11,7 @@ const Regions = preload("res://scripts/region_model.gd")
 var regions: Regions
 const Trade = preload("res://scripts/trade_model.gd")
 var diplomacy: Trade
+var collection: RefCounted
 var model: StationModel
 var asteroids: Dictionary = {}
 # Vector2 keys are Phase 1 station docks; integer keys are independent ships.
@@ -215,6 +216,8 @@ func cancel_unit(unit: Variant) -> void:
 		survey_jobs.erase(unit)
 		regions.survey_jobs.erase(unit)
 		diplomacy.cancel(unit)
+		if collection != null:
+			collection.cancel(unit)
 	changed.emit()
 
 # Logical marker coordinates, owned by the model so a checkpoint restores the same view.
@@ -223,7 +226,7 @@ static func discovery_position(asteroid_id: int) -> Vector2:
 	return slots[posmod(-asteroid_id - 1000, slots.size())]
 
 func unit_busy(unit: Variant) -> bool:
-	return jobs.has(unit) or survey_jobs.has(unit) or diplomacy.jobs.has(unit) or regions.survey_jobs.has(unit)
+	return (collection != null and collection.jobs.has(unit)) or jobs.has(unit) or survey_jobs.has(unit) or diplomacy.jobs.has(unit) or regions.survey_jobs.has(unit)
 
 func trade_error(ship_id: int, contact_id: String, offer_id: String) -> String:
 	if unit_busy(ship_id):

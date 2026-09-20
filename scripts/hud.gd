@@ -5,7 +5,7 @@ var orbit_label: Label
 const TradePanel = preload("res://scripts/trade_panel.gd")
 var trade_panel: PanelContainer
 var capability_buttons: Dictionary = {}
-const SHIP_ACTIONS: Dictionary = {"mining": "Assign asteroid", "survey": "Survey sector", "trade": "Trade with contact"}
+const SHIP_ACTIONS: Dictionary = {"mining": "Assign asteroid", "survey": "Survey sector", "trade": "Trade with contact", "collection": "Deploy at Home"}
 const SectorMap = preload("res://scripts/sector_map.gd")
 var sector_map: PanelContainer
 var map_button: Button
@@ -282,6 +282,8 @@ func _process(delta: float) -> void:
 	status_time -= delta
 	if status_time <= 0:
 		status_label.text = "Amber: salvage  ·  Violet: mine  ·  Inspect a module to upgrade  ·  Ships tab: fleet commands" if fleet.regions.primary_station_visible() else "Violet: mine  ·  Top overview: Scout / jump  ·  Station construction and salvage remain at Home"
+		if fleet.collection != null and not fleet.collection.waiting_message().is_empty():
+			status_label.text = fleet.collection.waiting_message()
 		status_label.add_theme_color_override("font_color", MUTED)
 	for item: Dictionary in floating:
 		item.time += delta
@@ -406,7 +408,9 @@ func _refresh_ships() -> void:
 			entry.add_child(sell)
 			sell_buttons[ship_id] = sell
 		var status: String = ""
-		if fleet.jobs.has(ship_id):
+		if fleet.collection != null and fleet.collection.jobs.has(ship_id):
+			status = fleet.collection.jobs[ship_id].status
+		elif fleet.jobs.has(ship_id):
 			status = "Mining · %ds" % fleet.jobs[ship_id].remaining
 		elif fleet.regions.survey_jobs.has(ship_id):
 			status = "Scouting · %ds" % fleet.regions.survey_jobs[ship_id].remaining
@@ -431,6 +435,9 @@ func _command_ship(ship_id: int, capability: String = "") -> void:
 	if not definition.has(capability) or fleet.unit_busy(ship_id):
 		return
 	match capability:
+		"collection":
+			var error: String = fleet.collection.deploy(ship_id)
+			message("Material Ship deployed at Earth." if error.is_empty() else error, not error.is_empty())
 		"mining":
 			ship_assignment_requested.emit(ship_id)
 			message("Miner #%d selected. Click a violet asteroid; mining repeats until depleted." % ship_id, false, 8.0)

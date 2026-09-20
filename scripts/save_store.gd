@@ -4,6 +4,7 @@ const Regions = preload("res://scripts/region_model.gd")
 const Trade = preload("res://scripts/trade_model.gd")
 const Fleet = preload("res://scripts/mining_fleet.gd")
 const Supply = preload("res://scripts/sector_supply.gd")
+const Collection = preload("res://scripts/material_collection.gd")
 const VERSION: int = 2
 const DEFAULT_PATH: String = "user://orbital-save.json"
 const STATION_FIELDS: Array[String] = ["modules", "module_tiers", "ships", "next_ship_id", "materials", "minerals", "capacity", "power_output", "power_use", "level", "ticks", "tick_elapsed", "refinery_progress", "total_refined"]
@@ -29,6 +30,7 @@ func _init(station: StationModel, mining: Fleet, sector_supply: Supply) -> void:
 	model = station
 	fleet = mining
 	supply = sector_supply
+	supply.collection.changed.connect(request_autosave)
 	model.module_built.connect(request_autosave.unbind(2))
 	model.module_removed.connect(request_autosave.unbind(1))
 	model.module_upgraded.connect(request_autosave.unbind(1))
@@ -61,6 +63,8 @@ func snapshot() -> Dictionary:
 	document["min_reader_version"] = int(document.get("min_reader_version", VERSION))
 	if not document.has("extensions"):
 		document["extensions"] = {}
+	_merge_fields(document.extensions, "material_collection", supply.collection, Collection.FIELDS)
+	document.extensions.material_collection["schema_version"] = 1
 	_merge_fields(document.extensions, "regions", fleet.regions, Regions.FIELDS)
 	document.extensions.regions["schema_version"] = 1
 	_merge_fields(document.extensions, "alien_trade", fleet.diplomacy, Trade.FIELDS)
@@ -287,11 +291,27 @@ func restore(document: Variant) -> String:
 	error = candidate_fleet.regions.validate(region_data, station_data, fleet_data, candidate_fleet.diplomacy.jobs, candidate.ship_catalog)
 	if not error.is_empty():
 		return error
+	candidate_supply.collection.sync_depots()
+	var collection_data: Dictionary = {"jobs": {}, "depots": candidate_supply.collection.depots.duplicate(true)}
+	if migrated.extensions.has("material_collection"):
+		var collection_extension: Variant = migrated.extensions.material_collection
+		if not collection_extension is Dictionary or collection_extension.get("schema_version") != 1:
+			return "Unsupported material collection extension."
+		collection_data = _decode_fields(collection_extension, Collection.FIELDS)
+		if not decode_error.is_empty():
+			return decode_error
+		error = _field_types(collection_data, candidate_supply.collection, Collection.FIELDS)
+		if not error.is_empty():
+			return error
+	error = _validate_collection(collection_data, station_data, fleet_data, region_data, candidate_fleet.diplomacy.jobs, candidate)
+	if not error.is_empty():
+		return error
 	# Commit only after the whole graph has passed validation. Existing model references survive.
 	_apply_fields(fleet.regions, region_data, Regions.FIELDS)
 	_apply_fields(model, station_data, STATION_FIELDS)
 	_apply_fields(fleet, fleet_data, FLEET_FIELDS)
 	_apply_fields(supply, supply_data, SUPPLY_FIELDS)
+	_apply_fields(supply.collection, collection_data, Collection.FIELDS)
 	for field: String in Trade.FIELDS:
 		fleet.diplomacy.set(field, candidate_fleet.diplomacy.get(field))
 	supply.rng.seed = int(supply_data.rng_seed)
@@ -522,3 +542,33 @@ func _load_fail(message: String) -> String:
 	# A bad or newer checkpoint is never silently overwritten by autosave.
 	autosave_blocked = FileAccess.file_exists(path)
 	return _fail(message + " Autosave paused; Save replaces the checkpoint." if autosave_blocked else message)
+
+func _validate_collection(data: Dictionary, station: Dictionary, mining: Dictionary, regions: Dictionary, trade_jobs: Dictionary, definitions: StationModel) -> String:
+	for point: Variant in data.depots:
+		if not point is Vector2 or not station.modules.has(point) or not definitions.catalog[station.modules[point]].has("material_depot"):
+			return "Invalid Space Depot assignment."
+		if not data.depots[point] is Dictionary or not _integer(data.depots[point].get("delivered"), 0):
+			return "Invalid depot delivery count."
+	for point: Vector2 in station.modules:
+		if definitions.catalog[station.modules[point]].has("material_depot") and not data.depots.has(point):
+			return "Missing Space Depot state."
+	var targets: Dictionary = {}
+	for ship_id: Variant in data.jobs:
+		if not ship_id is int or not station.ships.has(ship_id) or not definitions.ship_catalog[station.ships[ship_id]].has("collection"):
+			return "Invalid material collection ship."
+		if mining.jobs.has(ship_id) or mining.survey_jobs.has(ship_id) or regions.survey_jobs.has(ship_id) or trade_jobs.has(ship_id):
+			return "Collection ship is assigned twice."
+		var job: Variant = data.jobs[ship_id]
+		if not job is Dictionary:
+			return "Invalid collection assignment."
+		if job.get("region") != Regions.HOME or not _valid_vector(job.get("position")) or not _valid_vector(job.get("depot")):
+			return "Invalid home collection position."
+		if not _integer(job.get("cargo"), 0) or job.cargo > int(definitions.ship_catalog[station.ships[ship_id]].collection.cargo_capacity) or not _integer(job.get("target"), -1):
+			return "Invalid collection cargo or target."
+		if not job.get("waiting") is bool or not job.get("status") is String:
+			return "Invalid collection waiting state."
+		if job.target != -1:
+			if job.cargo > 0 or targets.has(job.target):
+				return "Duplicate collection reservation."
+			targets[job.target] = true
+	return ""

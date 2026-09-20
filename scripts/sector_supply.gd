@@ -2,6 +2,8 @@ class_name SectorSupply
 extends RefCounted
 
 # Dimensionless sector coordinates; no viewport, camera, nodes, or screen pixels.
+const Collection = preload("res://scripts/material_collection.gd")
+var collection: Collection
 var model: StationModel
 var fleet: MiningFleet
 var rules: Dictionary
@@ -18,6 +20,8 @@ var rng := RandomNumberGenerator.new()
 func _init(station: StationModel, mining_fleet: MiningFleet, seed_value: int = -1, configuration: Dictionary = {}) -> void:
 	model = station
 	fleet = mining_fleet
+	collection = Collection.new(station, mining_fleet, self)
+	fleet.collection = collection
 	rules = configuration.duplicate(true) if not configuration.is_empty() else JSON.parse_string(FileAccess.get_file_as_string("res://data/supply.json"))
 	if seed_value < 0:
 		rng.randomize()
@@ -39,6 +43,7 @@ func advance(delta: float) -> void:
 
 func _step(delta: float) -> void:
 	elapsed += delta
+	collection.advance(delta)
 	for debris_id: int in debris.keys():
 		var piece: Dictionary = debris[debris_id]
 		piece.position += piece.velocity * delta
@@ -82,11 +87,12 @@ func _spawn_asteroid(initial: bool = false) -> void:
 	home_asteroids[next_home_id] = {"position": Vector2(float(definition.initial_x) if initial else float(definition.entry_x), 0.0 if next_home_id % 2 == 1 else 1.0), "speed": rng.randf_range(definition.speed_min, definition.speed_max)}
 	fleet.register_asteroid(next_home_id, int(definition.minerals))
 
-func salvage(debris_id: int) -> int:
+func salvage(debris_id: int, receiver: Callable = Callable(), limit: int = -1) -> int:
 	if not debris.has(debris_id):
 		return 0
 	var piece: Dictionary = debris[debris_id]
-	var received: int = model.collect(int(piece.amount))
+	var amount: int = int(piece.amount) if limit < 0 else mini(int(piece.amount), limit)
+	var received: int = model.collect(amount) if not receiver.is_valid() else int(receiver.call(amount))
 	piece.amount -= received
 	if piece.amount == 0:
 		debris.erase(debris_id)

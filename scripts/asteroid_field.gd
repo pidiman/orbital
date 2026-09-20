@@ -66,6 +66,8 @@ func _on_completed(unit: Variant, asteroid_id: int, amount: int) -> void:
 
 func _draw() -> void:
 	for ship_id: int in fleet.model.ships:
+		if fleet.collection != null and fleet.collection.jobs.has(ship_id):
+			continue
 		var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
 		if not fleet.jobs.has(ship_id) and fleet.regions.primary_station_visible():
 			var point: Vector2 = home_position(ship_id)
