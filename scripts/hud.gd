@@ -7,7 +7,7 @@ var trade_panel: PanelContainer
 var research_panel: PanelContainer
 var research_button: Button
 var capability_buttons: Dictionary = {}
-const SHIP_ACTIONS: Dictionary = {"mining": "Assign asteroid", "survey": "Survey sector", "trade": "Trade with contact", "collection": "Deploy at Home"}
+const SHIP_ACTIONS: Dictionary = {"mining": "Assign asteroid", "survey": "Survey sector", "trade": "Trade with contact", "collection": "Deploy at Home", "founding": "Found outpost"}
 const SectorMap = preload("res://scripts/sector_map.gd")
 var sector_map: PanelContainer
 var map_button: Button
@@ -127,7 +127,7 @@ func _ready() -> void:
 	root.add_child(panel)
 	var margin := MarginContainer.new()
 	for side: String in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 14)
+		margin.add_theme_constant_override("margin_" + side, 8 if side == "bottom" else 14)
 	panel.add_child(margin)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 6)
@@ -224,7 +224,7 @@ func _ready() -> void:
 	research_panel.hud = self
 	research_panel.fleet = fleet
 	root.add_child(research_panel)
-	fleet.transport.arrived.connect(func(ship_id: int, region_id: String) -> void: message("Ship #%d arrived at %s. Remote operations are future scope." % [ship_id, fleet.regions.catalog[region_id].name]))
+	fleet.transport.arrived.connect(func(ship_id: int, region_id: String) -> void: message("Ship #%d arrived at %s. Use Ships commands for local operations." % [ship_id, fleet.regions.catalog[region_id].name]))
 	fleet.diplomacy.mission_completed.connect(_trade_completed)
 	model.changed.connect(refresh)
 	fleet.changed.connect(refresh)
@@ -264,7 +264,7 @@ func refresh() -> void:
 	for kind: String in tool_buttons:
 		tool_buttons[kind].visible = model.module_unlocked(kind)
 		tool_buttons[kind].disabled = not home
-	orbit_label.text = "EARTH  /  408 KM\nA small beginning. An infinite horizon." if home else "%s / EXPLORATION\nStation anchored at Earth. No outposts yet." % str(fleet.regions.catalog[fleet.regions.current_region].name).to_upper()
+	orbit_label.text = "EARTH  /  408 KM\nA small beginning. An infinite horizon." if home else "%s / EXPLORATION\n%s" % [str(fleet.regions.catalog[fleet.regions.current_region].name).to_upper(), fleet.outposts.short_summary(fleet.regions.current_region)]
 	minerals_label.text = str(model.minerals)
 	fleet_label.text = "MINERS  %d idle / %d total" % [fleet.idle_count(), fleet.mining_units().size()]
 	var refinery_count: int = model.module_count_with("conversion")
@@ -359,9 +359,16 @@ func _build_ships_page() -> void:
 	page.add_theme_constant_override("separation", 5)
 	tabs.add_child(page)
 	_label(page, "Independent ships · no grid cell needed", 12, MUTED)
+	var catalog_scroll := ScrollContainer.new()
+	catalog_scroll.custom_minimum_size.y = 120
+	catalog_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	page.add_child(catalog_scroll)
+	var catalog_rows := VBoxContainer.new()
+	catalog_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	catalog_scroll.add_child(catalog_rows)
 	for kind: String in model.ship_catalog:
 		var definition: Dictionary = model.ship_catalog[kind]
-		var button: Button = _catalog_button(page, definition)
+		var button: Button = _catalog_button(catalog_rows, definition)
 		ship_buttons[kind] = button
 		button.pressed.connect(func() -> void: _buy_ship(kind))
 	sector_label = _label(page, "", 12, Color("8bcdf1"))
@@ -426,8 +433,8 @@ func _refresh_ships() -> void:
 			entry.add_child(sell)
 			sell_buttons[ship_id] = sell
 		var status: String = ""
-		if not fleet.transport.work_error(ship_id).is_empty():
-			status = "In transit" if fleet.transport.jobs.has(ship_id) else "At " + str(fleet.regions.catalog[fleet.transport.location(ship_id)].name)
+		if fleet.transport.jobs.has(ship_id):
+			status = "In transit"
 		elif fleet.collection != null and fleet.collection.jobs.has(ship_id):
 			status = fleet.collection.jobs[ship_id].status
 		elif fleet.jobs.has(ship_id):
@@ -441,7 +448,15 @@ func _refresh_ships() -> void:
 		for capability: String in capability_buttons[ship_id]:
 			var button: Button = capability_buttons[ship_id][capability]
 			button.text = "%s #%d · %s" % [definition.name, ship_id, status if not status.is_empty() else SHIP_ACTIONS[capability]]
-			button.disabled = fleet.unit_busy(ship_id) or not fleet.transport.work_error(ship_id).is_empty()
+			var work_error: String = fleet.mining_work_error(ship_id) if capability == "mining" else fleet.transport.work_error(ship_id)
+			if capability == "founding":
+				work_error = ""
+				button.text = "%s #%d · Found outpost" % [definition.name, ship_id]
+				button.tooltip_text = fleet.outposts.cost_text(ship_id) + "\n" + fleet.outposts.founding_error(ship_id)
+			elif status.is_empty() and fleet.transport.location(ship_id) != fleet.regions.HOME:
+				button.text += " · " + str(fleet.regions.catalog[fleet.transport.location(ship_id)].name)
+			button.disabled = fleet.unit_busy(ship_id) or not work_error.is_empty()
+			if capability != "founding": button.tooltip_text = work_error
 		sell_buttons[ship_id].text = "Decommission · +%d M" % model.ship_refund(ship_id)
 
 func _command_ship(ship_id: int, capability: String = "") -> void:
@@ -455,6 +470,9 @@ func _command_ship(ship_id: int, capability: String = "") -> void:
 	if not definition.has(capability) or fleet.unit_busy(ship_id):
 		return
 	match capability:
+		"founding":
+			var error: String = fleet.outposts.found(ship_id)
+			message("Outpost founded. Local Minerals stay here; hauling is not available yet." if error.is_empty() else error, not error.is_empty(), 8.0)
 		"collection":
 			var error: String = fleet.collection.deploy(ship_id)
 			message("Material Ship deployed at Earth." if error.is_empty() else error, not error.is_empty())

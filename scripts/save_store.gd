@@ -26,6 +26,7 @@ var autosave_elapsed: float = 0.0
 var last_error: String = ""
 var preserved: Dictionary = {}
 var decode_error: String = ""
+var migration_notice: String = ""
 signal restored
 signal saved
 signal failed(message: String)
@@ -34,6 +35,7 @@ func _init(station: StationModel, mining: Fleet, sector_supply: Supply) -> void:
 	model = station
 	fleet = mining
 	supply = sector_supply
+	fleet.outposts.changed.connect(request_autosave)
 	fleet.research.changed.connect(request_autosave)
 	fleet.transport.changed.connect(request_autosave)
 	supply.collection.changed.connect(request_autosave)
@@ -69,6 +71,9 @@ func snapshot() -> Dictionary:
 	document["min_reader_version"] = int(document.get("min_reader_version", VERSION))
 	if not document.has("extensions"):
 		document["extensions"] = {}
+	if not document.extensions.has("outposts"):
+		document.extensions["outposts"] = {}
+	document.extensions.outposts["schema_version"] = 1
 	_merge_fields(document.extensions, "research", fleet.research, Research.FIELDS)
 	document.extensions.research["schema_version"] = 1
 	_merge_fields(document.extensions, "gate_transport", fleet.transport, Transport.FIELDS)
@@ -236,6 +241,10 @@ func restore(document: Variant) -> String:
 	var migrated: Dictionary = migrate(document)
 	if not migrated.get("state") is Dictionary or not migrated.get("extensions", {}) is Dictionary:
 		return "Missing save state or invalid extensions."
+	var legacy_outposts: bool = not migrated.extensions.has("outposts")
+	if not legacy_outposts:
+		if not migrated.extensions.outposts is Dictionary or migrated.extensions.outposts.get("schema_version") != 1 or not migrated.extensions.has("world_locations"):
+			return "Invalid outpost extension or missing location graph."
 	var state: Dictionary = migrated.state
 	for section: String in ["station", "fleet", "supply"]:
 		if not state.get(section) is Dictionary:
@@ -328,7 +337,7 @@ func restore(document: Variant) -> String:
 	var transport_data: Dictionary = _extension_fields(migrated.extensions, "gate_transport", candidate_fleet.transport, Transport.FIELDS)
 	if not decode_error.is_empty():
 		return decode_error
-	error = _validate_research_transport(research_data, transport_data, station_data, fleet_data, region_data, candidate_fleet.diplomacy.jobs, collection_data.jobs, candidate_fleet)
+	error = _validate_research_transport(research_data, transport_data, station_data, fleet_data, region_data, candidate_fleet.diplomacy.jobs, collection_data.jobs, candidate_fleet, not legacy_outposts)
 	if not error.is_empty():
 		return error
 	# Build a complete isolated candidate, migrating pre-location v2 saves first.
@@ -346,6 +355,11 @@ func restore(document: Variant) -> String:
 		error = LocationValidation.validate_graph(location_data, candidate, region_data, transport_data)
 		if not error.is_empty():
 			return error
+		if legacy_outposts and location_data.stations.size() != 1:
+			return "Outpost state requires its extension."
+		error = candidate_fleet.outposts.validate(location_data, region_data, int(station_data.next_ship_id))
+		if not error.is_empty():
+			return error
 		_apply_fields(candidate.locations, location_data, Locations.FIELDS)
 		error = LocationValidation.validate_projections(candidate, station_data, research_data, transport_data, collection_data)
 		if not error.is_empty():
@@ -353,7 +367,7 @@ func restore(document: Variant) -> String:
 		var assignments: Variant = _decode(migrated.extensions.world_locations.get("mining_assignments"))
 		if not decode_error.is_empty() or not assignments is Dictionary:
 			return "Invalid canonical mining assignments."
-		error = LocationValidation.validate_assignments(assignments, candidate_fleet, fleet_data.jobs)
+		error = LocationValidation.validate_assignments(assignments, candidate_fleet, fleet_data.jobs, legacy_outposts)
 		if not error.is_empty():
 			return error
 		candidate_fleet.mining_assignments = assignments
@@ -366,6 +380,16 @@ func restore(document: Variant) -> String:
 	error = LocationValidation.validate_collection(collection_data, candidate)
 	if not error.is_empty():
 		return error
+	var cancelled_remote: int = 0
+	if legacy_outposts:
+		# Retire the old cross-region shortcut without spending or destroying ore.
+		for unit: Variant in candidate_fleet.jobs.keys():
+			var assignment: Dictionary = candidate_fleet.mining_assignment(unit)
+			if assignment.origin_region != assignment.target.region:
+				candidate_fleet.asteroids[assignment.job.target].claimed = false
+				candidate_fleet.erase_mining_assignment(unit)
+				cancelled_remote += 1
+		fleet_data.jobs = candidate_fleet.jobs
 	# Commit only after the whole graph has passed validation. Existing model references survive.
 	_apply_fields(fleet.research, research_data, Research.FIELDS)
 	_apply_fields(fleet.transport, transport_data, Transport.FIELDS)
@@ -381,6 +405,7 @@ func restore(document: Variant) -> String:
 		fleet.diplomacy.set(field, candidate_fleet.diplomacy.get(field))
 	supply.rng.seed = int(supply_data.rng_seed)
 	supply.rng.state = int(supply_data.rng_state)
+	migration_notice = "Legacy remote mining orders released; ore preserved. Send Miners through a gate and found a local outpost." if cancelled_remote > 0 else ""
 	autosave_blocked = false
 	preserved = migrated.duplicate(true)
 	dirty = false
@@ -653,7 +678,7 @@ func _extension_fields(extensions: Dictionary, key: String, target: Object, fiel
 		decode_error = _field_types(decoded, target, fields)
 	return decoded
 
-func _validate_research_transport(research_data: Dictionary, transport_data: Dictionary, station: Dictionary, mining: Dictionary, region_data: Dictionary, trades: Dictionary, collectors: Dictionary, candidate: Fleet) -> String:
+func _validate_research_transport(research_data: Dictionary, transport_data: Dictionary, station: Dictionary, mining: Dictionary, region_data: Dictionary, trades: Dictionary, collectors: Dictionary, candidate: Fleet, allow_local_mining: bool = false) -> String:
 	for id: Variant in research_data.researched:
 		if not id is String or not candidate.research.catalog.has(id) or research_data.researched[id] != true:
 			return "Invalid researched technology."
@@ -701,6 +726,6 @@ func _validate_research_transport(research_data: Dictionary, transport_data: Dic
 				return "Invalid gate cost escrow."
 	for ship_id: int in station.ships:
 		if transport_data.jobs.has(ship_id) or transport_data.locations.get(ship_id, Regions.HOME) != Regions.HOME:
-			if mining.jobs.has(ship_id) or mining.survey_jobs.has(ship_id) or region_data.survey_jobs.has(ship_id) or trades.has(ship_id) or collectors.has(ship_id):
+			if (mining.jobs.has(ship_id) and (transport_data.jobs.has(ship_id) or not allow_local_mining)) or mining.survey_jobs.has(ship_id) or region_data.survey_jobs.has(ship_id) or trades.has(ship_id) or collectors.has(ship_id):
 				return "Relocated or in-transit ship has a conflicting work mission."
 	return ""

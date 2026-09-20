@@ -1,6 +1,7 @@
 extends RefCounted
 # Canonical identity, ownership and physical location. Never stores camera/view state.
 const FIELDS: Array[String] = ["stations", "structures", "ships", "next_structure_id"]
+var outpost_catalog: Dictionary
 var rules: Dictionary
 var stations: Dictionary = {}
 var structures: Dictionary = {}
@@ -9,6 +10,7 @@ var next_structure_id: int = 0
 var model_ref: WeakRef
 
 func _init(station_model: RefCounted = null) -> void:
+	outpost_catalog = JSON.parse_string(FileAccess.get_file_as_string("res://data/outposts.json"))
 	rules = JSON.parse_string(FileAccess.get_file_as_string("res://data/location_rules.json"))
 	stations[rules.primary_station.id] = rules.primary_station.duplicate(true)
 	if station_model != null:
@@ -58,19 +60,31 @@ static func actor_key(actor: Dictionary) -> String:
 func actor_record(actor: Dictionary) -> Dictionary:
 	return ships.get(actor.id, {}) if actor.type == "ship" else structures.get(actor.id, {})
 
-func mining_route(actor: Dictionary, target_id: int, target_region: String) -> Dictionary:
+func mining_route(actor: Dictionary, target_id: int, target_region: String, legacy: bool = false) -> Dictionary:
 	var record: Dictionary = actor_record(actor)
 	if record.is_empty():
 		return {}
 	var remote: bool = record.region != target_region
-	if remote and not (rules.mining.allow_remote_from_primary and record.region == station_region(primary_station())):
+	if remote and not ((legacy or rules.mining.allow_remote_from_primary) and record.region == station_region(primary_station())):
 		return {}
-	return {"actor": actor, "origin_region": record.region, "target": {"type": "asteroid", "id": target_id, "region": target_region}, "destination": destination(record.station_id), "cargo": {"minerals": 0}, "policy": "legacy_remote_home" if remote else "local"}
+	var destination_id: String = record.station_id
+	if not remote and record.region != station_region(primary_station()):
+		destination_id = outpost_at(record.region, record.owner)
+		if destination_id.is_empty():
+			return {}
+	return {"actor": actor, "origin_region": record.region, "target": {"type": "asteroid", "id": target_id, "region": target_region}, "destination": destination(destination_id), "cargo": {"minerals": 0}, "policy": "legacy_remote_home" if remote else ("local" if destination_id == primary_station() else "local_outpost")}
 
 func receive(destination_record: Dictionary, resource: String, amount: int) -> int:
-	# One inventory adapter currently exists. Future outposts register their own
-	# inventories here; unsupported destinations never silently credit Home.
-	if destination_record != destination(primary_station()) or model_ref == null:
+	var station_id: String = str(destination_record.get("station_id", ""))
+	if not stations.has(station_id) or destination_record != destination(station_id) or amount < 0:
+		return 0
+	if station_id != primary_station():
+		var inventory: Dictionary = stations[station_id].get("inventory", {})
+		if not inventory.has(resource):
+			return 0
+		inventory[resource] += amount
+		return amount
+	if model_ref == null:
 		return 0
 	var model: RefCounted = model_ref.get_ref()
 	if model == null:
@@ -148,3 +162,10 @@ func regional_survey_origin(ship_id: int, viewed_region: String) -> String:
 	if rules.regional_survey.origin == "viewed_region_legacy":
 		return viewed_region
 	return ship_region(ship_id)
+
+func outpost_at(region_id: String, owner: String) -> String:
+	for id: String in stations:
+		var station: Dictionary = stations[id]
+		if id != primary_station() and station.region == region_id and station.owner == owner and outpost_catalog.has(station.get("kind", "")):
+			return id
+	return ""

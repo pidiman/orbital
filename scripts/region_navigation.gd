@@ -99,7 +99,7 @@ func _ready() -> void:
 	target_rows = VBoxContainer.new()
 	target_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(target_rows)
-	hud._label(column, "Station stays at Earth. Mining continues remotely; distance costs come later.", 12, hud.MUTED)
+	hud._label(column, "Mining requires a local outpost and Miner. Hauling to Home is not available yet.", 12, hud.MUTED)
 	fleet.changed.connect(refresh)
 	fleet.model.changed.connect(refresh)
 	refresh()
@@ -160,7 +160,7 @@ func _survey() -> void:
 
 func _mine(asteroid_id: int) -> void:
 	var error: String = fleet.dispatch(asteroid_id, miner_picker.get_selected_id())
-	hud.message("Miner assigned. Ore returns to Home; mining continues across jumps." if error.is_empty() else error, not error.is_empty())
+	hud.message("Miner assigned. Minerals go to this region’s local storage." if error.is_empty() else error, not error.is_empty())
 
 func _fill(picker: OptionButton, capability: String) -> void:
 	var previous: int = picker.get_selected_id()
@@ -208,6 +208,7 @@ func refresh() -> void:
 		for content: Dictionary in record.contents:
 			if content.type == "anomaly":
 				anomalies.append("%s: +%d %s" % [content.name, content.amount, str(content.good).capitalize()])
+		detail_label.text += fleet.outposts.summary(selected_region) + "\n"
 		detail_label.text += "%d deposits. Studied: %s." % [record.asteroid_ids.size(), "; ".join(anomalies)]
 	var ship_id: int = scout_picker.get_selected_id()
 	var error: String = fleet.region_survey_error(ship_id, selected_region)
@@ -227,5 +228,6 @@ func refresh() -> void:
 			target_buttons[asteroid_id] = new_button
 		var rock: Dictionary = fleet.asteroids.get(asteroid_id, {})
 		var button: Button = target_buttons[asteroid_id]
-		button.disabled = rock.is_empty() or bool(rock.get("claimed", false)) or miner_picker.get_selected_id() <= 0 or fleet.unit_busy(miner_picker.get_selected_id())
+		button.disabled = rock.is_empty() or bool(rock.get("claimed", false)) or miner_picker.get_selected_id() <= 0 or not fleet.mining_error(miner_picker.get_selected_id(), asteroid_id).is_empty()
+		button.tooltip_text = fleet.mining_error(miner_picker.get_selected_id(), asteroid_id)
 		button.text = "Depleted deposit" if rock.is_empty() else "%s · %d Minerals" % ["Mining" if rock.claimed else "Assign Miner", rock.minerals]

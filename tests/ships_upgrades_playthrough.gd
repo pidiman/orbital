@@ -37,12 +37,16 @@ func _ready() -> void:
 	await page(1)
 	checks["ships_have_separate_page"] = game.hud.tabs.current_tab == 1 and game.hud.ship_buttons.size() == game.model.ship_catalog.size() and game.hud.ship_buttons.has("trader")
 	var materials_before: int = game.model.materials
+	game.hud.ship_buttons.miner.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.miner)
+	await settle(2)
 	await click(game.hud.ship_buttons.miner.get_global_rect().get_center())
 	var miner: int = game.model.next_ship_id
 	checks["independent_miner_purchased"] = game.model.ships.get(miner) == "miner" and game.model.materials == materials_before - 45
 	checks["ship_uses_power_not_grid"] = game.model.power_balance() == 4 and game.model.modules.size() == 2 and game.model.level == 1
 	mark("miner purchased")
 	await gather(35)
+	game.hud.ship_buttons.scout.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.scout)
+	await settle(2)
 	await click(game.hud.ship_buttons.scout.get_global_rect().get_center())
 	var scout: int = game.model.next_ship_id
 	checks["scout_purchased"] = game.model.ships.get(scout) == "scout" and game.model.power_balance() == 3

@@ -1,12 +1,12 @@
 # Location and ownership groundwork
 
-Gameplay remains unchanged. All models stay RefCounted and rendering stays 2D.
+The original refactor preserved gameplay. Outposts part 1 now adds founding and local mining; see [outposts-part1.md](outposts-part1.md) for current behavior, migration and verification. All models stay RefCounted and rendering stays 2D.
 
 ## Authority and compatibility
 
 `StationModel.locations` (`world_locations.gd`) owns the identity graph:
 
-- `stations[station_id]`: stable ID, owner, region. The data-defined primary station is `station:home`, owned by `player`, at Earth (`home`).
+- `stations[station_id]`: stable ID, owner, region. Outpost stations additionally hold definition, linked structure ID, local inventory and founding state. The data-defined primary station is `station:home`, owned by `player`, at Earth (`home`).
 - `structures[structure_id]`: monotonic `structure:N` ID, kind, station ID, owner, region, continuous Vector2 position, and state. Tier, refinery progress, lab completions, depot deliveries and gate jumps belong to this record.
 - `ships[ship_id]`: existing monotonic integer ID, kind, owning station, owner, physical region, and transit origin/destination. Ownership stays Home after teleportation; its power cost and recovery rules stay unchanged.
 
@@ -22,21 +22,21 @@ Mining assignments are keyed by typed actor identity (`ship/1`, `structure/struc
 
 Material collection resolves the ship's physical region, that region's supply, a stable depot ID and owning destination station. It calls the existing salvage operation, carries one Material, and deposits through the same inventory adapter. Full-storage waiting, removed-depot waiting, recovery and automatic resume retain their old behavior. Gates retain their source structure ID even after demolition, so launched trips still finish.
 
-`data/location_rules.json` declares primary ownership, supported work regions, the current supply region and compatibility policies. Unsupported inventory destinations do not silently credit Home. This is not an outpost inventory implementation.
+`data/location_rules.json` declares primary ownership, supported work regions, the current supply region and compatibility policies. Unsupported inventory destinations do not silently credit Home. Outposts now register their own local mineral inventories in this adapter; Home hauling remains unavailable.
 
 ## Save migration
 
-Save version remains **2**. `extensions.world_locations` schema 1 stores stations, structures, ships, the structure ID allocator and canonical mining assignments. Existing collection/gate extensions additionally store depot/destination and launch-gate identity. The old core fields remain compatibility projections.
+Save version remains **2**. `extensions.world_locations` schema 1 stores stations, structures, ships, the structure ID allocator and canonical mining assignments. Existing collection/gate extensions additionally store depot/destination and launch-gate identity. Outposts part 1 adds `extensions.outposts` schema 1 and additive outpost inventory/founding fields to the canonical graph, without changing the v2 core. The old core fields remain compatibility projections.
 
 A save without the new extension gets deterministic structure IDs and Home ownership/location defaults. Existing gate relocation/transit takes precedence over the default, preserving old gameplay. Active mining and collection routes are reconstructed; missing demolished depots/gates remain valid historical references. Validation checks canonical state against the old projections before committing the entire candidate. Unknown extension metadata is retained.
 
-## Policies explicitly preserved for review
+## Compatibility policies and outpost transition
 
-- **`legacy_remote_home`: Home miners still extract remote ore into Home storage without relocating.** The actor, remote target and Home destination are now explicit. Review this policy when remote work is designed.
+- **`legacy_remote_home` is now disabled for new orders.** Remote mining requires a physically local Miner and an outpost; delivery uses `local_outpost`. Pre-outpost saves release legacy cross-region orders without consuming their remaining ore and show a migration notice.
 - Regional Scout surveys still select their route origin from the viewed region (`viewed_region_legacy`); the ship's physical Home location stays distinct.
-- Gate arrivals still cannot work or return. Construction and material supply stay Home-only. No remote construction, remote mining capability, outpost UI or new balance rules were added.
+- Gate arrivals can found outposts through the `founding` capability or mine locally through `mining` after an outpost exists. Return travel, full remote module construction and material hauling are not implemented. Other work remains Home-only.
 
-## Verification
+## Original refactor verification (historical)
 
 `tests/location_checks.gd` exercises 62 identity/location/migration assertions, included in `test_ships_upgrades.gd`: same-position identities across stations, upgrade/rebuild IDs, explicit remote mining yield/timing, view isolation, collection cargo/wait/resume, gate transit/arrival, atomic corruption rejection, old v2 migration (including demolished launch/drop-off structures), deterministic continuation and disk round-trip.
 

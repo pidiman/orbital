@@ -15,6 +15,8 @@ const Research = preload("res://scripts/research_model.gd")
 const Transport = preload("res://scripts/gate_transport.gd")
 var research: Research
 var transport: Transport
+const Outposts = preload("res://scripts/outpost_model.gd")
+var outposts: Outposts
 var collection: RefCounted
 var model: StationModel
 var asteroids: Dictionary = {}
@@ -42,6 +44,8 @@ func _init(station: StationModel) -> void:
 	research = Research.new(model, diplomacy)
 	model.research = research
 	transport = Transport.new(self)
+	outposts = Outposts.new(self)
+	outposts.changed.connect(changed.emit)
 	research.changed.connect(changed.emit)
 	transport.changed.connect(changed.emit)
 	diplomacy.changed.connect(changed.emit)
@@ -70,7 +74,7 @@ func mining_units() -> Dictionary:
 			units[world_position] = definition.mining
 	for ship_id: int in model.ships:
 		var definition: Dictionary = model.ship_catalog[model.ships[ship_id]]
-		if definition.has("mining") and transport.work_error(ship_id).is_empty():
+		if definition.has("mining") and mining_work_error(ship_id).is_empty():
 			units[ship_id] = definition.mining
 	return units
 
@@ -86,8 +90,14 @@ func dispatch(asteroid_id: int, selected_ship: int = -1) -> String:
 		return "That asteroid has left the sector."
 	if asteroids[asteroid_id].claimed:
 		return "A ship is already mining this asteroid."
+	if selected_ship != -1:
+		var error: String = mining_error(selected_ship, asteroid_id)
+		if not error.is_empty():
+			return error
 	var units: Dictionary = mining_units()
 	if units.is_empty():
+		if asteroid_region(asteroid_id) != regions.HOME:
+			return "Local mining requires an outpost and a Miner sent through a Teleport Gate."
 		return "Build a Miner in Ships or a Mining Ship module first."
 	if selected_ship != -1 and not units.has(selected_ship):
 		return "Select a Miner ship to assign an asteroid."
@@ -108,7 +118,9 @@ func dispatch(asteroid_id: int, selected_ship: int = -1) -> String:
 		dispatched.emit(unit, asteroid_id)
 		changed.emit()
 		return ""
-	return "Selected Miner is busy." if selected_ship != -1 else "All Mining Ships are busy. Wait for a mission to finish."
+	if asteroid_region(asteroid_id) == regions.HOME:
+		return "Selected Miner is busy." if selected_ship != -1 else "All Mining Ships are busy. Wait for a mission to finish."
+	return "No idle Miner is in this region. Remote mining requires a local outpost and a Miner sent through a gate."
 
 func sector_by_id(sector_id: String) -> Dictionary:
 	for sector: Dictionary in sectors:
@@ -335,9 +347,30 @@ func import_mining_jobs(values: Dictionary) -> void:
 	mining_assignments.clear()
 	for unit: Variant in values:
 		var actor: Dictionary = model.locations.actor_for(unit)
-		var route: Dictionary = model.locations.mining_route(actor, int(values[unit].target), asteroid_region(int(values[unit].target)))
+		var route: Dictionary = model.locations.mining_route(actor, int(values[unit].target), asteroid_region(int(values[unit].target)), true)
 		if route.is_empty():
 			continue
 		route["legacy_unit"] = unit
 		route["job"] = values[unit]
 		mining_assignments[model.locations.actor_key(actor)] = route
+
+func mining_work_error(ship_id: int) -> String:
+	if transport.jobs.has(ship_id):
+		return "Ship is in teleport transit."
+	var world: RefCounted = model.locations
+	if world.ship_region(ship_id) == regions.HOME:
+		return ""
+	if not world.ships.has(ship_id) or world.outpost_at(world.ship_region(ship_id), world.ships[ship_id].owner).is_empty():
+		return "Found an outpost in this ship's region before mining."
+	return ""
+
+func mining_error(ship_id: int, asteroid_id: int) -> String:
+	if not model.ships.has(ship_id) or not model.ship_catalog[model.ships[ship_id]].has("mining"):
+		return "Select a Miner ship to assign an asteroid."
+	if unit_busy(ship_id):
+		return "Selected Miner is busy."
+	if not asteroids.has(asteroid_id):
+		return "That asteroid has left the sector."
+	if model.locations.ship_region(ship_id) != asteroid_region(asteroid_id):
+		return "Send the Miner through a Teleport Gate to the asteroid's region first."
+	return mining_work_error(ship_id)

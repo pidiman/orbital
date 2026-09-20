@@ -50,6 +50,7 @@ func _ready() -> void:
 	region_view = RegionView.new()
 	region_view.name = "RegionView"
 	region_view.regions = fleet.regions
+	region_view.fleet = fleet
 	add_child(region_view)
 	board = Board.new()
 	board.name = "StationBoard"
@@ -100,7 +101,7 @@ func _ready() -> void:
 	_update_region_view()
 	_sync_readouts()
 	if resumed:
-		hud.message("Colony restored from your latest checkpoint.", false, 7.0)
+		hud.message(persistence.migration_notice if not persistence.migration_notice.is_empty() else "Colony restored from your latest checkpoint.", false, 12.0)
 	elif not resume_error.is_empty():
 		hud.message(resume_error, true, 12.0)
 
@@ -136,7 +137,7 @@ func _manual_save() -> void:
 
 func _manual_load() -> void:
 	var error: String = persistence.load_game()
-	hud.message("Latest checkpoint restored." if error.is_empty() else error, not error.is_empty())
+	hud.message((persistence.migration_notice if not persistence.migration_notice.is_empty() else "Latest checkpoint restored.") if error.is_empty() else error, not error.is_empty(), 12.0)
 
 func _save_failure(message: String) -> void:
 	if is_instance_valid(hud):

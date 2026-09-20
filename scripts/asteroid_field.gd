@@ -58,8 +58,13 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _on_completed(unit: Variant, asteroid_id: int, amount: int) -> void:
 	var point: Vector2 = rocks[asteroid_id].point if rocks.has(asteroid_id) else board.center
-	minerals_delivered.emit(amount, point)
-	notice.emit("+%d Minerals. Auto-mining continues." % amount if fleet.jobs.has(unit) else "Mining complete: +%d Minerals. Ship ready." % amount, false)
+	var region: String = fleet.model.locations.actor_record(fleet.model.locations.actor_for(unit)).region
+	if region == fleet.regions.current_region:
+		minerals_delivered.emit(amount, point)
+	if region != fleet.regions.HOME:
+		notice.emit("%s outpost: +%d local Minerals. Home storage unchanged." % [fleet.regions.catalog[region].name, amount], false)
+	else:
+		notice.emit("+%d Minerals. Auto-mining continues." % amount if fleet.jobs.has(unit) else "Mining complete: +%d Minerals. Ship ready." % amount, false)
 	if not fleet.asteroids.has(asteroid_id):
 		rocks.erase(asteroid_id)
 	asteroid_count = rocks.size()

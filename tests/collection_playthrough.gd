@@ -11,6 +11,8 @@ func _ready() -> void:
 	await click(game.board.cell_position(Vector2i(1, 0)))
 	await gather(40)
 	await page(1)
+	game.hud.ship_buttons.material_ship.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.material_ship)
+	await settle(2)
 	await click(game.hud.ship_buttons.material_ship.get_global_rect().get_center())
 	var ship_id: int = game.model.next_ship_id
 	await click(game.hud.command_buttons[ship_id].get_global_rect().get_center())
@@ -44,6 +46,8 @@ func _ready() -> void:
 	await settle(2)
 	checks.restored_ui = game.hud.command_buttons[ship_id].text.contains("Storage full")
 	game.get_node("ResourceClock").set_process(true)
+	game.hud.ship_buttons.scout.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.scout)
+	await settle(2)
 	await click(game.hud.ship_buttons.scout.get_global_rect().get_center())
 	await settle(15)
 	checks.resume_after_purchase = not game.supply.collection.jobs[ship_id].waiting

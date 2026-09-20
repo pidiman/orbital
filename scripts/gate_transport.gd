@@ -30,7 +30,7 @@ func work_error(ship_id: int) -> String:
 	if jobs.has(ship_id):
 		return "Ship is in teleport transit."
 	if not fleet.model.locations.rules.work_regions.has(location(ship_id)):
-		return "Ship is stationed in %s. Remote ship operations are future scope." % fleet.regions.catalog[location(ship_id)].name
+		return "Ship is stationed in %s. This operation away from Home is future scope." % fleet.regions.catalog[location(ship_id)].name
 	return ""
 
 func jump_error(gate: Vector2, ship_id: int, destination: String) -> String:
@@ -82,10 +82,10 @@ func cancel(ship_id: int) -> void:
 	if jobs.has(ship_id):
 		for good: String in jobs[ship_id].cost:
 			fleet.diplomacy.inventory[good] += int(jobs[ship_id].cost[good])
+		if fleet.model.locations.ships.has(ship_id):
+			fleet.model.locations.ships[ship_id].region = jobs[ship_id].origin
+			fleet.model.locations.ships[ship_id].transit = {}
 	jobs.erase(ship_id)
-	if fleet.model.locations.ships.has(ship_id):
-		fleet.model.locations.ships[ship_id].transit = {}
-		fleet.model.locations.ships[ship_id].region = fleet.model.locations.station_region(fleet.model.locations.primary_station())
 	changed.emit()
 
 func migrate_job_locations() -> void:

@@ -26,7 +26,7 @@ func run(check: Callable) -> void:
 	var different := Regions.new(43)
 	different.generate("venus")
 	check.call(different.records.venus.contents != first.records.venus.contents, "different seeds produce different regional content")
-	check.call(first.catalog.mars.coordinate is Array and first.catalog.home.structures.primary_station and not first.allows_outposts("venus") and first.records.venus.structures.is_empty(), "abstract coordinates and separate future structure slots")
+	check.call(first.catalog.mars.coordinate is Array and first.catalog.home.structures.primary_station and first.allows_outposts("venus") and first.records.venus.structures.is_empty(), "abstract coordinates and enabled outpost regions")
 	var store: Store = make_store()
 	var model: StationModel = store.model
 	var fleet: MiningFleet = store.fleet
@@ -74,15 +74,15 @@ func run(check: Callable) -> void:
 	var resources_before: int = model.materials
 	check.call(not model.build(Vector2(0, 58), "solar").is_empty() and model.materials == resources_before and model.modules == modules, "construction rejected away from Home at model boundary")
 	var target: int = regions.records.venus.asteroid_ids[0]
-	check.call(fleet.dispatch(target, miner).is_empty(), "regional deposits use existing Miner mechanics")
+	check.call(not fleet.dispatch(target, miner).is_empty(), "regional deposits reject Home miners until transported")
 	tick(store, 3)
 	model.tick_elapsed = 0.375
-	check.call(store.save_game().is_empty() and loaded.load_game().is_empty() and loaded.snapshot() == store.snapshot(), "remote location active mining and fractional phase round trip")
+	check.call(store.save_game().is_empty() and loaded.load_game().is_empty() and loaded.snapshot() == store.snapshot(), "remote viewed location and fractional phase round trip")
 	check.call(loaded.fleet.regions.current_region == "venus" and loaded.fleet.regions.records.venus == regions.records.venus, "load restores current region content and RNG bits")
 	check.call(regions.jump("home").is_empty(), "unlocked adjacent return route")
 	var minerals_before: int = model.minerals
 	tick(store, 5)
-	check.call(model.minerals > minerals_before and regions.current_region == "home", "regional mining continues after leaving region")
+	check.call(model.minerals == minerals_before and regions.current_region == "home", "blocked remote mining never credits Home")
 	check.call(fleet.survey_region(scout, "mars").is_empty(), "Mars reachable from Home graph")
 	tick(store, 7)
 	check.call(regions.jump("mars").is_empty() and fleet.survey_region(scout, "pluto").is_empty(), "Mars unlocks non-Home multi-hop Pluto route")

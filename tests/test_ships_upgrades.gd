@@ -118,6 +118,10 @@ func _initialize() -> void:
 	var location_checks: Dictionary = preload("res://tests/location_checks.gd").run()
 	for name: String in location_checks:
 		check(location_checks[name], "location: " + name)
+	var outpost_checks: Dictionary = preload("res://tests/outpost_checks.gd").run()
+	check(outpost_checks.size() >= 40, "outpost checks finish")
+	for name: String in outpost_checks:
+		check(outpost_checks[name], "outpost: " + name)
 	print("Ships/upgrades checks: %d passed / %d total" % [checks - failures.size(), checks])
 	for failure: String in failures:
 		printerr("FAIL: " + failure)

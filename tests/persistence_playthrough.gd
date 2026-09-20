@@ -17,9 +17,13 @@ func _ready() -> void:
 	checks["build_autosaves"] = FileAccess.file_exists(test_path) and not game.persistence.dirty
 	await gather(45)
 	await page(1)
+	game.hud.ship_buttons.miner.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.miner)
+	await settle(2)
 	await click(game.hud.ship_buttons.miner.get_global_rect().get_center())
 	var miner: int = game.model.next_ship_id
 	await gather(35)
+	game.hud.ship_buttons.scout.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.scout)
+	await settle(2)
 	await click(game.hud.ship_buttons.scout.get_global_rect().get_center())
 	var scout: int = game.model.next_ship_id
 	await click(game.hud.command_buttons[miner].get_global_rect().get_center())

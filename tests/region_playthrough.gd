@@ -15,9 +15,13 @@ func _ready() -> void:
 	await click(game.board.cell_position(Vector2i(1, 0)))
 	await gather(35)
 	await page(1)
+	game.hud.ship_buttons.scout.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.scout)
+	await settle(2)
 	await click(game.hud.ship_buttons.scout.get_global_rect().get_center())
 	var scout: int = game.model.next_ship_id
 	await gather(45)
+	game.hud.ship_buttons.miner.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.miner)
+	await settle(2)
 	await click(game.hud.ship_buttons.miner.get_global_rect().get_center())
 	var miner: int = game.model.next_ship_id
 	var nav: Control = game.hud.region_navigation
@@ -44,7 +48,7 @@ func _ready() -> void:
 	var target: int = game.fleet.regions.records.venus.asteroid_ids[0]
 	await click(game.hud.command_buttons[miner].get_global_rect().get_center())
 	await click(game.asteroids.rocks[target].point)
-	checks["regional_asteroid_click_mines"] = game.fleet.jobs.has(miner) and game.fleet.jobs[miner].target == target
+	checks["regional_click_requires_local_miner"] = not game.fleet.jobs.has(miner) and game.hud.status_label.text.contains("Teleport Gate")
 	game.get_node("ResourceClock").set_process(false)
 	await click(game.hud.save_button.get_global_rect().get_center())
 	var expected: Dictionary = game.persistence.snapshot()
@@ -81,7 +85,7 @@ func _ready() -> void:
 	while game.model.minerals == before and attempts < 150:
 		attempts += 1
 		await get_tree().create_timer(0.1).timeout
-	checks["remote_mining_continues_at_home"] = game.model.minerals > before and game.fleet.regions.current_region == "home"
+	checks["blocked_remote_mining_does_not_credit_home"] = game.model.minerals == before and game.fleet.regions.current_region == "home"
 	# Multi-hop route: survey Mars, visit it, then scout Pluto.
 	await click(nav.region_buttons.pluto.get_global_rect().get_center())
 	checks["pluto_blocked_from_home"] = nav.send_button.disabled and nav.jump_button.disabled

@@ -20,7 +20,7 @@ static func validate_graph(data: Dictionary, model: StationModel, region_data: D
 		if not record is Dictionary or record.get("id") != id or not record.get("station_id") is String or not data.stations.has(record.station_id):
 			return "Invalid structure owner station."
 		var station: Dictionary = data.stations[record.station_id]
-		if record.get("owner") != station.owner or record.get("region") != station.region or not record.get("position") is Vector2 or not record.position.is_finite() or not record.get("kind") is String or not model.catalog.has(record.kind) or not record.get("state") is Dictionary:
+		if record.get("owner") != station.owner or record.get("region") != station.region or not record.get("position") is Vector2 or not record.position.is_finite() or not record.get("kind") is String or (not model.catalog.has(record.kind) and not model.locations.outpost_catalog.has(record.kind)) or not record.get("state") is Dictionary:
 			return "Invalid structure location, definition or state."
 		if not positions.has(record.station_id):
 			positions[record.station_id] = {}
@@ -59,7 +59,7 @@ static func validate_projections(model: StationModel, station_data: Dictionary, 
 			return "Canonical capability state disagrees with legacy " + str(pair[0]) + "."
 	return ""
 
-static func validate_assignments(assignments: Dictionary, fleet: MiningFleet, old_jobs: Dictionary) -> String:
+static func validate_assignments(assignments: Dictionary, fleet: MiningFleet, old_jobs: Dictionary, legacy: bool = false) -> String:
 	if assignments.size() != old_jobs.size():
 		return "Mining identity count disagrees with active missions."
 	var seen: Dictionary = {}
@@ -78,7 +78,7 @@ static func validate_assignments(assignments: Dictionary, fleet: MiningFleet, ol
 			return "Mining identity disagrees with legacy mission."
 		seen[unit] = true
 		var target: int = int(old_jobs[unit].target)
-		var expected: Dictionary = fleet.model.locations.mining_route(actor, target, fleet.asteroid_region(target))
+		var expected: Dictionary = fleet.model.locations.mining_route(actor, target, fleet.asteroid_region(target), legacy)
 		if expected.is_empty():
 			return "Mining route is not supported by current location policy."
 		for field: String in expected:

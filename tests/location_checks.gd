@@ -15,6 +15,7 @@ static func tick(store: Store, count: int) -> void:
 static func legacy(store: Store) -> Dictionary:
 	var result: Dictionary = store.snapshot()
 	result.extensions.erase("world_locations")
+	result.extensions.erase("outposts")
 	var jobs: Dictionary = store.supply.collection.jobs.duplicate(true)
 	for job: Dictionary in jobs.values():
 		job.erase("depot_id")
@@ -68,9 +69,13 @@ static func run() -> Dictionary:
 	checks.view_is_not_location = fleet.regions.viewed_region == "pluto" and world.ship_region(miner) == "home" and world.structures[solar_id].region == "home"
 	checks.remote_construction_still_blocked = not model.build(Vector2(174, 58), "solar").is_empty()
 	var target: int = fleet.regions.records.pluto.asteroid_ids[0]
-	checks.remote_dispatch = fleet.dispatch(target, miner).is_empty()
+	checks.cross_region_dispatch_rejected = not fleet.dispatch(target, miner).is_empty()
+	store.supply._spawn_asteroid()
+	target = store.supply.next_home_id
+	fleet.asteroids[target].minerals = 90
+	checks.home_dispatch_while_viewing_remote = fleet.dispatch(target, miner).is_empty()
 	var route: Dictionary = fleet.mining_assignment(miner)
-	checks.explicit_legacy_route = route.policy == "legacy_remote_home" and route.origin_region == "home" and route.target.region == "pluto" and route.destination == {"station_id": "station:home", "region": "home"} and route.cargo.minerals == 0
+	checks.explicit_home_route = route.policy == "local" and route.origin_region == "home" and route.target.region == "home" and route.destination == {"station_id": "station:home", "region": "home"} and route.cargo.minerals == 0
 	var ore: int = model.minerals
 	var amount: int = mini(fleet.asteroids[target].minerals, route.job.yield)
 	tick(store, int(route.job.duration) - 1)
@@ -106,7 +111,7 @@ static func run() -> Dictionary:
 		return checks
 	checks.legacy_active_migration = restore_error.is_empty() and loaded.snapshot().state == saved.state and loaded.model.locations.ships[departing].transit == world.ships[departing].transit
 	checks.legacy_collection_migration = loaded.supply.collection.jobs[collector].waiting and loaded.supply.collection.jobs[collector].cargo == 1 and loaded.supply.collection.jobs[collector].depot_id == loaded.model.structure_id_at(depot)
-	checks.legacy_routes_migrate = loaded.fleet.mining_assignment(miner).policy == "legacy_remote_home" and loaded.fleet.mining_assignment(dock).actor.id == loaded.model.structure_id_at(dock)
+	checks.legacy_routes_migrate = loaded.fleet.mining_assignment(miner).policy == "local" and loaded.fleet.mining_assignment(dock).actor.id == loaded.model.structure_id_at(dock)
 	var migrated: Dictionary = loaded.snapshot()
 	checks.migrated_roundtrip = loaded.restore(migrated).is_empty() and loaded.snapshot() == migrated
 	# Compare migrated legacy execution with the same active canonical checkpoint.

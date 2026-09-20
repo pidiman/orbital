@@ -1,6 +1,7 @@
 extends Node2D
 const Regions = preload("res://scripts/region_model.gd")
 var regions: Regions
+var fleet: MiningFleet
 var stars: Array[Vector2] = []
 var font: Font = ThemeDB.fallback_font
 
@@ -11,6 +12,7 @@ func _ready() -> void:
 		stars.append(Vector2(rng.randf(), rng.randf()))
 	get_viewport().size_changed.connect(queue_redraw)
 	regions.changed.connect(queue_redraw)
+	fleet.changed.connect(queue_redraw)
 
 # This projection is presentation only. Content coordinates never change on jump/resize.
 static func project(point: Vector2, area: Vector2) -> Vector2:
@@ -54,3 +56,13 @@ func _draw() -> void:
 		draw_circle(point, 4, tint)
 		draw_string(font, point + Vector2(-40, 30), content.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, tint)
 		draw_string(font, point + Vector2(-40, 45), "Studied · +%d %s" % [content.amount, str(content.good).capitalize()], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, tint)
+
+	var world: RefCounted = fleet.model.locations
+	var outpost_id: String = world.outpost_at(regions.current_region, world.rules.primary_station.owner)
+	if not outpost_id.is_empty():
+		var station: Dictionary = world.stations[outpost_id]
+		var structure: Dictionary = world.structures[station.structure_id]
+		var outpost: Dictionary = world.outpost_catalog[station.kind]
+		var point: Vector2 = project(structure.position, area)
+		ModuleArt.draw_module(self, point, outpost.art, 0.85)
+		draw_string(font, point + Vector2(-75, 40), "%s · %d Minerals" % [outpost.name, station.inventory.minerals], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(outpost.color))

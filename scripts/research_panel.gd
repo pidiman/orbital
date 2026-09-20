@@ -67,7 +67,7 @@ func _ready() -> void:
 	locations_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	column.add_child(locations_scroll)
 	locations_label = hud._label(locations_scroll, "", 13, hud.INK)
-	var note: Label = hud._label(column, "Arrived ships remain there. Remote ship work, mining and construction are future scope.", 12, hud.MUTED)
+	var note: Label = hud._label(column, "Jump Ships can found outposts. Local Miners deposit there. Return hauling and module construction are future scope.", 12, hud.MUTED)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	fleet.changed.connect(refresh)
 	fleet.model.changed.connect(refresh)

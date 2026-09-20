@@ -53,7 +53,7 @@
     },
     "structures": {
       "primary_station": false,
-      "outposts_enabled": false
+      "outposts_enabled": true
     },
     "content_rules": {
       "asteroid_count": [
@@ -93,7 +93,7 @@
     },
     "structures": {
       "primary_station": false,
-      "outposts_enabled": false
+      "outposts_enabled": true
     },
     "content_rules": {
       "asteroid_count": [
@@ -131,7 +131,7 @@
     },
     "structures": {
       "primary_station": false,
-      "outposts_enabled": false
+      "outposts_enabled": true
     },
     "content_rules": {
       "asteroid_count": [

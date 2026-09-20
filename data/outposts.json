@@ -1,0 +1,18 @@
+{
+  "mining_outpost": {
+    "name": "Mining Outpost",
+    "description": "Local mineral storage. Resources remain in this region.",
+    "cost": {
+      "materials": 60
+    },
+    "storage": {
+      "minerals": 0
+    },
+    "position": [
+      400,
+      110
+    ],
+    "art": "storage",
+    "color": "6ce0d5"
+  }
+}

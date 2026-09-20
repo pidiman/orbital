@@ -12,6 +12,8 @@ func _ready() -> void:
 	await click(game.board.cell_position(Vector2i(1, 0)))
 	await gather(35)
 	await page(1)
+	game.hud.ship_buttons.scout.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.scout)
+	await settle(2)
 	await click(game.hud.ship_buttons.scout.get_global_rect().get_center())
 	var scout: int = game.model.next_ship_id
 	checks["scout_built"] = game.model.ships.get(scout) == "scout" and game.model.power_balance() == 5
@@ -36,6 +38,8 @@ func _ready() -> void:
 	save_frame("discovery")
 	await click(map.close_button.get_global_rect().get_center())
 	await gather(45)
+	game.hud.ship_buttons.miner.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.miner)
+	await settle(2)
 	await click(game.hud.ship_buttons.miner.get_global_rect().get_center())
 	var miner: int = game.model.next_ship_id
 	checks["miner_built"] = game.model.ships.get(miner) == "miner"

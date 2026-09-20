@@ -24,6 +24,8 @@ func _ready() -> void:
 	checks["ui_rebuild_solar_recovery"] = game.model.modules.get(Vector2(58, 0)) == "solar" and game.model.power_balance() == 6
 	await gather(45)
 	await page(1)
+	game.hud.ship_buttons.miner.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.miner)
+	await settle(2)
 	await click(game.hud.ship_buttons.miner.get_global_rect().get_center())
 	var miner: int = game.model.next_ship_id
 	var target: int = game.asteroids.rocks.keys()[0]
@@ -36,6 +38,8 @@ func _ready() -> void:
 	checks["ui_ship_sale"] = not game.model.ships.has(miner) and game.model.materials == before + 22 and game.model.power_balance() == 6
 	checks["ui_busy_mission_release"] = not game.fleet.asteroids[target].claimed and game.fleet.jobs.is_empty() and not game.hud.command_buttons.has(miner)
 	await gather(35)
+	game.hud.ship_buttons.scout.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.scout)
+	await settle(2)
 	await click(game.hud.ship_buttons.scout.get_global_rect().get_center())
 	var scout: int = game.model.next_ship_id
 	await click(game.hud.command_buttons[scout].get_global_rect().get_center())

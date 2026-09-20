@@ -51,5 +51,17 @@
       "region": "home"
     },
     "art": "trader"
+  },
+  "jump_ship": {
+    "name": "Jump Ship",
+    "cost": 65,
+    "power_use": 2,
+    "color": "6ce0d5",
+    "description": "Travel through a Teleport Gate, then found a local mining outpost.",
+    "effect": "Found outpost \u00b7 2 power",
+    "founding": {
+      "outpost": "mining_outpost"
+    },
+    "art": "scout"
   }
 }

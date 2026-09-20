@@ -8,7 +8,7 @@
     "home"
   ],
   "mining": {
-    "allow_remote_from_primary": true
+    "allow_remote_from_primary": false
   },
   "regional_survey": {
     "origin": "viewed_region_legacy"
