@@ -7,6 +7,8 @@ const Supply = preload("res://scripts/sector_supply.gd")
 const Collection = preload("res://scripts/material_collection.gd")
 const Research = preload("res://scripts/research_model.gd")
 const Transport = preload("res://scripts/gate_transport.gd")
+const Locations = preload("res://scripts/world_locations.gd")
+const LocationValidation = preload("res://scripts/location_save_validation.gd")
 const VERSION: int = 2
 const DEFAULT_PATH: String = "user://orbital-save.json"
 const STATION_FIELDS: Array[String] = ["modules", "module_tiers", "ships", "next_ship_id", "materials", "minerals", "capacity", "power_output", "power_use", "level", "ticks", "tick_elapsed", "refinery_progress", "total_refined"]
@@ -77,6 +79,9 @@ func snapshot() -> Dictionary:
 	document.extensions.regions["schema_version"] = 1
 	_merge_fields(document.extensions, "alien_trade", fleet.diplomacy, Trade.FIELDS)
 	document.extensions.alien_trade["schema_version"] = 1
+	_merge_fields(document.extensions, "world_locations", model.locations, Locations.FIELDS)
+	document.extensions.world_locations["schema_version"] = 1
+	document.extensions.world_locations["mining_assignments"] = _encode(fleet.mining_assignments)
 	if not document.has("state"):
 		document["state"] = {}
 	_merge_fields(document.state, "station", model, STATION_FIELDS)
@@ -326,6 +331,41 @@ func restore(document: Variant) -> String:
 	error = _validate_research_transport(research_data, transport_data, station_data, fleet_data, region_data, candidate_fleet.diplomacy.jobs, collection_data.jobs, candidate_fleet)
 	if not error.is_empty():
 		return error
+	# Build a complete isolated candidate, migrating pre-location v2 saves first.
+	_apply_fields(candidate_fleet.regions, region_data, Regions.FIELDS)
+	_apply_fields(candidate_fleet, fleet_data, FLEET_FIELDS)
+	_apply_fields(candidate_fleet.research, research_data, Research.FIELDS)
+	_apply_fields(candidate_fleet.transport, transport_data, Transport.FIELDS)
+	_apply_fields(candidate_supply.collection, collection_data, Collection.FIELDS)
+	for ship_id: int in candidate_fleet.transport.jobs:
+		candidate.locations.begin_transit(ship_id, candidate_fleet.transport.jobs[ship_id].destination)
+	if migrated.extensions.has("world_locations"):
+		var location_data: Dictionary = _extension_fields(migrated.extensions, "world_locations", candidate.locations, Locations.FIELDS)
+		if not decode_error.is_empty():
+			return decode_error
+		error = LocationValidation.validate_graph(location_data, candidate, region_data, transport_data)
+		if not error.is_empty():
+			return error
+		_apply_fields(candidate.locations, location_data, Locations.FIELDS)
+		error = LocationValidation.validate_projections(candidate, station_data, research_data, transport_data, collection_data)
+		if not error.is_empty():
+			return error
+		var assignments: Variant = _decode(migrated.extensions.world_locations.get("mining_assignments"))
+		if not decode_error.is_empty() or not assignments is Dictionary:
+			return "Invalid canonical mining assignments."
+		error = LocationValidation.validate_assignments(assignments, candidate_fleet, fleet_data.jobs)
+		if not error.is_empty():
+			return error
+		candidate_fleet.mining_assignments = assignments
+	else:
+		candidate_supply.collection.migrate_job_locations()
+		candidate_fleet.transport.migrate_job_locations()
+	error = LocationValidation.validate_gate_bindings(transport_data, candidate)
+	if not error.is_empty():
+		return error
+	error = LocationValidation.validate_collection(collection_data, candidate)
+	if not error.is_empty():
+		return error
 	# Commit only after the whole graph has passed validation. Existing model references survive.
 	_apply_fields(fleet.research, research_data, Research.FIELDS)
 	_apply_fields(fleet.transport, transport_data, Transport.FIELDS)
@@ -334,6 +374,9 @@ func restore(document: Variant) -> String:
 	_apply_fields(fleet, fleet_data, FLEET_FIELDS)
 	_apply_fields(supply, supply_data, SUPPLY_FIELDS)
 	_apply_fields(supply.collection, collection_data, Collection.FIELDS)
+	for field: String in Locations.FIELDS:
+		model.locations.set(field, candidate.locations.get(field))
+	fleet.mining_assignments = candidate_fleet.mining_assignments
 	for field: String in Trade.FIELDS:
 		fleet.diplomacy.set(field, candidate_fleet.diplomacy.get(field))
 	supply.rng.seed = int(supply_data.rng_seed)

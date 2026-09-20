@@ -150,7 +150,7 @@ func _ready() -> void:
 	await click(game.hud.save_button.get_global_rect().get_center())
 	expected = game.persistence.snapshot()
 	game.persistence.autosave_blocked = true
-	game.fleet.transport.locations.clear()
+	game.fleet.transport.locations = {}
 	await click(game.hud.load_button.get_global_rect().get_center())
 	checks.arrived_save_load = game.persistence.snapshot() == expected
 	await click(game.hud.research_button.get_global_rect().get_center())

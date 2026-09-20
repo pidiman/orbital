@@ -2,8 +2,12 @@ extends RefCounted
 signal changed
 signal arrived(ship_id: int, region_id: String)
 const FIELDS: Array[String] = ["gates", "locations", "jobs"]
-var gates: Dictionary = {}
-var locations: Dictionary = {}
+var gates: Dictionary:
+	get: return fleet.model.capability_states("teleport", {"jumps": 0})
+	set(value): fleet.model.import_capability_states("teleport", value)
+var locations: Dictionary:
+	get: return fleet.model.locations.legacy_locations()
+	set(value): fleet.model.locations.import_locations(value)
 var jobs: Dictionary = {}
 var fleet_ref: WeakRef
 var fleet: RefCounted:
@@ -17,20 +21,15 @@ func _init(ships: RefCounted) -> void:
 	sync_gates()
 
 func sync_gates() -> void:
-	for point: Vector2 in gates.keys():
-		if not fleet.model.modules.has(point) or not fleet.model.definition_at(point).has("teleport"):
-			gates.erase(point)
-	for point: Vector2 in fleet.model.modules:
-		if fleet.model.definition_at(point).has("teleport") and not gates.has(point):
-			gates[point] = {"jumps": 0}
+	fleet.model.capability_states("teleport", {"jumps": 0})
 
 func location(ship_id: int) -> String:
-	return str(locations.get(ship_id, fleet.regions.HOME))
+	return fleet.model.locations.ship_region(ship_id)
 
 func work_error(ship_id: int) -> String:
 	if jobs.has(ship_id):
 		return "Ship is in teleport transit."
-	if location(ship_id) != fleet.regions.HOME:
+	if not fleet.model.locations.rules.work_regions.has(location(ship_id)):
 		return "Ship is stationed in %s. Remote ship operations are future scope." % fleet.regions.catalog[location(ship_id)].name
 	return ""
 
@@ -45,7 +44,8 @@ func jump_error(gate: Vector2, ship_id: int, destination: String) -> String:
 		return "Ship is busy. Choose an idle Home ship."
 	if not fleet.regions.is_discovered(destination):
 		return "Survey the destination region first."
-	if destination == fleet.regions.HOME or not fleet.regions.adjacent(fleet.regions.HOME, destination):
+	var origin: String = fleet.model.locations.structures[fleet.model.structure_id_at(gate)].region
+	if destination == origin or not fleet.regions.adjacent(origin, destination):
 		return "No direct gate route from Home to this region."
 	var capability: Dictionary = fleet.model.definition_at(gate).teleport
 	for good: String in capability.cost:
@@ -61,7 +61,8 @@ func jump(gate: Vector2, ship_id: int, destination: String) -> String:
 	for good: String in capability.cost:
 		fleet.diplomacy.inventory[good] -= int(capability.cost[good])
 	var duration: int = maxi(1, int(capability.seconds))
-	jobs[ship_id] = {"gate": gate, "origin": fleet.regions.HOME, "destination": destination, "remaining": duration, "duration": duration, "cost": capability.cost.duplicate(true)}
+	fleet.model.locations.begin_transit(ship_id, destination)
+	jobs[ship_id] = {"gate_id": fleet.model.structure_id_at(gate), "gate": gate, "origin": location(ship_id), "destination": destination, "remaining": duration, "duration": duration, "cost": capability.cost.duplicate(true)}
 	gates[gate].jumps += 1
 	changed.emit()
 	fleet.diplomacy.changed.emit()
@@ -72,7 +73,7 @@ func tick() -> void:
 		var job: Dictionary = jobs[ship_id]
 		job.remaining -= 1
 		if job.remaining <= 0:
-			locations[ship_id] = job.destination
+			fleet.model.locations.finish_transit(ship_id)
 			jobs.erase(ship_id)
 			arrived.emit(ship_id, job.destination)
 			changed.emit()
@@ -82,5 +83,12 @@ func cancel(ship_id: int) -> void:
 		for good: String in jobs[ship_id].cost:
 			fleet.diplomacy.inventory[good] += int(jobs[ship_id].cost[good])
 	jobs.erase(ship_id)
-	locations.erase(ship_id)
+	if fleet.model.locations.ships.has(ship_id):
+		fleet.model.locations.ships[ship_id].transit = {}
+		fleet.model.locations.ships[ship_id].region = fleet.model.locations.station_region(fleet.model.locations.primary_station())
 	changed.emit()
+
+func migrate_job_locations() -> void:
+	for job: Dictionary in jobs.values():
+		if not job.has("gate_id"):
+			job["gate_id"] = fleet.model.structure_id_at(job.gate) if fleet.model.modules.has(job.gate) and fleet.model.definition_at(job.gate).has("teleport") else ""

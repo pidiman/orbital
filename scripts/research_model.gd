@@ -3,7 +3,9 @@ signal changed
 const FIELDS: Array[String] = ["researched", "labs"]
 var catalog: Dictionary
 var researched: Dictionary = {}
-var labs: Dictionary = {}
+var labs: Dictionary:
+	get: return model.capability_states("research", {"completed": 0})
+	set(value): model.import_capability_states("research", value)
 var model_ref: WeakRef
 var trade_ref: WeakRef
 var model: StationModel:
@@ -21,12 +23,7 @@ func _init(station: StationModel, diplomacy: RefCounted) -> void:
 	sync_labs()
 
 func sync_labs() -> void:
-	for point: Vector2 in labs.keys():
-		if not model.modules.has(point) or not model.definition_at(point).has("research"):
-			labs.erase(point)
-	for point: Vector2 in model.modules:
-		if model.definition_at(point).has("research") and not labs.has(point):
-			labs[point] = {"completed": 0}
+	model.capability_states("research", {"completed": 0})
 
 func unlocked(category: String, item: String) -> bool:
 	var gated: bool = false

@@ -97,3 +97,9 @@ func salvage(debris_id: int, receiver: Callable = Callable(), limit: int = -1) -
 	if piece.amount == 0:
 		debris.erase(debris_id)
 	return received
+
+func content_region() -> String:
+	return str(model.locations.rules.collection.supply_region)
+
+func debris_in(region_id: String) -> Dictionary:
+	return debris if region_id == content_region() else {}

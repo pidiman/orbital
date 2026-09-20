@@ -78,7 +78,7 @@ func _initialize() -> void:
 	fund_and_build(model, Vector2(-58, 58), "refinery")
 	model.materials = 20
 	model.minerals = 4
-	model.refinery_progress.clear()
+	model.refinery_progress = {}
 	for i in range(3):
 		model.tick()
 	check(model.materials == 32 and model.minerals == 0, "parallel refineries consume exact input")

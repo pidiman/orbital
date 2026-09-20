@@ -1,5 +1,7 @@
 class_name StationModel
 extends RefCounted
+const Locations = preload("res://scripts/world_locations.gd")
+var locations: Locations
 const Geometry = preload("res://scripts/station_geometry.gd")
 
 signal module_removed(world_position: Vector2)
@@ -18,14 +20,22 @@ var region_context: RefCounted
 var decommission_rules: Dictionary = {}
 var catalog: Dictionary = {}
 var ship_catalog: Dictionary = {}
-var ships: Dictionary = {}
+var ships: Dictionary:
+	get: return locations.legacy_ships()
+	set(value): locations.import_ships(value)
 var next_ship_id: int = 0
-var module_tiers: Dictionary = {}
-# Canonical continuous station-world centers, in world units (58 per module).
+var module_tiers: Dictionary:
+	get: return locations.position_state("tier")
+	set(value): locations.import_position_state("tier", value)
+# Primary-station position view, in continuous world units (58 per module).
 # Never round here: grid snapping belongs exclusively to the board input adapter.
-var modules: Dictionary = {Vector2.ZERO: "habitat"}
+var modules: Dictionary:
+	get: return locations.legacy_modules()
+	set(value): locations.import_modules(value)
 var minerals: int = 0
-var refinery_progress: Dictionary = {}
+var refinery_progress: Dictionary:
+	get: return locations.position_state("refinery_progress")
+	set(value): locations.import_position_state("refinery_progress", value)
 var total_refined: int = 0
 var materials: int = 40
 var capacity: int = 100
@@ -36,6 +46,8 @@ var ticks: int = 0
 var tick_elapsed: float = 0.0
 
 func _init() -> void:
+	locations = Locations.new(self)
+	locations.add_structure(locations.primary_station(), "habitat", Vector2.ZERO)
 	decommission_rules = JSON.parse_string(FileAccess.get_file_as_string("res://data/decommission.json"))
 	catalog = JSON.parse_string(FileAccess.get_file_as_string("res://data/modules.json"))
 	ship_catalog = JSON.parse_string(FileAccess.get_file_as_string("res://data/ships.json"))
@@ -97,7 +109,7 @@ func build(world_position: Vector2, kind: String) -> String:
 		return error
 	var old_level: int = level
 	materials -= int(catalog[kind].cost)
-	modules[world_position] = kind
+	locations.add_structure(locations.primary_station(), kind, world_position)
 	recalculate()
 	module_built.emit(world_position, kind)
 	changed.emit()
@@ -139,7 +151,7 @@ func _refine() -> void:
 			materials += int(recipe.output)
 			produced += int(recipe.output)
 			progress = 0
-		refinery_progress[world_position] = progress
+		structure_state(world_position)["refinery_progress"] = progress
 	if produced > 0:
 		total_refined += produced
 		refined.emit(produced)
@@ -184,7 +196,7 @@ func upgrade_module(world_position: Vector2) -> String:
 	var upgrade: Dictionary = next_upgrade(world_position)
 	materials -= int(upgrade.cost.materials)
 	minerals -= int(upgrade.cost.minerals)
-	module_tiers[world_position] = tier_at(world_position) + 1
+	structure_state(world_position)["tier"] = tier_at(world_position) + 1
 	recalculate()
 	module_upgraded.emit(world_position)
 	changed.emit()
@@ -206,7 +218,7 @@ func buy_ship(kind: String) -> String:
 		return error
 	materials -= int(ship_catalog[kind].cost)
 	next_ship_id += 1
-	ships[next_ship_id] = kind
+	locations.add_ship(next_ship_id, kind, locations.primary_station())
 	recalculate()
 	ship_built.emit(next_ship_id)
 	changed.emit()
@@ -238,9 +250,7 @@ func demolish_module(world_position: Vector2) -> String:
 	if not error.is_empty():
 		return error
 	var refund: int = module_refund(world_position)
-	modules.erase(world_position)
-	module_tiers.erase(world_position)
-	refinery_progress.erase(world_position)
+	locations.structures.erase(structure_id_at(world_position))
 	recalculate()
 	# Keep existing stock and the full refund, even after removing Storage.
 	# Above-capacity stock can be spent; salvage/refining pause until there is room.
@@ -259,7 +269,7 @@ func decommission_ship(ship_id: int) -> String:
 	if not ships.has(ship_id):
 		return "This ship has already been decommissioned."
 	var refund: int = ship_refund(ship_id)
-	ships.erase(ship_id)
+	locations.ships.erase(ship_id)
 	recalculate()
 	materials += refund
 	ship_removed.emit(ship_id)
@@ -298,3 +308,23 @@ func modules_connected(a: Vector2, b: Vector2) -> bool:
 			if Geometry.connected(first, second):
 				return true
 	return false
+
+# Position APIs are primary-station adapters, not global structure identity.
+func structure_id_at(point: Vector2) -> String:
+	return locations.structure_at(locations.primary_station(), point)
+
+func structure_state(point: Vector2) -> Dictionary:
+	return locations.structures[structure_id_at(point)].state
+
+func capability_states(capability: String, defaults: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	for point: Vector2 in modules:
+		if definition_at(point).has(capability):
+			var state: Dictionary = structure_state(point)
+			if not state.has(capability):
+				state[capability] = defaults.duplicate(true)
+			result[point] = state[capability]
+	return result
+
+func import_capability_states(capability: String, values: Dictionary) -> void:
+	locations.import_position_state(capability, values)

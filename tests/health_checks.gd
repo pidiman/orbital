@@ -67,7 +67,7 @@ func _recovery(check: Callable) -> void:
 	check.call(fleet.jobs.is_empty() and not fleet.asteroids[123].claimed, "mining dock demolition releases mission")
 	poor.collect(1000)
 	poor.build(Vector2(0, 58), "refinery")
-	poor.refinery_progress[Vector2(0, 58)] = 2
+	poor.structure_state(Vector2(0, 58))["refinery_progress"] = 2
 	poor.demolish_module(Vector2(0, 58))
 	check.call(not poor.refinery_progress.has(Vector2(0, 58)), "demolition removes refinery progress")
 	poor.collect(1000)

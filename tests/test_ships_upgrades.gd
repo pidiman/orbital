@@ -89,7 +89,7 @@ func _initialize() -> void:
 	check(model.upgrade_module(Vector2(-58, 0)).is_empty(), "refinery upgrade")
 	model.materials = 0
 	model.minerals = 10
-	model.refinery_progress.clear()
+	model.refinery_progress = {}
 	model.tick()
 	check(model.materials == 0, "upgraded refinery waits")
 	model.tick()
@@ -115,6 +115,9 @@ func _initialize() -> void:
 	preload("res://tests/region_checks.gd").new().run(check)
 	check_continuous_positions()
 	preload("res://tests/exploration_checks.gd").new().run(check)
+	var location_checks: Dictionary = preload("res://tests/location_checks.gd").run()
+	for name: String in location_checks:
+		check(location_checks[name], "location: " + name)
 	print("Ships/upgrades checks: %d passed / %d total" % [checks - failures.size(), checks])
 	for failure: String in failures:
 		printerr("FAIL: " + failure)

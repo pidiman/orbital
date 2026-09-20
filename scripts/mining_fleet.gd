@@ -18,8 +18,16 @@ var transport: Transport
 var collection: RefCounted
 var model: StationModel
 var asteroids: Dictionary = {}
-# Vector2 keys are Phase 1 station docks; integer keys are independent ships.
-var jobs: Dictionary = {}
+# Canonical mining assignments are keyed by stable, typed actor identity.
+var mining_assignments: Dictionary = {}
+# Legacy primary-station/UI/save adapter. Values reference the canonical job timers.
+var jobs: Dictionary:
+	get:
+		var result: Dictionary = {}
+		for assignment: Dictionary in mining_assignments.values():
+			result[assignment.legacy_unit] = assignment.job
+		return result
+	set(value): import_mining_jobs(value)
 var survey_jobs: Dictionary = {}
 var sectors: Array = []
 var total_mined: int = 0
@@ -89,7 +97,13 @@ func dispatch(asteroid_id: int, selected_ship: int = -1) -> String:
 		if unit_busy(unit):
 			continue
 		var capability: Dictionary = units[unit]
-		jobs[unit] = {"target": asteroid_id, "remaining": int(capability.seconds), "duration": int(capability.seconds), "yield": int(capability.yield), "repeat": bool(capability.get("repeat", false))}
+		var actor: Dictionary = model.locations.actor_for(unit)
+		var route: Dictionary = model.locations.mining_route(actor, asteroid_id, asteroid_region(asteroid_id))
+		if route.is_empty():
+			continue
+		route["legacy_unit"] = unit
+		route["job"] = {"target": asteroid_id, "remaining": int(capability.seconds), "duration": int(capability.seconds), "yield": int(capability.yield), "repeat": bool(capability.get("repeat", false))}
+		mining_assignments[model.locations.actor_key(actor)] = route
 		asteroids[asteroid_id].claimed = true
 		dispatched.emit(unit, asteroid_id)
 		changed.emit()
@@ -193,7 +207,8 @@ func tick() -> void:
 	diplomacy.tick()
 	_tick_regions()
 	for unit: Variant in jobs.keys():
-		var job: Dictionary = jobs[unit]
+		var assignment: Dictionary = mining_assignment(unit)
+		var job: Dictionary = assignment.job
 		job.remaining -= 1
 		if job.remaining > 0:
 			continue
@@ -204,10 +219,13 @@ func tick() -> void:
 			job.remaining = job.duration
 		else:
 			asteroid.claimed = false
-			jobs.erase(unit)
+			erase_mining_assignment(unit)
 			if asteroid.minerals <= 0:
 				asteroids.erase(job.target)
-		model.add_minerals(amount)
+		# Cargo is delivered on the same completion tick as before; no new travel leg.
+		assignment.cargo.minerals = amount
+		var delivered: int = model.locations.receive(assignment.destination, "minerals", int(assignment.cargo.minerals))
+		assignment.cargo.minerals -= delivered
 		total_mined += amount
 		completed.emit(unit, int(job.target), amount)
 	for ship_id: int in survey_jobs.keys():
@@ -223,7 +241,7 @@ func cancel_unit(unit: Variant) -> void:
 		var target: int = jobs[unit].target
 		if asteroids.has(target):
 			asteroids[target].claimed = false
-		jobs.erase(unit)
+		erase_mining_assignment(unit)
 	if unit is int:
 		survey_jobs.erase(unit)
 		regions.survey_jobs.erase(unit)
@@ -261,7 +279,7 @@ func region_survey_error(ship_id: int, region_id: String) -> String:
 		return "Build and select a Scout ship."
 	if unit_busy(ship_id):
 		return "This ship is already on a mission."
-	return regions.survey_error(region_id)
+	return regions.survey_error(region_id, model.locations.regional_survey_origin(ship_id, regions.viewed_region))
 
 func region_survey_duration(ship_id: int, region_id: String) -> int:
 	var capability: Dictionary = model.ship_catalog[model.ships[ship_id]].survey
@@ -272,7 +290,7 @@ func survey_region(ship_id: int, region_id: String) -> String:
 	if not error.is_empty():
 		return error
 	var duration: int = region_survey_duration(ship_id, region_id)
-	regions.begin_survey(ship_id, region_id, duration)
+	regions.begin_survey(ship_id, region_id, duration, model.locations.regional_survey_origin(ship_id, regions.viewed_region))
 	changed.emit()
 	return ""
 
@@ -300,3 +318,26 @@ func _discover_region(region_id: String) -> void:
 
 func asteroid_region(asteroid_id: int) -> String:
 	return str(asteroids.get(asteroid_id, {}).get("region_id", Regions.HOME))
+
+func mining_assignment(unit: Variant) -> Dictionary:
+	for assignment: Dictionary in mining_assignments.values():
+		if typeof(assignment.legacy_unit) == typeof(unit) and assignment.legacy_unit == unit:
+			return assignment
+	return {}
+
+func erase_mining_assignment(unit: Variant) -> void:
+	for key: String in mining_assignments.keys():
+		if typeof(mining_assignments[key].legacy_unit) == typeof(unit) and mining_assignments[key].legacy_unit == unit:
+			mining_assignments.erase(key)
+			return
+
+func import_mining_jobs(values: Dictionary) -> void:
+	mining_assignments.clear()
+	for unit: Variant in values:
+		var actor: Dictionary = model.locations.actor_for(unit)
+		var route: Dictionary = model.locations.mining_route(actor, int(values[unit].target), asteroid_region(int(values[unit].target)))
+		if route.is_empty():
+			continue
+		route["legacy_unit"] = unit
+		route["job"] = values[unit]
+		mining_assignments[model.locations.actor_key(actor)] = route

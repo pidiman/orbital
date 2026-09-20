@@ -10,7 +10,11 @@ const FIELDS: Array[String] = ["current_region", "records", "survey_jobs"]
 var catalog: Dictionary
 var planets: Dictionary
 var anomaly_catalog: Dictionary
-var current_region: String = HOME
+# View/navigation location only. Ships and structures live in WorldLocations.
+var viewed_region: String = HOME
+var current_region: String:
+	get: return viewed_region
+	set(value): viewed_region = value
 var records: Dictionary = {}
 var survey_jobs: Dictionary = {}
 
@@ -45,10 +49,11 @@ func state(region_id: String) -> String:
 		return "unlocked"
 	return "surveying" if not survey_job(region_id).is_empty() else "unknown"
 
-func survey_error(region_id: String) -> String:
+func survey_error(region_id: String, origin_region: String = "") -> String:
+	var origin: String = current_region if origin_region.is_empty() else origin_region
 	if not catalog.has(region_id):
 		return "Unknown region."
-	if not adjacent(current_region, region_id):
+	if not adjacent(origin, region_id):
 		return "Scout an adjacent region. Reach this route from " + ", ".join(catalog[region_id].neighbors) + "."
 	if is_discovered(region_id):
 		return "Region already surveyed and unlocked."
@@ -178,8 +183,8 @@ func _integer(value: Variant, minimum: int) -> bool:
 	return (value is int or value is float) and is_finite(float(value)) and value == floor(value) and value >= minimum and absf(float(value)) <= 9007199254740991.0
 
 # Fleet validates capabilities/occupancy before starting the location-specific job.
-func begin_survey(ship_id: int, region_id: String, duration: int) -> void:
-	survey_jobs[ship_id] = {"region_id": region_id, "origin": current_region, "remaining": duration, "duration": duration}
+func begin_survey(ship_id: int, region_id: String, duration: int, origin_region: String = "") -> void:
+	survey_jobs[ship_id] = {"region_id": region_id, "origin": current_region if origin_region.is_empty() else origin_region, "remaining": duration, "duration": duration}
 	survey_started.emit()
 	changed.emit()
 
