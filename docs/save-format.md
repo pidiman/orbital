@@ -86,3 +86,22 @@ installed module, tier and economy remain in the existing station fields.
 Missing extensions default to idle ships and zero delivered counts. Validation rejects
 invalid cargo, foreign-region assignments, duplicate reservations and overlapping fleet
 missions before committing any state. Unknown extension fields remain preserved.
+
+### Research and gate transport (v2 additive extensions)
+
+`extensions.research` schema 1 stores `researched` (technology IDs mapped to true)
+and `labs` (continuous module positions mapped to completion counters).
+`extensions.gate_transport` schema 1 stores `gates` (module positions and launch
+counters), `locations` (ship IDs and region IDs), and `jobs` (ship IDs mapped to
+gate origin, Home origin region, destination, remaining/duration ticks and paid
+cost escrow). Absent ship locations mean Home. Installed modules continue using
+the existing station module map; multi-cell occupancy is derived from catalog
+footprints rather than duplicated into save data.
+
+Missing extensions mean no researched technologies and no relocated/in-transit
+ships. Existing labs/gates derive their initial counters from installed modules;
+a locked gate without its technology is rejected. Unknown extension metadata is
+preserved. Research prerequisites, module footprint bounds/overlap, state references,
+discovered adjacent routes, cargo costs, timers and cross-role ship occupancy are
+validated before changing the live models. Gate demolition may leave an already
+launched transit job: that job still completes at its saved destination.

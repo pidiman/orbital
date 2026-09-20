@@ -118,6 +118,8 @@ func _button(parent: Node, text: String) -> Button:
 	return button
 
 func open_region(region_id: String, ship_id: int = -1) -> void:
+	if is_instance_valid(hud.research_panel):
+		hud.research_panel.hide()
 	hud.choose("")
 	hud.sector_map.hide()
 	hud.trade_panel.hide()
@@ -145,6 +147,7 @@ func _jump(region_id: String) -> void:
 		panel.hide()
 		hud.sector_map.hide()
 		hud.trade_panel.hide()
+		hud.research_panel.hide()
 		hud.message("Location: %s. The station remains at Earth." % fleet.regions.catalog[region_id].name)
 	else:
 		hud.message(error, true)

@@ -1,0 +1,14 @@
+{
+  "teleportation": {
+    "id": "teleportation",
+    "name": "Teleport Gate",
+    "description": "Unlock a 2\u00d72 gate to transport ships from Earth. Remote operations are future research.",
+    "tech_cost": 2,
+    "requires": [],
+    "unlocks": {
+      "modules": [
+        "teleport_gate"
+      ]
+    }
+  }
+}

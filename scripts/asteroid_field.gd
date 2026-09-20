@@ -66,10 +66,12 @@ func _on_completed(unit: Variant, asteroid_id: int, amount: int) -> void:
 
 func _draw() -> void:
 	for ship_id: int in fleet.model.ships:
+		if fleet.transport.jobs.has(ship_id) or fleet.transport.location(ship_id) != fleet.regions.current_region:
+			continue
 		if fleet.collection != null and fleet.collection.jobs.has(ship_id):
 			continue
 		var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
-		if not fleet.jobs.has(ship_id) and fleet.regions.primary_station_visible():
+		if not fleet.jobs.has(ship_id):
 			var point: Vector2 = home_position(ship_id)
 			ModuleArt.draw_module(self, point, definition.get("art", "scout"), 0.55)
 			var text: String = "%s #%d" % [definition.name, ship_id]

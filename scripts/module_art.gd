@@ -9,7 +9,21 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 	cyan.a = opacity
 	gold.a = opacity
 	canvas.draw_set_transform(center, 0.0, Vector2.ONE * scale_factor)
-	if kind == "solar":
+	if kind == "teleport_gate":
+		var violet := Color(0.73, 0.65, 0.96, opacity)
+		canvas.draw_rect(Rect2(-27, -27, 54, 54), Color(0.08, 0.13, 0.22, opacity))
+		canvas.draw_rect(Rect2(-27, -27, 54, 54), violet, false, 1)
+		canvas.draw_circle(Vector2.ZERO, 22, violet, false, 3, true)
+		canvas.draw_circle(Vector2.ZERO, 16, cyan, false, 1, true)
+		for angle in [0.0, PI / 2, PI, PI * 1.5]:
+			canvas.draw_line(Vector2.from_angle(angle) * 20, Vector2.from_angle(angle) * 26, ink, 3)
+	elif kind == "research_lab":
+		canvas.draw_rect(Rect2(-23, -23, 46, 46), Color(0.1, 0.2, 0.3, opacity))
+		canvas.draw_rect(Rect2(-23, -23, 46, 46), cyan, false, 2)
+		canvas.draw_circle(Vector2.ZERO, 6, gold)
+		canvas.draw_arc(Vector2.ZERO, 15, 0, TAU, 32, cyan, 1.5, true)
+		canvas.draw_line(Vector2(-17, 12), Vector2(17, -12), ink, 2)
+	elif kind == "solar":
 		canvas.draw_line(Vector2(-22, 0), Vector2(22, 0), ink, 3)
 		for x in [-24, 6]:
 			canvas.draw_rect(Rect2(x, -20, 18, 40), Color(0.1, 0.35, 0.43, opacity))

@@ -11,6 +11,10 @@ const Regions = preload("res://scripts/region_model.gd")
 var regions: Regions
 const Trade = preload("res://scripts/trade_model.gd")
 var diplomacy: Trade
+const Research = preload("res://scripts/research_model.gd")
+const Transport = preload("res://scripts/gate_transport.gd")
+var research: Research
+var transport: Transport
 var collection: RefCounted
 var model: StationModel
 var asteroids: Dictionary = {}
@@ -27,6 +31,11 @@ func _init(station: StationModel) -> void:
 	model.region_context = regions
 	regions.changed.connect(changed.emit)
 	diplomacy = Trade.new(model)
+	research = Research.new(model, diplomacy)
+	model.research = research
+	transport = Transport.new(self)
+	research.changed.connect(changed.emit)
+	transport.changed.connect(changed.emit)
 	diplomacy.changed.connect(changed.emit)
 	model.module_removed.connect(cancel_unit)
 	model.ship_removed.connect(cancel_unit)
@@ -53,7 +62,7 @@ func mining_units() -> Dictionary:
 			units[world_position] = definition.mining
 	for ship_id: int in model.ships:
 		var definition: Dictionary = model.ship_catalog[model.ships[ship_id]]
-		if definition.has("mining"):
+		if definition.has("mining") and transport.work_error(ship_id).is_empty():
 			units[ship_id] = definition.mining
 	return units
 
@@ -125,6 +134,8 @@ func travel_duration(ship_id: int, sector_id: String) -> int:
 	return maxi(1, int(ceil(float(sector.get("travel_seconds", capability.seconds)) / float(capability.get("travel_speed", 1.0)))))
 
 func survey_error(ship_id: int, sector_id: String) -> String:
+	if not transport.work_error(ship_id).is_empty():
+		return transport.work_error(ship_id)
 	if not model.ships.has(ship_id) or not model.ship_catalog[model.ships[ship_id]].has("survey"):
 		return "Build and select a Scout ship."
 	if unit_busy(ship_id):
@@ -178,6 +189,7 @@ func revealed_count() -> int:
 	return count
 
 func tick() -> void:
+	transport.tick()
 	diplomacy.tick()
 	_tick_regions()
 	for unit: Variant in jobs.keys():
@@ -215,6 +227,7 @@ func cancel_unit(unit: Variant) -> void:
 	if unit is int:
 		survey_jobs.erase(unit)
 		regions.survey_jobs.erase(unit)
+		transport.cancel(unit)
 		diplomacy.cancel(unit)
 		if collection != null:
 			collection.cancel(unit)
@@ -226,9 +239,11 @@ static func discovery_position(asteroid_id: int) -> Vector2:
 	return slots[posmod(-asteroid_id - 1000, slots.size())]
 
 func unit_busy(unit: Variant) -> bool:
-	return (collection != null and collection.jobs.has(unit)) or jobs.has(unit) or survey_jobs.has(unit) or diplomacy.jobs.has(unit) or regions.survey_jobs.has(unit)
+	return transport.jobs.has(unit) or (collection != null and collection.jobs.has(unit)) or jobs.has(unit) or survey_jobs.has(unit) or diplomacy.jobs.has(unit) or regions.survey_jobs.has(unit)
 
 func trade_error(ship_id: int, contact_id: String, offer_id: String) -> String:
+	if not transport.work_error(ship_id).is_empty():
+		return transport.work_error(ship_id)
 	if unit_busy(ship_id):
 		return "This ship is already on a mission."
 	return diplomacy.trade_error(ship_id, contact_id, offer_id)
@@ -240,6 +255,8 @@ func trade(ship_id: int, contact_id: String, offer_id: String) -> String:
 	return diplomacy.dispatch(ship_id, contact_id, offer_id)
 
 func region_survey_error(ship_id: int, region_id: String) -> String:
+	if not transport.work_error(ship_id).is_empty():
+		return transport.work_error(ship_id)
 	if not model.ships.has(ship_id) or not model.ship_catalog[model.ships[ship_id]].has("survey"):
 		return "Build and select a Scout ship."
 	if unit_busy(ship_id):

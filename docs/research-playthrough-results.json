@@ -1,0 +1,49 @@
+{
+  "duration_ms": 21607,
+  "errors_seen": [],
+  "finished": true,
+  "frame_warnings": [],
+  "frames": [
+    "research_unlocked.jpg",
+    "gate_built_2x2.jpg",
+    "gate_in_transit.jpg",
+    "ship_arrived_venus.jpg",
+    "research_gate_restored.jpg"
+  ],
+  "reports": {
+    "checks": {
+      "alien_anomaly_reveals_contacts": true,
+      "anomaly_travel_timer": true,
+      "arrived_only_ship": true,
+      "arrived_region_view": true,
+      "arrived_save_load": true,
+      "available": true,
+      "debris_collection": true,
+      "demolish_frees_footprint": true,
+      "gate_cost": true,
+      "gate_hidden": true,
+      "inspect_from_any_cell": true,
+      "insufficient_message": true,
+      "isolated_from_player_checkpoint": true,
+      "jump_spends_crystal": true,
+      "lab_built": true,
+      "location_restored_ui": true,
+      "mining_still_works": true,
+      "no_lab_message": true,
+      "only_2d": true,
+      "panel_fits": true,
+      "research_spent_tech": true,
+      "reserved_four_cells": true,
+      "trade_acquired_goods": true,
+      "trade_has_own_action": true,
+      "trade_launch_archive_data": true,
+      "trade_launch_prism_crystals": true,
+      "trade_launch_prism_gift": true,
+      "trader_built_cost_power": true,
+      "transit_save_load": true,
+      "transit_visible": true,
+      "unlocked_in_ui": true
+    },
+    "stage": "goods acquired"
+  }
+}

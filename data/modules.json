@@ -29,7 +29,7 @@
     "capacity": 0,
     "color": "6ce0d5",
     "description": "Catch sunlight. Fuel expansion.",
-    "effect": "Produces 6 \u00b7 uses 1 power",
+    "effect": "Produces 6 · uses 1 power",
     "upgrades": [
       {
         "cost": {
@@ -39,7 +39,7 @@
         "stats": {
           "power_output": 10
         },
-        "description": "Generation: 6 \u2192 10 power"
+        "description": "Generation: 6 → 10 power"
       }
     ]
   },
@@ -51,7 +51,7 @@
     "capacity": 75,
     "color": "eebd76",
     "description": "Room for your next big idea.",
-    "effect": "+75 capacity \u00b7 uses 1 power",
+    "effect": "+75 capacity · uses 1 power",
     "upgrades": [
       {
         "cost": {
@@ -61,7 +61,7 @@
         "stats": {
           "capacity": 150
         },
-        "description": "Storage bonus: 75 \u2192 150"
+        "description": "Storage bonus: 75 → 150"
       }
     ]
   },
@@ -73,7 +73,7 @@
     "capacity": 0,
     "color": "b9a6f5",
     "description": "Click an asteroid to send a ship.",
-    "effect": "8s mission \u00b7 uses 2 power",
+    "effect": "8s mission · uses 2 power",
     "mining": {
       "seconds": 8,
       "yield": 18
@@ -87,7 +87,7 @@
     "capacity": 0,
     "color": "eeaa80",
     "description": "Turns raw ore into new possibilities.",
-    "effect": "2 minerals \u2192 6 M / 3s \u00b7 3 power",
+    "effect": "2 minerals → 6 M / 3s · 3 power",
     "conversion": {
       "seconds": 3,
       "input": 2,
@@ -106,7 +106,7 @@
             "output": 6
           }
         },
-        "description": "Refining cycle: 3s \u2192 2s"
+        "description": "Refining cycle: 3s → 2s"
       }
     ]
   },
@@ -118,8 +118,41 @@
     "capacity": 50,
     "color": "eebd76",
     "description": "Automated material drop-off at Earth.",
-    "effect": "+50 capacity \u00b7 uses 2 power",
+    "effect": "+50 capacity · uses 2 power",
     "material_depot": {},
     "art": "storage"
+  },
+  "research_lab": {
+    "name": "Research Lab",
+    "cost": 40,
+    "power_use": 2,
+    "power_output": 0,
+    "capacity": 0,
+    "color": "8bcdf1",
+    "description": "Spend trade Tech on permanent technologies.",
+    "effect": "Research access · 2 power",
+    "research": {},
+    "art": "research_lab"
+  },
+  "teleport_gate": {
+    "name": "Teleport Gate",
+    "cost": 80,
+    "power_use": 3,
+    "power_output": 0,
+    "capacity": 0,
+    "color": "b9a6f5",
+    "description": "Transport idle Home ships to discovered adjacent regions.",
+    "effect": "2×2 footprint · 3 power",
+    "footprint": [
+      2,
+      2
+    ],
+    "teleport": {
+      "cost": {
+        "xenocrystal": 1
+      },
+      "seconds": 3
+    },
+    "art": "teleport_gate"
   }
 }

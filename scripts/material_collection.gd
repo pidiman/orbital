@@ -34,6 +34,8 @@ static func depot_position(point: Vector2) -> Vector2:
 func deploy(ship_id: int) -> String:
 	if not model.ships.has(ship_id) or not model.ship_catalog[model.ships[ship_id]].has("collection"):
 		return "Select a ship with material collection capability."
+	if not fleet.transport.work_error(ship_id).is_empty():
+		return fleet.transport.work_error(ship_id)
 	if fleet.unit_busy(ship_id):
 		return "This ship is already on a mission."
 	if model.ship_catalog[model.ships[ship_id]].collection.get("region", "home") != fleet.regions.HOME:

@@ -4,6 +4,8 @@ var region_navigation: Control
 var orbit_label: Label
 const TradePanel = preload("res://scripts/trade_panel.gd")
 var trade_panel: PanelContainer
+var research_panel: PanelContainer
+var research_button: Button
 var capability_buttons: Dictionary = {}
 const SHIP_ACTIONS: Dictionary = {"mining": "Assign asteroid", "survey": "Survey sector", "trade": "Trade with contact", "collection": "Deploy at Home"}
 const SectorMap = preload("res://scripts/sector_map.gd")
@@ -146,10 +148,15 @@ func _ready() -> void:
 	tabs.add_theme_color_override("font_unselected_color", MUTED)
 	tabs.add_theme_font_size_override("font_size", 14)
 	column.add_child(tabs)
+	var module_scroll := ScrollContainer.new()
+	module_scroll.name = "Modules"
+	module_scroll.custom_minimum_size.y = 340
+	module_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	tabs.add_child(module_scroll)
 	var module_page := VBoxContainer.new()
-	module_page.name = "Modules"
+	module_page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	module_page.add_theme_constant_override("separation", 4)
-	tabs.add_child(module_page)
+	module_scroll.add_child(module_page)
 	var instruction := _label(module_page, "Choose a module, then a green cell.", 12, MUTED)
 	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	for kind: String in model.catalog:
@@ -163,8 +170,13 @@ func _ready() -> void:
 	map_button = Button.new()
 	map_button.text = "Sector map / Exploration"
 	map_button.custom_minimum_size.y = 34
-	map_button.pressed.connect(func() -> void: region_navigation.panel.hide(); trade_panel.hide(); sector_map.open_map())
+	map_button.pressed.connect(func() -> void: research_panel.hide(); region_navigation.panel.hide(); trade_panel.hide(); sector_map.open_map())
 	column.add_child(map_button)
+	research_button = Button.new()
+	research_button.text = "Research / Teleport Gates"
+	research_button.custom_minimum_size.y = 34
+	research_button.pressed.connect(func() -> void: research_panel.open_panel())
+	column.add_child(research_button)
 	var cancel := Button.new()
 	cancel.name = "CancelButton"
 	cancel.text = "Inspect / cancel command"
@@ -208,6 +220,11 @@ func _ready() -> void:
 	trade_panel.fleet = fleet
 	root.add_child(trade_panel)
 	_create_region_navigation()
+	research_panel = preload("res://scripts/research_panel.gd").new()
+	research_panel.hud = self
+	research_panel.fleet = fleet
+	root.add_child(research_panel)
+	fleet.transport.arrived.connect(func(ship_id: int, region_id: String) -> void: message("Ship #%d arrived at %s. Remote operations are future scope." % [ship_id, fleet.regions.catalog[region_id].name]))
 	fleet.diplomacy.mission_completed.connect(_trade_completed)
 	model.changed.connect(refresh)
 	fleet.changed.connect(refresh)
@@ -244,8 +261,9 @@ func choose(kind: String) -> void:
 
 func refresh() -> void:
 	var home: bool = fleet.regions.primary_station_visible()
-	for button: Button in tool_buttons.values():
-		button.disabled = not home
+	for kind: String in tool_buttons:
+		tool_buttons[kind].visible = model.module_unlocked(kind)
+		tool_buttons[kind].disabled = not home
 	orbit_label.text = "EARTH  /  408 KM\nA small beginning. An infinite horizon." if home else "%s / EXPLORATION\nStation anchored at Earth. No outposts yet." % str(fleet.regions.catalog[fleet.regions.current_region].name).to_upper()
 	minerals_label.text = str(model.minerals)
 	fleet_label.text = "MINERS  %d idle / %d total" % [fleet.idle_count(), fleet.mining_units().size()]
@@ -408,7 +426,9 @@ func _refresh_ships() -> void:
 			entry.add_child(sell)
 			sell_buttons[ship_id] = sell
 		var status: String = ""
-		if fleet.collection != null and fleet.collection.jobs.has(ship_id):
+		if not fleet.transport.work_error(ship_id).is_empty():
+			status = "In transit" if fleet.transport.jobs.has(ship_id) else "At " + str(fleet.regions.catalog[fleet.transport.location(ship_id)].name)
+		elif fleet.collection != null and fleet.collection.jobs.has(ship_id):
 			status = fleet.collection.jobs[ship_id].status
 		elif fleet.jobs.has(ship_id):
 			status = "Mining · %ds" % fleet.jobs[ship_id].remaining
@@ -421,7 +441,7 @@ func _refresh_ships() -> void:
 		for capability: String in capability_buttons[ship_id]:
 			var button: Button = capability_buttons[ship_id][capability]
 			button.text = "%s #%d · %s" % [definition.name, ship_id, status if not status.is_empty() else SHIP_ACTIONS[capability]]
-			button.disabled = fleet.unit_busy(ship_id)
+			button.disabled = fleet.unit_busy(ship_id) or not fleet.transport.work_error(ship_id).is_empty()
 		sell_buttons[ship_id].text = "Decommission · +%d M" % model.ship_refund(ship_id)
 
 func _command_ship(ship_id: int, capability: String = "") -> void:
@@ -543,6 +563,9 @@ func _sell_ship(ship_id: int) -> void:
 	message(success if error.is_empty() else error, not error.is_empty())
 
 func reset_after_load() -> void:
+	research_panel.hide()
+	research_panel.picker_signature = ""
+	research_panel.refresh()
 	choose("")
 	selected_position = Vector2.INF
 	for item: Dictionary in floating:

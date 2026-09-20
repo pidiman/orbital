@@ -13,6 +13,7 @@ signal module_built(world_position: Vector2, kind: String)
 signal level_reached(level: int)
 
 # This model always owns the primary station at Earth; region structures are separate.
+var research: RefCounted
 var region_context: RefCounted
 var decommission_rules: Dictionary = {}
 var catalog: Dictionary = {}
@@ -68,12 +69,20 @@ func placement_error(world_position: Vector2, kind: String) -> String:
 		return "Station construction is Home-only. Jump back to Earth."
 	if not catalog.has(kind):
 		return "Choose a module first."
-	if not Geometry.contains_center(world_position):
-		return "Build inside the station grid."
-	for existing: Vector2 in modules:
-		if Geometry.overlaps(world_position, existing):
-			return "This cell already has a module."
-	if not Geometry.touches_any(world_position, modules.keys()):
+	if not module_unlocked(kind):
+		return "Research this module's technology in a Research Lab first."
+	var points: Array[Vector2] = footprint_points(world_position, kind)
+	var touching: bool = false
+	for point: Vector2 in points:
+		if not Geometry.contains_center(point):
+			return "Build the entire footprint inside the station grid."
+		for existing: Vector2 in modules:
+			for occupied: Vector2 in footprint_points(existing, modules[existing]):
+				if Geometry.overlaps(point, occupied):
+					return "This footprint overlaps an existing module."
+				if Geometry.connected(point, occupied):
+					touching = true
+	if not touching:
 		return "Connect to an existing module's edge."
 	var definition: Dictionary = catalog[kind]
 	if materials < int(definition.cost):
@@ -256,3 +265,36 @@ func decommission_ship(ship_id: int) -> String:
 	ship_removed.emit(ship_id)
 	changed.emit()
 	return ""
+
+func module_unlocked(kind: String) -> bool:
+	if research != null:
+		return research.unlocked("modules", kind)
+	# Station-only callers still enforce catalog locks before a fleet is attached.
+	var technologies: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/technologies.json"))
+	for technology: Dictionary in technologies.values():
+		if technology.unlocks.get("modules", []).has(kind):
+			return false
+	return true
+
+func footprint_size(kind: String) -> Vector2:
+	var size: Array = catalog[kind].get("footprint", [1, 1])
+	return Vector2(size[0], size[1])
+
+func footprint_points(origin: Vector2, kind: String) -> Array[Vector2]:
+	var size: Vector2 = footprint_size(kind)
+	var points: Array[Vector2] = []
+	for x in range(int(size.x)):
+		for y in range(int(size.y)):
+			points.append(origin + (Vector2(x, y) - (size - Vector2.ONE) * 0.5) * Geometry.MODULE_SIZE)
+	return points
+
+func footprint_rect(origin: Vector2, kind: String) -> Rect2:
+	var size: Vector2 = footprint_size(kind) * Geometry.MODULE_SIZE
+	return Rect2(origin - size * 0.5, size)
+
+func modules_connected(a: Vector2, b: Vector2) -> bool:
+	for first: Vector2 in footprint_points(a, modules[a]):
+		for second: Vector2 in footprint_points(b, modules[b]):
+			if Geometry.connected(first, second):
+				return true
+	return false

@@ -5,6 +5,8 @@ const Trade = preload("res://scripts/trade_model.gd")
 const Fleet = preload("res://scripts/mining_fleet.gd")
 const Supply = preload("res://scripts/sector_supply.gd")
 const Collection = preload("res://scripts/material_collection.gd")
+const Research = preload("res://scripts/research_model.gd")
+const Transport = preload("res://scripts/gate_transport.gd")
 const VERSION: int = 2
 const DEFAULT_PATH: String = "user://orbital-save.json"
 const STATION_FIELDS: Array[String] = ["modules", "module_tiers", "ships", "next_ship_id", "materials", "minerals", "capacity", "power_output", "power_use", "level", "ticks", "tick_elapsed", "refinery_progress", "total_refined"]
@@ -30,6 +32,8 @@ func _init(station: StationModel, mining: Fleet, sector_supply: Supply) -> void:
 	model = station
 	fleet = mining
 	supply = sector_supply
+	fleet.research.changed.connect(request_autosave)
+	fleet.transport.changed.connect(request_autosave)
 	supply.collection.changed.connect(request_autosave)
 	model.module_built.connect(request_autosave.unbind(2))
 	model.module_removed.connect(request_autosave.unbind(1))
@@ -63,6 +67,10 @@ func snapshot() -> Dictionary:
 	document["min_reader_version"] = int(document.get("min_reader_version", VERSION))
 	if not document.has("extensions"):
 		document["extensions"] = {}
+	_merge_fields(document.extensions, "research", fleet.research, Research.FIELDS)
+	document.extensions.research["schema_version"] = 1
+	_merge_fields(document.extensions, "gate_transport", fleet.transport, Transport.FIELDS)
+	document.extensions.gate_transport["schema_version"] = 1
 	_merge_fields(document.extensions, "material_collection", supply.collection, Collection.FIELDS)
 	document.extensions.material_collection["schema_version"] = 1
 	_merge_fields(document.extensions, "regions", fleet.regions, Regions.FIELDS)
@@ -306,7 +314,18 @@ func restore(document: Variant) -> String:
 	error = _validate_collection(collection_data, station_data, fleet_data, region_data, candidate_fleet.diplomacy.jobs, candidate)
 	if not error.is_empty():
 		return error
+	candidate_fleet.research.sync_labs()
+	candidate_fleet.transport.sync_gates()
+	var research_data: Dictionary = _extension_fields(migrated.extensions, "research", candidate_fleet.research, Research.FIELDS)
+	var transport_data: Dictionary = _extension_fields(migrated.extensions, "gate_transport", candidate_fleet.transport, Transport.FIELDS)
+	if not decode_error.is_empty():
+		return decode_error
+	error = _validate_research_transport(research_data, transport_data, station_data, fleet_data, region_data, candidate_fleet.diplomacy.jobs, collection_data.jobs, candidate_fleet)
+	if not error.is_empty():
+		return error
 	# Commit only after the whole graph has passed validation. Existing model references survive.
+	_apply_fields(fleet.research, research_data, Research.FIELDS)
+	_apply_fields(fleet.transport, transport_data, Transport.FIELDS)
 	_apply_fields(fleet.regions, region_data, Regions.FIELDS)
 	_apply_fields(model, station_data, STATION_FIELDS)
 	_apply_fields(fleet, fleet_data, FLEET_FIELDS)
@@ -571,4 +590,71 @@ func _validate_collection(data: Dictionary, station: Dictionary, mining: Diction
 			if job.cargo > 0 or targets.has(job.target):
 				return "Duplicate collection reservation."
 			targets[job.target] = true
+	return ""
+
+func _extension_fields(extensions: Dictionary, key: String, target: Object, fields: Array[String]) -> Dictionary:
+	if not extensions.has(key):
+		var defaults: Dictionary = {}
+		for field: String in fields:
+			defaults[field] = target.get(field).duplicate(true)
+		return defaults
+	var extension: Variant = extensions[key]
+	if not extension is Dictionary or extension.get("schema_version") != 1:
+		decode_error = "Unsupported " + key + " extension."
+		return {}
+	var decoded: Dictionary = _decode_fields(extension, fields)
+	if decode_error.is_empty():
+		decode_error = _field_types(decoded, target, fields)
+	return decoded
+
+func _validate_research_transport(research_data: Dictionary, transport_data: Dictionary, station: Dictionary, mining: Dictionary, region_data: Dictionary, trades: Dictionary, collectors: Dictionary, candidate: Fleet) -> String:
+	for id: Variant in research_data.researched:
+		if not id is String or not candidate.research.catalog.has(id) or research_data.researched[id] != true:
+			return "Invalid researched technology."
+		for prerequisite: String in candidate.research.catalog[id].get("requires", []):
+			if not research_data.researched.has(prerequisite):
+				return "Missing research prerequisite."
+	candidate.research.researched = research_data.researched
+	for pair: Array in [[research_data.labs, "research", "completed"], [transport_data.gates, "teleport", "jumps"]]:
+		var records: Dictionary = pair[0]
+		for point: Variant in records:
+			if not point is Vector2 or not station.modules.has(point) or not candidate.model.definition_at(point).has(pair[1]):
+				return "Invalid research or gate module state."
+			if not records[point] is Dictionary or not _integer(records[point].get(pair[2]), 0):
+				return "Invalid research or gate counter."
+		for point: Vector2 in station.modules:
+			if candidate.model.definition_at(point).has(pair[1]) and not records.has(point):
+				return "Missing research or gate module state."
+	var occupied: Array[Vector2] = []
+	for point: Vector2 in station.modules:
+		if not candidate.model.module_unlocked(station.modules[point]):
+			return "Installed module requires unresearched technology."
+		for cell: Vector2 in candidate.model.footprint_points(point, station.modules[point]):
+			if not StationGeometry.contains_center(cell):
+				return "Saved module footprint is outside the station grid."
+			for other: Vector2 in occupied:
+				if StationGeometry.overlaps(cell, other):
+					return "Saved module footprints overlap."
+			occupied.append(cell)
+	for ship_id: Variant in transport_data.locations:
+		var destination: Variant = transport_data.locations[ship_id]
+		if not ship_id is int or not station.ships.has(ship_id) or not destination is String or not region_data.records.has(destination) or not region_data.records[destination].discovered:
+			return "Invalid relocated ship."
+	for ship_id: Variant in transport_data.jobs:
+		var job: Variant = transport_data.jobs[ship_id]
+		if not ship_id is int or not station.ships.has(ship_id) or not _valid_job(job) or not _valid_vector(job.get("gate")):
+			return "Invalid gate transit."
+		if job.get("origin") != Regions.HOME or transport_data.locations.get(ship_id, Regions.HOME) != Regions.HOME:
+			return "Gate departure must be at Home."
+		if not job.get("destination") is String or not region_data.records.has(job.destination) or not region_data.records[job.destination].discovered or not candidate.regions.adjacent(Regions.HOME, job.destination):
+			return "Invalid gate route."
+		if not job.get("cost") is Dictionary:
+			return "Invalid gate cost escrow."
+		for good: Variant in job.cost:
+			if not good is String or not candidate.diplomacy.goods_catalog.has(good) or not _integer(job.cost[good], 0):
+				return "Invalid gate cost escrow."
+	for ship_id: int in station.ships:
+		if transport_data.jobs.has(ship_id) or transport_data.locations.get(ship_id, Regions.HOME) != Regions.HOME:
+			if mining.jobs.has(ship_id) or mining.survey_jobs.has(ship_id) or region_data.survey_jobs.has(ship_id) or trades.has(ship_id) or collectors.has(ship_id):
+				return "Relocated or in-transit ship has a conflicting work mission."
 	return ""
