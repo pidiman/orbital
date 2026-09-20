@@ -1,0 +1,74 @@
+# Orbital checkpoints — JSON version 2
+
+## Location and controls
+
+The single latest checkpoint is `user://orbital-save.json`. In this native Summer installation, that resolves to:
+
+`/Users/pidiman/Library/Application Support/Godot/app_userdata/Orbital/orbital-save.json`
+
+Use **Save** and **Load** in the resource header. Save and autosave share this latest-checkpoint slot; Load restores its most recent contents, not a separate historical manual save. Startup automatically resumes it when present.
+
+Autosave is requested after module build/demolition/upgrade, ship purchase/sale, mission dispatch/completion, survey launch and discovery. Requests are coalesced until the end of the frame, after model mutations finish. A periodic checkpoint every 10 simulation seconds covers salvage and ongoing drift/timers. Normal close/scene teardown saves the last state. Forced termination can only recover the last successful checkpoint; there is no offline progress calculation.
+
+## Envelope
+
+```json
+{
+  "format": "orbital.save",
+  "version": 2,
+  "min_reader_version": 2,
+  "state": {
+    "station": {},
+    "fleet": {},
+    "supply": {}
+  },
+  "extensions": {}
+}
+```
+
+`save_store.gd` owns explicit persisted-field allowlists; it does not serialize nodes, scripts, resources, or arbitrary engine objects. The three state sections are canonical snapshots of the RefCounted models.
+
+| Section | Saved state |
+| --- | --- |
+| station | Continuous module world positions and kinds; tiers; ship IDs/types; next ship ID; Materials, Minerals, capacity, Power output/use (balance is their difference), colony level; refinery progress; tick count, fractional tick phase and total refined |
+| fleet | All live asteroids, remaining ore, reservations and sector provenance; Miner and legacy dock jobs with target/timer/yield/repeat; Scout jobs with destination/travel timer; complete sector discovery records; next discovery ID and total mined |
+| supply | Debris amounts/positions/velocities, home-asteroid positions/drift, all ID counters, supply rules, elapsed time, partial fixed step, spawn timers, RNG seed and state |
+
+Discovered asteroid marker positions are now logical model coordinates too. The view projects them after load, rather than picking a new marker location. ResourceClock retains no independent gameplay timer: its fractional phase lives in StationModel.
+
+## Lossless JSON representation
+
+- Ordinary records use JSON objects/arrays and strings/booleans/numbers.
+- Non-string dictionary keys use `{"$entries":[{"key":{"type":"id","value":"1"},"value":...}]}`. Module keys use `type: "position"` and a Vector2 value. This preserves integer ship IDs versus continuous module positions, including mixed mining-job keys and dictionary order.
+- Vector2 uses `{"$vector2":[x,y]}` with lossless encoded float components.
+- Simulation floating-point values use `{"$float64":"<16 hexadecimal digits>"}`: eight bytes written/read with PackedByteArray encode_double/decode_double. This avoids observed decimal-parser round-off in supply speeds and fractional clocks.
+- RNG seed/state are signed 64-bit decimal **strings**, never JSON numbers.
+- Snapshot comparison normalizes ordinary JSON numbers to JSON's single numeric category. Typed engine integer fields and map keys are restored explicitly; exact simulation floats and RNG state retain their bits.
+
+Do not edit these tags casually. Unknown or malformed tags inside required model fields are rejected.
+
+## Versions and future phases
+
+`migrate()` contains a tested version-1 → version-2 migration step. The v1 fixture lacks `station.tick_elapsed` and `extensions`; migration supplies `0.0` and `{}`. This is the migration scaffold for future schema changes, not a claim that an earlier released save system existed. Add sequential migration steps for future breaking revisions.
+
+Future alien relations/trade history can live under namespaced `extensions` keys, such as `extensions.alien_relations` and `extensions.trade_history`. Their absence means the future system uses its defaults. Extensions, unknown envelope keys, unknown state sections and optional section fields are retained when saving again. Only known fields are decoded/validated. A newer document is accepted if it declares `min_reader_version <= 2` and retains the required compatible core; its version is not downgraded. New required semantics should raise `min_reader_version` and add a migration in the newer application.
+
+Module/ship catalogs remain external data-driven definitions, referenced by kind. Missing definitions or inconsistent derived Power/capacity/level reject load rather than silently changing the colony. Migration for future balance changes or removed content is deferred. Supply rules are saved with the supply snapshot to preserve exact continuation.
+
+## Reliability
+
+Writes go to a same-directory `.tmp`, flush/close, then rename over the checkpoint. A failed write/rename preserves the previous checkpoint. Loads parse and validate the complete state graph before applying it to the existing models. Checks include required types, finite positions/timers, resource quantities, available definitions/tiers, unique sector IDs, valid mining/survey references/reservations, supply timing and ID counters. No rewards or build actions are replayed during restoration.
+
+Malformed JSON, incompatible versions and invalid state leave the running session intact. If an existing file cannot load, autosave pauses so it cannot overwrite the file with a fresh colony. An explicit successful Save replaces that checkpoint and resumes autosave; a successful Load also resumes it.
+
+## Covered and deferred
+
+Covered: all current economic and mission state above, exact timer/supply continuation, automatic startup resume, atomic writes and graceful-exit saving. Gameplay remains 2D; the Earth script and active scene are unchanged.
+
+Not persisted: transient hover/build selections, selected tabs/open panels, floating notifications, and decorative animation phase. These reset when the model is restored. Deferred: multiple slots, cloud sync, historical backups, offline progress, Phase 4 gameplay, and native-file recovery after arbitrary disk damage. Native Summer persistence is verified; browser storage durability still needs testing with an HTML5 export.
+
+## Verification
+
+`tests/persistence_checks.gd` runs within the existing headless model suite. It verifies exact canonical save→JSON file→load equality with simultaneous Miner, dock, refinery and survey work; fractional positions/tiers; resources and level; 64-bit RNG; identical future evolution; migrations; preserved compatible future data; atomic rejection of corrupt/orphaned state; autosave and missing files. The combined suite passes 128/128 checks, including 22 persistence checks.
+
+`tests/persistence_playthrough.gd` presses real Save/Load buttons, checks build/discovery autosaves, restores active jobs and readouts, tears down the scene and constructs a fresh session through the normal startup loader, resumes jobs to completion, and verifies graceful-exit saving: 15/15 checks. Existing MVP, mining, ships/upgrades/positions, exploration and recovery playthroughs also pass (88 checks). Disposable verification instances disable the player slot by default; persistence probes explicitly use and clean up isolated test files.

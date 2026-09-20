@@ -1,0 +1,30 @@
+{
+  "duration_ms": 2750,
+  "errors_seen": [],
+  "finished": true,
+  "frame_warnings": [],
+  "frames": [
+    "saved_active_jobs.jpg",
+    "loaded_active_jobs.jpg",
+    "resumed_jobs_complete.jpg"
+  ],
+  "reports": {
+    "checks": {
+      "active_jobs_before_save": true,
+      "build_autosaves": true,
+      "debris_collection": true,
+      "discovery_autosave_runs": true,
+      "entire_runtime_2d": true,
+      "fresh_start_auto_resumes_exact_state": true,
+      "graceful_exit_saves_last_state": true,
+      "load_button_restores_exact_state": true,
+      "load_refreshes_hud_and_views": true,
+      "load_restores_jobs_and_ids": true,
+      "restored_jobs_complete": true,
+      "resume_status_visible": true,
+      "save_button_feedback": true,
+      "session_changed_after_save": true,
+      "verification_isolated_from_player_save": true
+    }
+  }
+}

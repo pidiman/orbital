@@ -39,7 +39,7 @@ func _sync_view() -> void:
 		rocks[asteroid_id] = {"point": Vector2(source.position.x * (area.x - 380.0), 150.0 + source.position.y * (area.y - 276.0)), "angle": fmod(asteroid_id * 2.399, TAU) + supply.elapsed * 0.06}
 	# Reconstruct discovered markers from model state, even after recreating the view.
 	for asteroid_id: int in fleet.asteroids:
-		if fleet.asteroids[asteroid_id].get("persistent", false) and not rocks.has(asteroid_id):
+		if fleet.asteroids[asteroid_id].get("persistent", false):
 			_add_discovery_marker(asteroid_id)
 	asteroid_count = rocks.size()
 
@@ -117,18 +117,9 @@ func _on_surveyed(sector: Dictionary) -> void:
 	notice.emit("%s revealed. Open Sector map for the discovery report." % sector.name, false)
 
 func _add_discovery_marker(asteroid_id: int) -> void:
-	var point := Vector2(650, 230)
-	var best_gap: float = -1.0
-	for lane_y: float in [230.0, get_viewport_rect().size.y - 206.0]:
-		for lane_x: float in [300.0, 450.0, 600.0, 750.0]:
-			var candidate := Vector2(lane_x, lane_y)
-			var gap: float = 10000.0
-			for existing: Dictionary in rocks.values():
-				gap = minf(gap, candidate.distance_to(existing.point))
-			if gap > best_gap:
-				point = candidate
-				best_gap = gap
-	rocks[asteroid_id] = {"point": point, "angle": 0.2}
+	var logical: Vector2 = fleet.asteroids[asteroid_id].get("position", Fleet.discovery_position(asteroid_id))
+	var area: Vector2 = get_viewport_rect().size
+	rocks[asteroid_id] = {"point": Vector2(logical.x * (area.x - 380.0), 230.0 + logical.y * (area.y - 436.0)), "angle": 0.2}
 
 func home_asteroid_count() -> int:
 	return supply.home_asteroids.size()

@@ -3,6 +3,10 @@ const SectorMap = preload("res://scripts/sector_map.gd")
 var sector_map: PanelContainer
 var map_button: Button
 const Fleet = preload("res://scripts/mining_fleet.gd")
+signal save_requested
+signal load_requested
+var save_button: Button
+var load_button: Button
 signal tool_selected(kind: String)
 signal ship_assignment_requested(ship_id: int)
 var model: StationModel
@@ -69,6 +73,27 @@ func _ready() -> void:
 	row.add_child(branding)
 	_label(branding, "O R B I T A L", 28, INK)
 	_label(branding, "LOW EARTH ORBIT  /  COLONY PROGRAM", 11, MUTED)
+	var persistence := HBoxContainer.new()
+	persistence.alignment = BoxContainer.ALIGNMENT_CENTER
+	persistence.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(persistence)
+	save_button = Button.new()
+	save_button.text = "Save"
+	save_button.custom_minimum_size = Vector2(62, 34)
+	save_button.tooltip_text = "Save latest checkpoint. Autosaves also run after actions and every 10 seconds."
+	save_button.pressed.connect(func() -> void: save_requested.emit())
+	persistence.add_child(save_button)
+	load_button = Button.new()
+	load_button.text = "Load"
+	load_button.custom_minimum_size = Vector2(62, 34)
+	load_button.tooltip_text = "Restore the latest manual or automatic checkpoint."
+	load_button.pressed.connect(func() -> void: load_requested.emit())
+	persistence.add_child(load_button)
+	for action: Button in [save_button, load_button]:
+		action.add_theme_font_size_override("font_size", 13)
+		action.add_theme_color_override("font_color", INK)
+		action.add_theme_stylebox_override("normal", _style(Color("172738"), Color("314454")))
+		action.add_theme_stylebox_override("hover", _style(Color("25404b"), CYAN))
 	var resources := VBoxContainer.new()
 	resources.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(resources)
@@ -358,6 +383,7 @@ func _refresh_ships() -> void:
 			command = "Mining · %ds" % fleet.jobs[ship_id].remaining if target < 0 else "Mining #%d · %ds" % [target, fleet.jobs[ship_id].remaining]
 		elif fleet.survey_jobs.has(ship_id):
 			command = "Surveying · %ds" % fleet.survey_jobs[ship_id].remaining
+		sell_buttons[ship_id].text = "Decommission · +%d M" % model.ship_refund(ship_id)
 		command_buttons[ship_id].text = "%s #%d · %s" % [definition.name, ship_id, command]
 		command_buttons[ship_id].disabled = fleet.jobs.has(ship_id) or fleet.survey_jobs.has(ship_id)
 
@@ -445,3 +471,25 @@ func _sell_ship(ship_id: int) -> void:
 	var refund: int = model.ship_refund(ship_id)
 	var error: String = model.decommission_ship(ship_id)
 	message("Ship decommissioned. +%d Materials; power freed." % refund if error.is_empty() else error, not error.is_empty())
+
+func reset_after_load() -> void:
+	choose("")
+	selected_position = Vector2.INF
+	for item: Dictionary in floating:
+		item.label.queue_free()
+	floating.clear()
+	for entry: Control in ship_entries.values():
+		entry.hide()
+		entry.queue_free()
+	ship_entries.clear()
+	command_buttons.clear()
+	sell_buttons.clear()
+	fleet.changed.disconnect(sector_map.refresh)
+	model.changed.disconnect(sector_map.refresh)
+	root.remove_child(sector_map)
+	sector_map.queue_free()
+	sector_map = SectorMap.new()
+	sector_map.hud = self
+	sector_map.fleet = fleet
+	root.add_child(sector_map)
+	refresh()

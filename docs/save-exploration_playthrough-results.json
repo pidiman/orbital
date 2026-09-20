@@ -1,0 +1,36 @@
+{
+  "duration_ms": 4285,
+  "errors_seen": [],
+  "finished": true,
+  "frame_warnings": [],
+  "frames": [
+    "exploring.jpg",
+    "discovery.jpg",
+    "discovery_mining.jpg",
+    "anomaly.jpg"
+  ],
+  "reports": {
+    "checks": {
+      "anomaly_report": true,
+      "auto_mining_continues": true,
+      "debris_collection": true,
+      "discovered_ore_delivered": true,
+      "empty_report": true,
+      "exploring_state_and_timer": true,
+      "map_closes": true,
+      "map_open_and_fits": true,
+      "map_ore_updates": true,
+      "miner_assigned_discovery": true,
+      "miner_built": true,
+      "no_miner_button_disabled": true,
+      "revealed_report_and_target": true,
+      "runtime_entirely_2d": true,
+      "scout_and_travel_visible": true,
+      "scout_built": true,
+      "scout_returned_no_duplicate": true,
+      "selected_scout_launched": true,
+      "travel_not_instant": true,
+      "unexplored_contents_hidden": true
+    }
+  }
+}

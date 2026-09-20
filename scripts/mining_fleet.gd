@@ -5,6 +5,7 @@ signal changed
 signal dispatched(unit: Variant, asteroid_id: int)
 signal completed(unit: Variant, asteroid_id: int, amount: int)
 signal surveyed(sector: Dictionary)
+signal survey_started(ship_id: int, sector_id: String)
 
 var model: StationModel
 var asteroids: Dictionary = {}
@@ -127,6 +128,7 @@ func survey(ship_id: int, sector_id: String = "") -> String:
 		return error
 	var duration: int = travel_duration(ship_id, sector_id)
 	survey_jobs[ship_id] = {"sector_id": sector_id, "remaining": duration, "duration": duration}
+	survey_started.emit(ship_id, sector_id)
 	changed.emit()
 	return ""
 
@@ -140,7 +142,7 @@ func _reveal(sector_id: String) -> void:
 		if content.type == "asteroid" and int(content.get("minerals", 0)) > 0:
 			var asteroid_id: int = next_discovery_id
 			next_discovery_id -= 1
-			asteroids[asteroid_id] = {"minerals": int(content.minerals), "claimed": false, "persistent": true, "sector_id": sector_id, "name": content.get("name", "Deposit")}
+			asteroids[asteroid_id] = {"minerals": int(content.minerals), "claimed": false, "persistent": true, "sector_id": sector_id, "name": content.get("name", "Deposit"), "position": discovery_position(asteroid_id)}
 			sector.asteroid_ids.append(asteroid_id)
 	surveyed.emit(sector)
 
@@ -187,3 +189,8 @@ func cancel_unit(unit: Variant) -> void:
 	if unit is int:
 		survey_jobs.erase(unit)
 	changed.emit()
+
+# Logical marker coordinates, owned by the model so a checkpoint restores the same view.
+static func discovery_position(asteroid_id: int) -> Vector2:
+	var slots: Array[Vector2] = [Vector2(5.0 / 6.0, 1.0), Vector2(1.0 / 3.0, 0.0), Vector2(2.0 / 3.0, 0.0), Vector2(0.5, 1.0)]
+	return slots[posmod(-asteroid_id - 1000, slots.size())]

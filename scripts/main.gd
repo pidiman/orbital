@@ -1,4 +1,9 @@
 extends Node2D
+const SaveStore = preload("res://scripts/save_store.gd")
+var persistence: SaveStore
+var save_path: String = SaveStore.DEFAULT_PATH
+# Used only by isolated restart probes; never exposed as a gameplay control.
+var verification_persistence: bool = false
 const Supply = preload("res://scripts/sector_supply.gd")
 var supply: Supply
 const Backdrop = preload("res://scripts/space_backdrop.gd")
@@ -25,6 +30,17 @@ func _ready() -> void:
 	fleet = Fleet.new(model)
 	model.ticked.connect(fleet.tick)
 	supply = Supply.new(model, fleet)
+	persistence = SaveStore.new(model, fleet, supply)
+	# Disposable playtests must never read or overwrite the player's checkpoint.
+	persistence.path = save_path
+	persistence.enabled = verification_persistence or (not OS.get_cmdline_args().has("--summer-verify") and not get_tree().root.has_node("SummerProbe"))
+	var resume_error: String = ""
+	var resumed: bool = false
+	if persistence.enabled and FileAccess.file_exists(persistence.path):
+		resume_error = persistence.load_game()
+		resumed = resume_error.is_empty()
+	process_priority = 1000
+	get_tree().auto_accept_quit = false
 	var background := Backdrop.new()
 	background.name = "SpaceBackdrop"
 	add_child(background)
@@ -62,6 +78,15 @@ func _ready() -> void:
 	asteroids.minerals_delivered.connect(hud.show_minerals)
 	model.refined.connect(hud.show_refining)
 	model.changed.connect(_sync_readouts)
+	persistence.restored.connect(_restore_presentation)
+	persistence.failed.connect(_save_failure)
+	hud.save_requested.connect(_manual_save)
+	hud.load_requested.connect(_manual_load)
+	_sync_readouts()
+	if resumed:
+		hud.message("Colony restored from your latest checkpoint.", false, 7.0)
+	elif not resume_error.is_empty():
+		hud.message(resume_error, true, 12.0)
 
 func _build(world_position: Vector2) -> void:
 	var previous_level: int = model.level
@@ -85,3 +110,41 @@ func _unhandled_input(event: InputEvent) -> void:
 func _select_tool(kind: String) -> void:
 	board.selected = kind
 	asteroids.selected_ship = -1
+
+func _process(delta: float) -> void:
+	persistence.advance(delta)
+
+func _manual_save() -> void:
+	var error: String = persistence.save_game()
+	hud.message("Colony saved to user://orbital-save.json" if error.is_empty() else error, not error.is_empty())
+
+func _manual_load() -> void:
+	var error: String = persistence.load_game()
+	hud.message("Latest checkpoint restored." if error.is_empty() else error, not error.is_empty())
+
+func _save_failure(message: String) -> void:
+	if is_instance_valid(hud):
+		hud.message(message, true, 8.0)
+
+func _restore_presentation() -> void:
+	board.selected = ""
+	board.inspected_position = Vector2.INF
+	board.pulses.clear()
+	asteroids.selected_ship = -1
+	asteroids.rocks.clear()
+	asteroids._sync_view()
+	debris._sync_view()
+	hud.reset_after_load()
+	_sync_readouts()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_save_on_exit()
+		get_tree().quit()
+
+func _exit_tree() -> void:
+	_save_on_exit()
+
+func _save_on_exit() -> void:
+	if persistence != null and persistence.enabled and not persistence.autosave_blocked:
+		persistence.save_game()

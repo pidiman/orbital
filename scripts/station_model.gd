@@ -30,6 +30,7 @@ var power_output: int = 3
 var power_use: int = 2
 var level: int = 1
 var ticks: int = 0
+var tick_elapsed: float = 0.0
 
 func _init() -> void:
 	decommission_rules = JSON.parse_string(FileAccess.get_file_as_string("res://data/decommission.json"))

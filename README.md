@@ -119,3 +119,9 @@ Verification: 72/72 combined model checks (including exploration, ships/upgrades
 Inspect a module → **Demolish**, or Ships → **Decommission**, for a 50% Materials refund and released power/position. Busy missions are cancelled safely. The original habitat is protected; generator removal cannot cause a power deficit. Stock and refunds survive removal of Storage, even above capacity.
 
 Salvage and home-asteroid spawning/lifecycle now run in the RefCounted `SectorSupply`, independently of rendering. Tune `data/supply.json` and `data/decommission.json`; definitions may override refund ratios. See [health-fix architecture and verification](docs/health-fixes.md). Run `tests/test_ships_upgrades.gd` for the combined model suite, including renderer-free supply and recovery checks.
+
+## Save / Load
+
+The resource header now has **Save** and **Load**. Both manual and automatic saves use the latest checkpoint at `user://orbital-save.json`; startup resumes it. Autosaves follow builds, decommissioning, upgrades and mission/discovery changes, every 10 seconds, and on graceful exit.
+
+All current model state, jobs, fractional clocks and supply RNG are restored. The JSON v2 envelope includes migrations and preserved `extensions` for future relations/trade data. See [save format, native location, compatibility and limitations](docs/save-format.md).

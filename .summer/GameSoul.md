@@ -43,3 +43,7 @@ A sector map lists reachable destinations from Home orbit. Owned Scouts reveal a
 ## Recovery and resource supply contract
 
 Placed modules and owned ships can be decommissioned for partial Materials refunds, freeing power and positions. The initial habitat is protected; no connectivity restriction may trap recovery. Removed busy units release missions without rewards. Resource supply is simulation-owned and presentation-independent: a RefCounted model controls spawning, lifecycle and salvage amounts in sector coordinates; Node2D fields are views/input adapters only. Earth/orbit art remains unchanged.
+
+## Persistence contract
+
+A versioned JSON checkpoint in user:// stores presentation-independent station, fleet and supply state, including continuous positions, tiers, resource/colony values, active jobs, discovery records, supply RNG and fractional timer phases. Save/Load are mouse controls; autosave follows meaningful actions and periodic progress, and startup resumes the latest checkpoint. Extensions preserve future Phase 4 data; incompatible/corrupt saves are rejected before mutation. No offline progress or transient UI-state persistence.
