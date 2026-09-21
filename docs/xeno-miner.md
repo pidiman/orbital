@@ -4,7 +4,7 @@
 
 Buy it through Ships, select its tray tile or sprite, choose **Assign Xeno node**, then click a teal Xenocrystal node in its physical region. Clicking a node without selecting a ship can also assign an idle compatible miner. Wrong resource, busy ship, transit, and wrong-region assignments are rejected. The same MiningFleet dispatch, timer, repeat, cancellation, reservation, completion and visual flight paths handle both resources.
 
-Xenocrystals are no longer click-salvageable, including old floating pickups. Materials and Minerals retain their click-salvage behavior; Material Ships still collect Materials only. The rare 0.2% floating spawn weight and single-unit default node quantity are unchanged. A claimed node stops expiring while the ship works; cancellation releases it and resumes expiration. Larger data-tuned nodes repeat one unit per cycle.
+Xenocrystals are no longer click-salvageable, including old floating pickups. Materials and Minerals retain their click-salvage behavior; Material Ships still collect Materials only. The floating spawn weight is 2 (about 1.96%); nodes contain one unit and last 180 seconds unclaimed. See `docs/floating-resources.md` for the visibility fix. A claimed node stops expiring while the ship works; cancellation releases it and resumes expiration. Larger data-tuned nodes repeat one unit per cycle.
 
 The **Xeno Dock** costs 25 Materials and 1 Power, initially parks 2 Xeno Miners, and uses the standard docking capacity upgrades: 3 / 4 / 6 / 8 slots for 30 / 55 / 90 / 140 Materials. No dock is required to work; homeless messaging and local-region parking are unchanged.
 

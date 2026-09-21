@@ -17,11 +17,12 @@
       "color": "b6a0e8"
     },
     "xenocrystal": {
-      "weight": 0.2,
+      "weight": 2.0,
       "amount_min": 1,
       "amount_max": 1,
       "color": "72dbcb",
-      "requires_mining": true
+      "requires_mining": true,
+      "lifetime_seconds": 180.0
     }
   }
 }

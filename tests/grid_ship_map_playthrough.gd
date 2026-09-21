@@ -32,14 +32,18 @@ func _ready() -> void:
 	for kind: String in game.model.ship_catalog:
 		await use(hud.ship_buttons[kind])
 		ids[kind] = game.model.next_ship_id
+	# Explicit test framing for sprite hit tests; selection no longer reframes.
+	game.ship_camera.reset_view()
 	for id: int in game.model.ships:
+		game.ship_camera.position = game.ship_camera.ship_point(id)
+		game.ship_camera.force_update_scroll()
 		await tile(id)
-		checks["tray %d" % id] = hud.selected_ship_id == id and centered(id)
+		checks["tray %d" % id] = hud.selected_ship_id == id and tile_camera_stable
 		hud.close_panels()
 		var before: Dictionary = game.persistence.snapshot()
 		await click(game.get_viewport().get_canvas_transform() * game.ship_camera.ship_point(id))
 		checks["map menu %d" % id] = hud.selected_ship_id == id and hud.ship_context.visible and hud.sell_buttons[id].is_visible_in_tree()
-		checks["shared selection %d" % id] = hud.ship_tiles[id].selected_ship and centered(id)
+		checks["shared selection %d" % id] = hud.ship_tiles[id].selected_ship and game.ship_camera.ship_id == -1
 		checks["view only %d" % id] = before == game.persistence.snapshot()
 		for capability: String in hud.capability_buttons[id]:
 			checks["map command %d %s" % [id, capability]] = hud.capability_buttons[id][capability].is_visible_in_tree()

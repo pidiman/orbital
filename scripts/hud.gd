@@ -24,6 +24,7 @@ var context_detail: Label
 var selected_ship_id: int = -1
 var context_gate: Button
 var station_view_button: Button
+var zoom_label: Label
 var grid_controls: HBoxContainer
 var grid_buttons: Dictionary = {}
 var menu_buttons: Dictionary = {}
@@ -369,6 +370,8 @@ func show_salvage(amount: int, point: Vector2, resource: String = "materials") -
 	floating.append({"label": label, "time": 0.0, "duration": 1.2})
 
 func _process(delta: float) -> void:
+	if is_instance_valid(zoom_label):
+		zoom_label.text = ("%.2f" % get_parent().ship_camera.zoom.x).trim_suffix("0") + "x"
 	if is_instance_valid(grid_controls):
 		grid_controls.visible = get_parent().preferences.values.show_grid_controls
 		footer_balance.visible = grid_controls.visible
@@ -978,6 +981,7 @@ func deselect_ship() -> void:
 func select_ship(id: int) -> void:
 	if not model.ships.has(id): return
 	var region: String = fleet.transport.location(id)
+	var different_region: bool = region != fleet.regions.current_region
 	# Viewing a discovered region is the existing presentation-location command.
 	var error: String = fleet.regions.set_location(region)
 	if not error.is_empty():
@@ -985,7 +989,8 @@ func select_ship(id: int) -> void:
 		return
 	selected_ship_id = id
 	activate_panel(ship_context, "Ship")
-	get_parent().ship_camera.focus_ship(id)
+	get_parent().ship_camera.ship_id = -1
+	if different_region: get_parent().ship_camera.focus_ship(id)
 	_refresh_ships()
 
 func _selected_ship_gate() -> void:
@@ -1005,12 +1010,12 @@ func _setup_grid_controls() -> void:
 	status_label.reparent(row)
 	row.add_child(grid_controls)
 	row.move_child(grid_controls, 0)
-	grid_controls.custom_minimum_size.x = 210
+	grid_controls.custom_minimum_size.x = 250
 	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	footer_balance = Control.new()
-	footer_balance.custom_minimum_size.x = 210
+	footer_balance.custom_minimum_size.x = 250
 	footer_balance.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(footer_balance)
 	for caption: String in ["Fit grid", "−", "+"]:
@@ -1021,6 +1026,11 @@ func _setup_grid_controls() -> void:
 		button.pressed.connect(_grid_action.bind(caption))
 		grid_controls.add_child(button)
 		grid_buttons[caption] = button
+	zoom_label = _label(grid_controls, "1.0x", 14, INK)
+	zoom_label.custom_minimum_size.x = 50
+	zoom_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	zoom_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	grid_controls.move_child(zoom_label, 2)
 	get_viewport().size_changed.connect(_layout_grid_controls)
 	_layout_grid_controls()
 	grid_controls.visible = get_parent().preferences.values.show_grid_controls

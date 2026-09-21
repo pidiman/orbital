@@ -102,7 +102,7 @@ func _spawn_debris(_initial: bool = false, region_id: String = "home") -> void:
 		extent = Vector2(0.7, 0.5)
 		center = Vector2(0.7, 0.5)
 	next_debris_id += 1
-	floating[region_id].pieces[next_debris_id] = {"position": center + Vector2(random.randf_range(-extent.x, extent.x), random.randf_range(-extent.y, extent.y)), "velocity": Vector2.ZERO, "resource": resource, "amount": random.randi_range(int(definition.amount_min), int(definition.amount_max)), "remaining": float(floating_rules.lifetime_seconds)}
+	floating[region_id].pieces[next_debris_id] = {"position": center + Vector2(random.randf_range(-extent.x, extent.x), random.randf_range(-extent.y, extent.y)), "velocity": Vector2.ZERO, "resource": resource, "amount": random.randi_range(int(definition.amount_min), int(definition.amount_max)), "remaining": float(definition.get("lifetime_seconds", floating_rules.lifetime_seconds))}
 	record.rng_state = str(random.state)
 	sync_mining_nodes()
 
@@ -127,7 +127,8 @@ func advance_floating(delta: float) -> void:
 					fleet.resource_targets.erase(target)
 		pool.timer += delta
 		if pool.timer + 0.0000001 >= float(floating_rules.spawn_seconds):
-			pool.timer -= float(floating_rules.spawn_seconds)
+			# The epsilon comparison can fire a few ulps early; keep saves valid.
+			pool.timer = maxf(0.0, pool.timer - float(floating_rules.spawn_seconds))
 			if pool.pieces.size() < int(floating_rules.max_count): _spawn_debris(false, region_id)
 
 func _spawn_asteroid(initial: bool = false) -> void:

@@ -30,7 +30,7 @@ static func run() -> Dictionary:
 		amounts[piece.resource][piece.amount] = true
 		quadrants[Vector2(signf(piece.position.x - 0.5), signf(piece.position.y - 0.5))] = true
 	checks.all_types = counts.values().all(func(n: int) -> bool: return n > 0)
-	checks.rare_crystals = counts.xenocrystal < counts.minerals / 20 and counts.minerals < counts.materials
+	checks.rare_crystals = counts.xenocrystal < counts.minerals / 4 and counts.minerals < counts.materials
 	checks.random_amounts = amounts.materials.size() == 7 and amounts.minerals.size() == 3 and amounts.xenocrystal.keys() == [1]
 	checks.whole_grid = quadrants.size() == 4
 	model.materials = 0

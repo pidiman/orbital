@@ -193,7 +193,7 @@ func _save_on_exit() -> void:
 		persistence.save_game()
 
 func _update_region_view() -> void:
-	ship_camera.reset_view()
+	ship_camera.reset_view(true)
 	var home: bool = fleet.regions.primary_station_visible()
 	background.visible = home
 	region_view.visible = not home

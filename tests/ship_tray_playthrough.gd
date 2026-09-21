@@ -1,5 +1,7 @@
 extends "res://tests/outpost_playthrough.gd"
 
+var tile_camera_stable: bool = false
+
 func _ready() -> void:
 	await settle(3)
 	game = get_tree().root.get_node("Orbital")
@@ -28,7 +30,7 @@ func _ready() -> void:
 		var before: Dictionary = game.persistence.snapshot()
 		await tile(id)
 		checks["tile selects %d" % id] = hud.selected_ship_id == id and hud.ship_context.visible
-		checks["camera centers %d" % id] = centered(id)
+		checks["camera stable %d" % id] = tile_camera_stable
 		checks["no simulation mutation %d" % id] = before == game.persistence.snapshot()
 		checks["commands retained %d" % id] = hud.sell_buttons[id].is_visible_in_tree()
 		for capability: String in hud.capability_buttons[id]:
@@ -38,7 +40,7 @@ func _ready() -> void:
 	await use(hud.capability_buttons[ids.material_ship].collection)
 	checks.material_deploy = game.fleet.collection.jobs.has(ids.material_ship)
 	await settle(3)
-	checks.collection_camera = centered(ids.material_ship)
+	checks.collection_camera = game.ship_camera.ship_id == -1
 	await tile(ids.trader)
 	await use(hud.capability_buttons[ids.trader].trade)
 	checks.trade_context_opens = hud.trade_panel.visible and not hud.ship_context.visible
@@ -65,7 +67,7 @@ func _ready() -> void:
 	await use(hud.gate_panel.jump_button)
 	checks.gate_command_unchanged = game.fleet.transport.jobs.has(ids.jump_ship) and game.fleet.diplomacy.inventory.xenocrystal >= 0
 	await tile(ids.jump_ship)
-	checks.transit_shown = hud.context_detail.text.contains("In transit") and hud.context_detail.text.contains("Venus") and centered(ids.jump_ship)
+	checks.transit_shown = hud.context_detail.text.contains("In transit") and hud.context_detail.text.contains("Venus") and tile_camera_stable
 	for i in range(10): game.fleet.transport.tick()
 	var before: Dictionary = game.persistence.snapshot()
 	await tile(ids.jump_ship)
@@ -120,7 +122,7 @@ func _ready() -> void:
 	checks.tray_pointer_scroll = hud.ship_tray.scroll_horizontal > 0
 	var last: int = game.model.next_ship_id
 	await tile(last)
-	checks.last_tile_reachable = hud.selected_ship_id == last and centered(last)
+	checks.last_tile_reachable = hud.selected_ship_id == last and tile_camera_stable
 	checks.panels_clear_tray_footer = hud.ship_context.position.y >= hud.ship_tray.get_global_rect().end.y and hud.ship_context.get_global_rect().end.y < hud.footer.position.y
 	save_frame("many_ships")
 	# Verify world interaction under an offset camera, not just model commands.
@@ -167,7 +169,7 @@ func _ready() -> void:
 	checks.save_load_unchanged = game.persistence.snapshot() == expected
 	checks.tray_rebuilt_on_load = hud.ship_tiles.size() == game.model.ships.size() and hud.selected_ship_id == -1 and not hud.ship_context.visible
 	await tile(last)
-	checks.restored_tile_works = centered(last)
+	checks.restored_tile_works = tile_camera_stable
 	game.persistence.enabled = false
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(test_path))
 	checks.only_2d = no_3d(game)
@@ -177,7 +179,10 @@ func _ready() -> void:
 func tile(id: int) -> void:
 	game.hud.ship_tray.ensure_control_visible(game.hud.ship_tiles[id])
 	await settle(2)
+	var camera_position: Vector2 = game.ship_camera.position
+	var camera_zoom: Vector2 = game.ship_camera.zoom
 	await click(game.hud.ship_tiles[id].get_global_rect().get_center())
+	tile_camera_stable = game.ship_camera.position == camera_position and game.ship_camera.zoom == camera_zoom
 
 func centered(id: int) -> bool:
 	var point: Vector2 = game.get_viewport().get_canvas_transform() * game.ship_camera.ship_point(id)

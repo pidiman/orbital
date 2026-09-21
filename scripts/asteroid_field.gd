@@ -57,6 +57,8 @@ func handle_click(point: Vector2) -> bool:
 				var highlighted: int = get_parent().hud.selected_ship_id
 				if fleet.model.ships.has(highlighted) and fleet.model.ship_catalog[fleet.model.ships[highlighted]].has("mining"):
 					assignment_ship = highlighted
+			# Dispatch never changes the player's camera framing.
+			get_parent().ship_camera.ship_id = -1
 			var error: String = fleet.dispatch(asteroid_id, assignment_ship)
 			notice.emit("Mining ship dispatched. %s arrive when the timer ends." % fleet.target_resource(asteroid_id).capitalize() if error.is_empty() else error, not error.is_empty())
 			if error.is_empty():
