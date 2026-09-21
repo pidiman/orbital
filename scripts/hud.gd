@@ -77,6 +77,7 @@ var upgrade_title: Label
 var upgrade_stats: Label
 var upgrade_detail: Label
 var refinery_selector: OptionButton
+var refinery_run_button: Button
 var upgrade_button: Button
 var selected_position: Vector2 = Vector2(99, 99)
 var tool_buttons: Dictionary = {}
@@ -614,6 +615,12 @@ func _build_upgrade_page() -> void:
 		var error: String = model.set_refinery_recipe(selected_position, refinery_selector.get_item_metadata(index))
 		if not error.is_empty(): message(error, true))
 	page.add_child(refinery_selector)
+	refinery_run_button = Button.new()
+	refinery_run_button.custom_minimum_size.y = 44
+	refinery_run_button.pressed.connect(func() -> void:
+		var error: String = model.set_refinery_running(selected_position, not model.refinery_running(selected_position))
+		if not error.is_empty(): message(error, true))
+	page.add_child(refinery_run_button)
 	upgrade_button = Button.new()
 	upgrade_button.custom_minimum_size.y = 54
 	upgrade_button.add_theme_font_size_override("font_size", 13)
@@ -643,7 +650,9 @@ func inspect_module(world_position: Vector2) -> void:
 	_refresh_upgrade()
 
 func _refresh_upgrade() -> void:
-	refinery_selector.hide()
+	var is_refinery: bool = fleet.regions.primary_station_visible() and model.modules.has(selected_position) and model.definition_at(selected_position).has("conversion")
+	refinery_selector.visible = is_refinery
+	refinery_run_button.visible = is_refinery
 	upgrade_title.show()
 	if is_instance_valid(tabs) and tabs.current_tab == 2 and panel.has_node("MenuFrame"):
 		panel.get_node("MenuFrame").get_child(0).get_child(0).text = "Build"
@@ -683,13 +692,18 @@ func _refresh_upgrade() -> void:
 		for job: Dictionary in fleet.hauling.jobs.values():
 			if job.refinery_id == model.structure_id_at(selected_position): assigned += 1
 		upgrade_stats.text += "\nHaulers assigned: %d" % assigned
-		refinery_selector.clear()
-		for recipe_id: String in definition.recipes:
-			refinery_selector.add_item(model.refinery_recipes[recipe_id].name)
-			var index: int = refinery_selector.item_count - 1
-			refinery_selector.set_item_metadata(index, recipe_id)
-			if recipe_id == model.refinery_recipe_id(selected_position): refinery_selector.select(index)
-		refinery_selector.show()
+		# Preserve an open popup across model/fleet refreshes; rebuild only if its choices change.
+		var recipe_ids: Array = definition.recipes
+		var displayed_ids: Array = []
+		for index in range(refinery_selector.item_count): displayed_ids.append(refinery_selector.get_item_metadata(index))
+		if displayed_ids != recipe_ids:
+			refinery_selector.clear()
+			for recipe_id: String in recipe_ids:
+				refinery_selector.add_item(model.refinery_recipes[recipe_id].name)
+				refinery_selector.set_item_metadata(refinery_selector.item_count - 1, recipe_id)
+		refinery_selector.select(recipe_ids.find(model.refinery_recipe_id(selected_position)))
+		refinery_run_button.text = "Stop production" if model.refinery_running(selected_position) else "Run production · Stopped"
+
 	var current_tier: int = model.tier_at(selected_position)
 	var next: Dictionary = model.next_upgrade(selected_position)
 	if next.is_empty():

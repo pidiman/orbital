@@ -175,7 +175,18 @@ func set_refinery_recipe(world_position: Vector2, recipe_id: String) -> String:
 	changed.emit()
 	return ""
 
+func refinery_running(world_position: Vector2) -> bool:
+	return bool(structure_state(world_position).get("refinery_running", true))
+
+func set_refinery_running(world_position: Vector2, running: bool) -> String:
+	if not modules.has(world_position) or not definition_at(world_position).has("conversion"): return "Choose a Refinery."
+	if refinery_running(world_position) == running: return ""
+	structure_state(world_position)["refinery_running"] = running
+	changed.emit()
+	return ""
+
 func refinery_pause_reason(world_position: Vector2) -> String:
+	if not refinery_running(world_position): return "Stopped"
 	var recipe: Dictionary = refinery_recipe(world_position)
 	if refinery_buffer_space(world_position) < int(recipe.output): return "buffer full · paused"
 	if upgrade_resource_amount(recipe.input_resource) < int(recipe.input): return "waiting for " + recipe.input_resource

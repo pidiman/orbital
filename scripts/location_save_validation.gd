@@ -36,6 +36,8 @@ static func validate_graph(data: Dictionary, model: StationModel, region_data: D
 				if not resource is String or not resource in allowed_outputs or not integer(record.state.output_buffer[resource]): return "Invalid buffered resource."
 				total += int(record.state.output_buffer[resource])
 			if total > int(model.definition_for(record.kind, int(record.state.get("tier", 1))).get("output_buffer_capacity", 30)): return "Refinery buffer exceeds capacity."
+		if record.state.has("refinery_running"):
+			if not model.catalog.get(record.kind, {}).has("conversion") or not record.state.refinery_running is bool: return "Invalid refinery running state."
 		if record.state.has("refinery_recipe"):
 			var recipe: Variant = record.state.refinery_recipe
 			if not recipe is String or not model.refinery_recipes.has(recipe) or not model.catalog.get(record.kind, {}).get("recipes", []).has(recipe):
