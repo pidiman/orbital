@@ -241,3 +241,10 @@ func add_catalog_defaults() -> void:
 	for good: String in goods_catalog:
 		if not inventory.has(good):
 			inventory[good] = 0
+
+# Resource receipt through the existing trade-goods authority.
+func receive_goods(good: String, amount: int) -> int:
+	if amount < 0 or not inventory.has(good): return 0
+	inventory[good] += amount
+	changed.emit()
+	return amount

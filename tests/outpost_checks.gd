@@ -80,7 +80,7 @@ static func run() -> Dictionary:
 	fleet.cancel_unit(miner)
 	checks.cancel_stays_local = model.locations.ship_region(miner) == "venus" and not fleet.asteroids[target].claimed
 	checks.no_remote_building = fleet.regions.jump("venus").is_empty() and not model.build(Vector2(58, 58), "solar").is_empty()
-	checks.no_material_hauling = store.supply.debris_in("venus").is_empty()
+	checks.no_material_hauling = store.supply.collection.depots_in("venus").is_empty()
 	fleet.regions.jump("home")
 	model.materials = 100
 	model.buy_ship("miner")

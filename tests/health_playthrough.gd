@@ -47,16 +47,16 @@ func _ready() -> void:
 	checks["ui_scout_sale_releases_sector"] = game.fleet.survey_jobs.is_empty() and game.fleet.sector_state("dawn") == "unexplored"
 	# Removing both visual fields must not stop supply simulation or create duplicate spawns.
 	var supply_time: float = game.supply.elapsed
-	var debris_ids: Array = game.supply.debris.keys()
+	var debris_ids: Array = game.supply.debris_in("home").keys()
 	game.remove_child(game.debris)
 	game.remove_child(game.asteroids)
 	await get_tree().create_timer(3.2).timeout
 	checks["supply_advances_without_views"] = game.supply.elapsed > supply_time + 3.0 and game.supply.next_debris_id > debris_ids.back()
-	var count_before: int = game.supply.debris.size()
+	var count_before: int = game.supply.debris_in("home").size()
 	game.add_child(game.debris)
 	game.add_child(game.asteroids)
 	await settle(2)
-	checks["views_rehydrate_without_spawning"] = game.debris.pieces.size() == count_before and game.debris.pieces.size() == game.supply.debris.size()
+	checks["views_rehydrate_without_spawning"] = game.debris.pieces.size() == count_before and game.debris.pieces.size() == game.supply.debris_in("home").size()
 	# Legal model API setup of the audited 81-module case; recovery itself uses mouse input.
 	var positions: Array[Vector2] = []
 	for x in range(-4, 5):

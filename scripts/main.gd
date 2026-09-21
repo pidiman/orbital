@@ -200,8 +200,8 @@ func _update_region_view() -> void:
 	region_view.queue_redraw()
 	board.visible = home
 	board.set_process_unhandled_input(home)
-	debris.visible = home
-	debris.set_process_unhandled_input(home)
+	debris.visible = true
+	debris.set_process_unhandled_input(true)
 	board.selected = ""
 	board.inspected_position = Vector2.INF
 	asteroids.selected_ship = -1

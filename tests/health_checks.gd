@@ -2,7 +2,10 @@ extends RefCounted
 const Supply = preload("res://scripts/sector_supply.gd")
 
 func run(check: Callable) -> void:
+	var dimensions := StationGeometry.grid_dimensions
+	StationGeometry.grid_dimensions = Vector2i(9, 9)
 	_recovery(check)
+	StationGeometry.grid_dimensions = dimensions
 	_supply(check)
 
 func _recovery(check: Callable) -> void:
@@ -95,29 +98,31 @@ func _supply(check: Callable) -> void:
 	var model := StationModel.new()
 	var fleet := MiningFleet.new(model)
 	var supply := Supply.new(model, fleet, 42)
-	check.call(supply is RefCounted and supply.debris.size() == 5 and supply.home_asteroids.size() == 1, "headless supply initializes without nodes")
+	check.call(supply is RefCounted and supply.debris_in("home").size() == 5 and supply.home_asteroids.size() == 1, "headless supply initializes without nodes")
 	var amounts_valid: bool = true
-	for piece: Dictionary in supply.debris.values():
-		amounts_valid = amounts_valid and piece.amount >= 8 and piece.amount <= 14
+	for piece: Dictionary in supply.debris_in("home").values():
+		amounts_valid = amounts_valid and piece.amount >= supply.floating_rules.types[piece.resource].amount_min and piece.amount <= supply.floating_rules.types[piece.resource].amount_max
 	check.call(amounts_valid and fleet.asteroids[1].minerals == 18, "configured salvage and ore amounts")
 	var before: Vector2 = supply.home_asteroids[1].position
 	supply.advance(2.95)
-	check.call(supply.debris.size() == 5 and supply.home_asteroids[1].position.x > before.x, "headless drift and spawn delay")
+	check.call(supply.debris_in("home").size() == 5 and supply.home_asteroids[1].position.x > before.x, "headless drift and spawn delay")
 	supply.advance(0.05)
 	check.call(supply.next_debris_id == 6, "debris spawns at three seconds")
 	supply.advance(9.0)
 	check.call(supply.next_home_id == 2 and supply.home_asteroids.size() == 2, "home asteroid spawns at twelve seconds")
-	var id: int = supply.debris.keys()[0]
-	var amount: int = supply.debris[id].amount
+	var id: int = supply.debris_in("home").keys()[0]
+	supply.debris_in("home")[id].resource = "materials"
+	supply.debris_in("home")[id].amount = 10
+	var amount: int = supply.debris_in("home")[id].amount
 	model.materials = model.capacity - 3
-	check.call(supply.salvage(id) == 3 and supply.debris[id].amount == amount - 3, "partial salvage preserves remainder")
-	check.call(supply.salvage(id) == 0 and supply.debris[id].amount == amount - 3, "full storage preserves salvage")
+	check.call(supply.salvage(id) == 3 and supply.debris_in("home")[id].amount == amount - 3, "partial salvage preserves remainder")
+	check.call(supply.salvage(id) == 0 and supply.debris_in("home")[id].amount == amount - 3, "full storage preserves salvage")
 	model.materials = 0
-	check.call(supply.salvage(id) == amount - 3 and not supply.debris.has(id) and supply.salvage(id) == 0, "salvage removes exhausted debris without duplicate award")
-	var expiring_id: int = supply.debris.keys()[0]
-	supply.debris[expiring_id].position.x = 2.0
+	check.call(supply.salvage(id) == amount - 3 and not supply.debris_in("home").has(id) and supply.salvage(id) == 0, "salvage removes exhausted debris without duplicate award")
+	var expiring_id: int = supply.debris_in("home").keys()[0]
+	supply.debris_in("home")[expiring_id].remaining = 0.01
 	supply.advance(0.05)
-	check.call(not supply.debris.has(expiring_id) and supply.salvage(expiring_id) == 0, "expired debris cannot pay out")
+	check.call(not supply.debris_in("home").has(expiring_id) and supply.salvage(expiring_id) == 0, "expired debris cannot pay out")
 	fleet.asteroids[1].claimed = true
 	supply.home_asteroids[1].position.x = 2.0
 	supply.advance(1.0)
@@ -130,15 +135,18 @@ func _supply(check: Callable) -> void:
 	check.call(not supply.home_asteroids.has(2), "mined asteroid cleaned without rendering")
 	var same_model := StationModel.new()
 	var same_fleet := MiningFleet.new(same_model)
+	var region_records: Dictionary = same_fleet.regions.records.duplicate(true)
 	var first := Supply.new(same_model, same_fleet, 100)
 	var other_model := StationModel.new()
-	var second := Supply.new(other_model, MiningFleet.new(other_model), 100)
+	var other_fleet := MiningFleet.new(other_model)
+	other_fleet.regions.records = region_records
+	var second := Supply.new(other_model, other_fleet, 100)
 	first.advance(30.0)
 	for index in range(600):
 		second.advance(0.05)
-	check.call(first.debris == second.debris and first.home_asteroids == second.home_asteroids, "seeded supply independent of frame subdivision")
+	check.call(first.floating == second.floating and first.home_asteroids == second.home_asteroids, "seeded supply independent of frame subdivision")
 	first.advance(1000.0)
-	check.call(first.debris.size() <= int(first.rules.debris.max_count) and first.home_asteroids.size() <= int(first.rules.asteroids.max_count) and first.next_home_id > 3, "long-run population caps and replenishment")
+	check.call(first.debris_in("home").size() <= int(first.rules.debris.max_count) and first.home_asteroids.size() <= int(first.rules.asteroids.max_count) and first.next_home_id > 3, "long-run population caps and replenishment")
 	var config: Dictionary = supply.rules.duplicate(true)
 	config.debris.amount_min = 27
 	config.debris.amount_max = 27
@@ -147,4 +155,8 @@ func _supply(check: Callable) -> void:
 	var custom_model := StationModel.new()
 	var custom_fleet := MiningFleet.new(custom_model)
 	var custom := Supply.new(custom_model, custom_fleet, 0, config)
-	check.call(custom.debris.size() == 2 and custom.debris[1].amount == 27 and custom_fleet.asteroids[1].minerals == 36, "supply amounts and populations data driven")
+	custom.floating_rules.initial_count = 2
+	custom.floating_rules.types = {"materials": {"weight": 1, "amount_min": 27, "amount_max": 27}}
+	custom.floating.clear()
+	custom.ensure_floating_region("home")
+	check.call(custom.debris_in("home").size() == 2 and custom.debris_in("home").values()[0].amount == 27 and custom_fleet.asteroids[1].minerals == 36, "supply amounts and populations data driven")

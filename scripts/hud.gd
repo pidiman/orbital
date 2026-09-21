@@ -324,7 +324,7 @@ func choose(kind: String) -> void:
 	for id: String in tool_buttons:
 		tool_buttons[id].add_theme_stylebox_override("normal", _style(Color("1f3a3c") if id == selected else Color("172738"), CYAN if id == selected else Color("304557")))
 	tool_selected.emit(kind)
-	message("Click amber debris for Materials or violet asteroids to send a ship." if kind.is_empty() else "%s selected. Click a green cell beside the station." % model.catalog[kind].name)
+	message("Click labeled floating resources to collect; violet asteroids dispatch a Miner." if kind.is_empty() else "%s selected. Click a green cell beside the station." % model.catalog[kind].name)
 
 func refresh() -> void:
 	var home: bool = fleet.regions.primary_station_visible()
@@ -360,8 +360,8 @@ func _level_up(level: int) -> void:
 	title.position = Vector2(150, 440)
 	floating.append({"label": title, "time": 0.0, "duration": 4.0})
 
-func show_salvage(amount: int, point: Vector2) -> void:
-	var label := _label(root, "+%d MATERIALS" % amount, 16, GOLD)
+func show_salvage(amount: int, point: Vector2, resource: String = "materials") -> void:
+	var label := _label(root, "+%d %s" % [amount, resource.to_upper()], 16, GOLD)
 	label.position = get_viewport().get_canvas_transform() * point + Vector2(-35, -30)
 	floating.append({"label": label, "time": 0.0, "duration": 1.2})
 
@@ -371,7 +371,7 @@ func _process(delta: float) -> void:
 		footer_balance.visible = grid_controls.visible
 	status_time -= delta
 	if status_time <= 0:
-		status_label.text = "Amber: salvage  ·  Violet: mine  ·  Inspect a module to upgrade  ·  Ships: fleet commands" if fleet.regions.primary_station_visible() else "Violet: mine  ·  Outposts/Regions: Scout / view region  ·  Station construction and salvage remain at Home"
+		status_label.text = "Labeled pickups: salvage  ·  Violet asteroids: mine  ·  Inspect a module to upgrade  ·  Ships: fleet commands" if fleet.regions.primary_station_visible() else "Labeled pickups: salvage  ·  Violet: mine  ·  Outposts/Regions: Scout / view region  ·  Station construction remains at Home"
 		if fleet.collection != null and not fleet.collection.waiting_message().is_empty():
 			status_label.text = fleet.collection.waiting_message()
 		if not fleet.docking.waiting_message().is_empty() and fleet.collection.waiting_message().is_empty():
@@ -1069,6 +1069,12 @@ func _setup_menu() -> void:
 	old_row.queue_free()
 	settings_button = Button.new()
 	settings_button.text = "Settings"
+	settings_button.theme = save_button.theme
+	settings_button.add_theme_font_size_override("font_size", save_button.get_theme_font_size("font_size"))
+	settings_button.add_theme_color_override("font_color", save_button.get_theme_color("font_color"))
+	for style: String in ["normal", "hover"]:
+		settings_button.add_theme_stylebox_override(style, save_button.get_theme_stylebox(style))
+		load_button.add_theme_stylebox_override(style, save_button.get_theme_stylebox(style))
 	settings_button.pressed.connect(func() -> void: open_menu("Settings"))
 	body.add_child(settings_button)
 	_wrap_panel(menu_panel, "Menu")

@@ -83,6 +83,8 @@ func snapshot() -> Dictionary:
 	document.extensions.research["schema_version"] = 1
 	_merge_fields(document.extensions, "gate_transport", fleet.transport, Transport.FIELDS)
 	document.extensions.gate_transport["schema_version"] = 1
+	_merge_fields(document.extensions, "floating_resources", supply, Supply.FLOATING_FIELDS)
+	document.extensions.floating_resources["schema_version"] = 1
 	_merge_fields(document.extensions, "material_collection", supply.collection, Collection.FIELDS)
 	document.extensions.material_collection["schema_version"] = 1
 	_merge_fields(document.extensions, "regions", fleet.regions, Regions.FIELDS)
@@ -321,6 +323,16 @@ func restore(document: Variant) -> String:
 	error = candidate_fleet.regions.validate(region_data, station_data, fleet_data, candidate_fleet.diplomacy.jobs, candidate.ship_catalog)
 	if not error.is_empty():
 		return error
+	var floating_data: Dictionary = {}
+	if migrated.extensions.has("floating_resources"):
+		var decoded: Dictionary = _extension_fields(migrated.extensions, "floating_resources", candidate_supply, Supply.FLOATING_FIELDS)
+		if not decode_error.is_empty(): return decode_error
+		floating_data = decoded.floating
+		error = candidate_supply.validate_floating(floating_data, region_data.records, int(supply_data.next_debris_id))
+		if not error.is_empty(): return error
+		for pool: Dictionary in floating_data.values():
+			for id: int in pool.pieces:
+				if supply_data.debris.has(id): return "Duplicate legacy/floating resource ID."
 	candidate_supply.collection.sync_depots()
 	var collection_data: Dictionary = {"jobs": {}, "depots": candidate_supply.collection.depots.duplicate(true)}
 	if migrated.extensions.has("material_collection"):
@@ -410,6 +422,7 @@ func restore(document: Variant) -> String:
 	_apply_fields(model, station_data, STATION_FIELDS)
 	_apply_fields(fleet, fleet_data, FLEET_FIELDS)
 	_apply_fields(supply, supply_data, SUPPLY_FIELDS)
+	supply.floating = floating_data
 	_apply_fields(supply.collection, collection_data, Collection.FIELDS)
 	for field: String in Locations.FIELDS:
 		model.locations.set(field, candidate.locations.get(field))

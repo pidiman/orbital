@@ -107,6 +107,7 @@ func advance(delta: float) -> void:
 			job.target = -1
 			var distance: float = INF
 			for debris_id: int in available_debris:
+				if available_debris[debris_id].get("resource", "materials") != "materials": continue
 				var reserved: bool = false
 				for other: Dictionary in jobs.values():
 					if other != job and other.target == debris_id:

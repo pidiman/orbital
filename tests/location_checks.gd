@@ -87,6 +87,7 @@ static func run() -> Dictionary:
 	checks.stable_dock_assignment = fleet.mining_assignments.has("structure/" + model.structure_id_at(dock)) and fleet.mining_assignment(dock).policy == "local"
 	checks.collection_deploy = store.supply.collection.deploy(collector).is_empty()
 	store.supply.debris = {1: {"position": Vector2(0.5, 0.5), "velocity": Vector2.ZERO, "amount": 10}}
+	store.supply.floating.clear()
 	store.supply.next_debris_id = 1
 	store.supply.collection.advance(0.1)
 	var job: Dictionary = store.supply.collection.jobs[collector]
