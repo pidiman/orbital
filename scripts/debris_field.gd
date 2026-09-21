@@ -33,7 +33,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	for i in range(pieces.size() - 1, -1, -1):
 		var piece: Dictionary = pieces[i]
-		if event.position.distance_to(piece.point) <= 27:
+		if (get_canvas_transform().affine_inverse() * event.position).distance_to(piece.point) <= 27:
 			var collected: int = supply.salvage(int(piece.id))
 			if collected == 0:
 				full_storage.emit()

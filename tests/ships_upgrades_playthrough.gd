@@ -32,7 +32,7 @@ func _ready() -> void:
 	board.center = saved_center
 	mark("fresh game")
 	await select("solar")
-	await click(game.board.cell_position(Vector2i(1, 0)))
+	await click(game.get_viewport().get_canvas_transform() * (game.board.cell_position(Vector2i(1, 0))))
 	await gather(45)
 	await page(1)
 	checks["ships_have_separate_page"] = game.hud.tabs.current_tab == 1 and game.hud.ship_buttons.size() == game.model.ship_catalog.size() and game.hud.ship_buttons.has("trader")
@@ -69,7 +69,7 @@ func _ready() -> void:
 		return
 	await use(game.hud.command_buttons[miner])
 	checks["explicit_miner_selected"] = game.asteroids.selected_ship == miner
-	await click(game.asteroids.rocks[rich_target].point)
+	await click(game.get_viewport().get_canvas_transform() * (game.asteroids.rocks[rich_target].point))
 	checks["assigned_target_reserved"] = game.fleet.jobs.has(miner) and game.fleet.jobs[miner].target == rich_target and game.fleet.asteroids[rich_target].claimed
 	mark("assigned rich asteroid")
 	await get_tree().create_timer(2.0).timeout
@@ -90,7 +90,7 @@ func _ready() -> void:
 	checks["second_cycle_without_click"] = game.fleet.total_mined == 36 and game.model.minerals == 36
 	mark("second cycle without input")
 	# Click existing Solar in inspect mode; no build tool remains selected after purchase.
-	await click(game.board.cell_position(Vector2i(1, 0)))
+	await click(game.get_viewport().get_canvas_transform() * (game.board.cell_position(Vector2i(1, 0))))
 	checks["module_inspector_opens"] = game.hud.tabs.current_tab == 2 and game.hud.upgrade_title.text.contains("Tier 1")
 	checks["upgrade_cost_visible"] = game.hud.upgrade_button.text.contains("30 M + 8 Minerals") and not game.hud.upgrade_button.disabled
 	await settle(2)
@@ -146,16 +146,29 @@ func gather(target: int) -> void:
 		if game.debris.pieces.is_empty():
 			await get_tree().create_timer(0.4).timeout
 		else:
-			var point: Vector2 = game.debris.pieces[0].point
+			var candidates: Array = game.debris.pieces.filter(func(piece: Dictionary) -> bool:
+				var screen: Vector2 = game.get_viewport().get_canvas_transform() * piece.point
+				return screen.x > 30 and screen.x < 780 and screen.y > 275 and screen.y < game.get_viewport_rect().size.y - 85)
+			if candidates.is_empty():
+				await get_tree().create_timer(0.3).timeout
+				continue
+			var point: Vector2 = candidates[0].point
 			if point.x < 30:
 				await get_tree().create_timer(0.3).timeout
 				continue
 			var before: int = game.model.materials
-			await click(point)
+			await click(game.get_viewport().get_canvas_transform() * point)
 			if game.model.materials > before:
 				checks["debris_collection"] = true
 
 func use(button: Control) -> void:
+	if game.hud.ship_context.is_ancestor_of(button) and not button.is_visible_in_tree():
+		for ship_id: int in game.hud.ship_entries:
+			if game.hud.ship_entries[ship_id].is_ancestor_of(button):
+				game.hud.ship_tray.ensure_control_visible(game.hud.ship_tiles[ship_id])
+				await settle(2)
+				await click(game.hud.ship_tiles[ship_id].get_global_rect().get_center())
+				break
 	var hud = game.hud
 	if not button.is_visible_in_tree():
 		var menu: String = ""

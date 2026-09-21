@@ -46,10 +46,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if not selected.is_empty():
-			requested_build.emit(placement_position(event.position))
+			requested_build.emit(placement_position(get_canvas_transform().affine_inverse() * event.position))
 			get_viewport().set_input_as_handled()
-		elif module_at_screen(event.position) != Vector2.INF:
-			inspected_position = module_at_screen(event.position)
+		elif module_at_screen(get_canvas_transform().affine_inverse() * event.position) != Vector2.INF:
+			inspected_position = module_at_screen(get_canvas_transform().affine_inverse() * event.position)
 			module_selected.emit(inspected_position)
 			get_viewport().set_input_as_handled()
 

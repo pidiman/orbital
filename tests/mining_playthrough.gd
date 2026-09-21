@@ -19,18 +19,18 @@ func _ready() -> void:
 	await get_tree().create_timer(0.3).timeout
 	checks["asteroids_drift"] = game.asteroids.rocks[first_id].point.x > first_point.x
 	await select("solar")
-	await click(game.board.cell_position(Vector2i(1, 0)))
+	await click(game.get_viewport().get_canvas_transform() * (game.board.cell_position(Vector2i(1, 0))))
 	await gather(45)
 	await select("mining_ship")
-	await click(game.board.cell_position(Vector2i(0, 1)))
+	await click(game.get_viewport().get_canvas_transform() * (game.board.cell_position(Vector2i(0, 1))))
 	checks["ship_built_with_cost_and_power"] = game.model.modules.get(Vector2(0, 58)) == "mining_ship" and game.model.power_balance() == 4
 	mark("ship built")
 	first_id = await visible_asteroid()
-	await click(game.asteroids.rocks[first_id].point)
+	await click(game.get_viewport().get_canvas_transform() * (game.asteroids.rocks[first_id].point))
 	checks["asteroid_click_dispatches"] = game.fleet.jobs.size() == 1 and game.model.minerals == 0
 	checks["asteroid_click_does_not_build"] = game.model.modules.size() == 3
 	mark("mission launched")
-	await click(game.asteroids.rocks[first_id].point)
+	await click(game.get_viewport().get_canvas_transform() * (game.asteroids.rocks[first_id].point))
 	checks["duplicate_click_no_extra_mission"] = game.fleet.jobs.size() == 1
 	await get_tree().create_timer(2.0).timeout
 	checks["mining_is_timed"] = game.model.minerals == 0 and game.fleet.jobs.size() == 1
@@ -48,7 +48,7 @@ func _ready() -> void:
 	save_frame("minerals_delivered")
 	await gather(40)
 	await select("refinery")
-	await click(game.board.cell_position(Vector2i(-1, 0)))
+	await click(game.get_viewport().get_canvas_transform() * (game.board.cell_position(Vector2i(-1, 0))))
 	checks["refinery_built_and_powered"] = game.model.modules.get(Vector2(-58, 0)) == "refinery" and game.model.power_balance() == 1
 	var material_before: int = game.model.materials
 	var mineral_before: int = game.model.minerals
@@ -67,7 +67,7 @@ func _ready() -> void:
 	checks["periodic_asteroids_spawn"] = game.asteroids.next_id >= 2
 	# Dispatch again after the first return; normal loop remains repeatable.
 	var second_id: int = await visible_asteroid()
-	await click(game.asteroids.rocks[second_id].point)
+	await click(game.get_viewport().get_canvas_transform() * (game.asteroids.rocks[second_id].point))
 	checks["returned_ship_can_dispatch_again"] = game.fleet.jobs.size() == 1
 	# Every catalog entry remains fully visible and clickable above the footer.
 	await use(game.hud.menu_buttons.Build)
@@ -116,16 +116,29 @@ func gather(target: int) -> void:
 		if game.debris.pieces.is_empty():
 			await get_tree().create_timer(0.4).timeout
 		else:
-			var point: Vector2 = game.debris.pieces[0].point
+			var candidates: Array = game.debris.pieces.filter(func(piece: Dictionary) -> bool:
+				var screen: Vector2 = game.get_viewport().get_canvas_transform() * piece.point
+				return screen.x > 30 and screen.x < 780 and screen.y > 275 and screen.y < game.get_viewport_rect().size.y - 85)
+			if candidates.is_empty():
+				await get_tree().create_timer(0.3).timeout
+				continue
+			var point: Vector2 = candidates[0].point
 			if point.x < 30:
 				await get_tree().create_timer(0.3).timeout
 				continue
 			var before: int = game.model.materials
-			await click(point)
+			await click(game.get_viewport().get_canvas_transform() * point)
 			if game.model.materials > before:
 				checks["debris_collection"] = true
 
 func use(button: Control) -> void:
+	if game.hud.ship_context.is_ancestor_of(button) and not button.is_visible_in_tree():
+		for ship_id: int in game.hud.ship_entries:
+			if game.hud.ship_entries[ship_id].is_ancestor_of(button):
+				game.hud.ship_tray.ensure_control_visible(game.hud.ship_tiles[ship_id])
+				await settle(2)
+				await click(game.hud.ship_tiles[ship_id].get_global_rect().get_center())
+				break
 	var hud = game.hud
 	if not button.is_visible_in_tree():
 		var menu: String = ""

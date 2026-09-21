@@ -13,7 +13,7 @@ func _ready() -> void:
 	game.persistence.enabled = true
 	Engine.time_scale = 3.0
 	await select("solar")
-	await click(game.board.cell_position(Vector2i(1, 0)))
+	await click(game.get_viewport().get_canvas_transform() * (game.board.cell_position(Vector2i(1, 0))))
 	checks["build_autosaves"] = FileAccess.file_exists(test_path) and not game.persistence.dirty
 	await gather(45)
 	await page(1)
@@ -28,7 +28,7 @@ func _ready() -> void:
 	var scout: int = game.model.next_ship_id
 	await use(game.hud.command_buttons[miner])
 	var asteroid_id: int = game.asteroids.rocks.keys()[0]
-	await click(game.asteroids.rocks[asteroid_id].point)
+	await click(game.get_viewport().get_canvas_transform() * (game.asteroids.rocks[asteroid_id].point))
 	await use(game.hud.command_buttons[scout])
 	game.get_node("ResourceClock").set_process(false)
 	checks["active_jobs_before_save"] = game.fleet.jobs.has(miner) and game.fleet.survey_jobs.has(scout)
@@ -130,16 +130,29 @@ func gather(target: int) -> void:
 		if game.debris.pieces.is_empty():
 			await get_tree().create_timer(0.4).timeout
 		else:
-			var point: Vector2 = game.debris.pieces[0].point
+			var candidates: Array = game.debris.pieces.filter(func(piece: Dictionary) -> bool:
+				var screen: Vector2 = game.get_viewport().get_canvas_transform() * piece.point
+				return screen.x > 30 and screen.x < 780 and screen.y > 275 and screen.y < game.get_viewport_rect().size.y - 85)
+			if candidates.is_empty():
+				await get_tree().create_timer(0.3).timeout
+				continue
+			var point: Vector2 = candidates[0].point
 			if point.x < 30:
 				await get_tree().create_timer(0.3).timeout
 				continue
 			var before: int = game.model.materials
-			await click(point)
+			await click(game.get_viewport().get_canvas_transform() * point)
 			if game.model.materials > before:
 				checks["debris_collection"] = true
 
 func use(button: Control) -> void:
+	if game.hud.ship_context.is_ancestor_of(button) and not button.is_visible_in_tree():
+		for ship_id: int in game.hud.ship_entries:
+			if game.hud.ship_entries[ship_id].is_ancestor_of(button):
+				game.hud.ship_tray.ensure_control_visible(game.hud.ship_tiles[ship_id])
+				await settle(2)
+				await click(game.hud.ship_tiles[ship_id].get_global_rect().get_center())
+				break
 	var hud = game.hud
 	if not button.is_visible_in_tree():
 		var menu: String = ""

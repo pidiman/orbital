@@ -48,7 +48,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
 		return
 	for asteroid_id: int in rocks:
-		if event.position.distance_to(rocks[asteroid_id].point) <= 34.0:
+		if (get_canvas_transform().affine_inverse() * event.position).distance_to(rocks[asteroid_id].point) <= 34.0:
 			var error: String = fleet.dispatch(asteroid_id, selected_ship)
 			notice.emit("Mining Ship dispatched. Minerals arrive when the timer ends." if error.is_empty() else error, not error.is_empty())
 			if error.is_empty():
@@ -71,7 +71,13 @@ func _on_completed(unit: Variant, asteroid_id: int, amount: int) -> void:
 
 func _draw() -> void:
 	for ship_id: int in fleet.model.ships:
-		if fleet.transport.jobs.has(ship_id) or fleet.transport.location(ship_id) != fleet.regions.current_region:
+		if fleet.transport.location(ship_id) != fleet.regions.current_region:
+			continue
+		if fleet.transport.jobs.has(ship_id):
+			var point: Vector2 = board.world_to_screen(fleet.transport.jobs[ship_id].gate)
+			var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
+			ModuleArt.draw_module(self, point, definition.get("art", "scout"), 0.55, 0.5)
+			draw_string(font, point + Vector2(-30, 40), "In transit", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ORE)
 			continue
 		if fleet.collection != null and fleet.collection.jobs.has(ship_id):
 			continue
@@ -97,8 +103,7 @@ func _draw() -> void:
 		var target: Vector2 = rocks[job.target].point
 		draw_dashed_line(start, target, Color(0.72, 0.62, 0.96, 0.4), 1.5, 7.0)
 		var progress: float = 1.0 - float(job.remaining) / float(job.duration)
-		var flight: float = clampf(progress * 4.0, 0.0, 1.0) if progress < 0.75 else clampf((1.0 - progress) * 4.0, 0.0, 1.0)
-		var ship_point: Vector2 = start.lerp(target + Vector2(0, 30), flight)
+		var ship_point: Vector2 = ship_position(unit)
 		ModuleArt.draw_module(self, ship_point, "mining_ship", 0.55)
 		draw_arc(target, 34.0, -PI / 2, -PI / 2 + TAU * maxf(0.01, progress), 48, ORE, 3.0, true)
 		draw_string(font, target + Vector2(-21, 51), "%ds" % job.remaining, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ORE)
@@ -141,3 +146,12 @@ func _add_discovery_marker(asteroid_id: int) -> void:
 
 func home_asteroid_count() -> int:
 	return supply.home_asteroids.size()
+
+func ship_position(unit: Variant) -> Vector2:
+	var start: Vector2 = home_position(unit)
+	if not fleet.jobs.has(unit): return start
+	var job: Dictionary = fleet.jobs[unit]
+	if not rocks.has(job.target): return start
+	var progress: float = 1.0 - float(job.remaining) / float(job.duration)
+	var flight: float = clampf(progress * 4.0, 0.0, 1.0) if progress < 0.75 else clampf((1.0 - progress) * 4.0, 0.0, 1.0)
+	return start.lerp(rocks[job.target].point + Vector2(0, 30), flight)

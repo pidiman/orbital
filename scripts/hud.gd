@@ -11,7 +11,19 @@ var research_button: Button
 var gate_panel: PanelContainer
 var tech_label: Label
 var xenocrystal_label: Label
+var menu_scroll: ScrollContainer
 var toolbar: GridContainer
+var title_label: Label
+var ship_tray: ScrollContainer
+var tray_rows: HBoxContainer
+var ship_tiles: Dictionary = {}
+var ship_context: PanelContainer
+var empty_tray: Label
+var context_title: Label
+var context_detail: Label
+var selected_ship_id: int = -1
+var context_gate: Button
+var station_view_button: Button
 var menu_buttons: Dictionary = {}
 var managed_panels: Array[PanelContainer] = []
 var panel_closes: Dictionary = {}
@@ -75,9 +87,9 @@ func _ready() -> void:
 	var header := PanelContainer.new()
 	header.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	header.offset_left = 28
-	header.offset_top = 12
+	header.offset_top = 80
 	header.offset_right = -28
-	header.offset_bottom = 76
+	header.offset_bottom = 136
 	header.add_theme_stylebox_override("panel", _style(Color("111d2c"), Color("253647")))
 	root.add_child(header)
 	var header_margin := MarginContainer.new()
@@ -86,13 +98,14 @@ func _ready() -> void:
 	header.add_child(header_margin)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	header_margin.add_child(row)
 	var branding := VBoxContainer.new()
 	branding.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	branding.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(branding)
-	_label(branding, "O R B I T A L", 22, INK)
-	_label(branding, "COLONY PROGRAM", 11, MUTED)
+	title_label = _label(branding, "O R B I T A L", 22, INK)
+	branding.hide()
 	var persistence := HBoxContainer.new()
 	persistence.alignment = BoxContainer.ALIGNMENT_CENTER
 	persistence.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -249,6 +262,7 @@ func _ready() -> void:
 	gate_panel.fleet = fleet
 	root.add_child(gate_panel)
 	_setup_menus()
+	_setup_ship_tray()
 	if DevConfig.DEBUG_MODE:
 		dev_panel = preload("res://scripts/dev_panel.gd").new()
 		dev_panel.hud = self
@@ -320,12 +334,12 @@ func message(text: String, error: bool = false, duration: float = 4.0) -> void:
 func _level_up(level: int) -> void:
 	message("COLONY ESTABLISHED  ·  Your little corner of the cosmos is thriving." if level == 3 else "LEVEL %d REACHED  ·  A new chapter above Earth." % level, false, 8.0)
 	var title := _label(root, "COLONY ESTABLISHED" if level == 3 else "LEVEL %d REACHED" % level, 30, CYAN)
-	title.position = Vector2(150, 250)
+	title.position = Vector2(150, 440)
 	floating.append({"label": title, "time": 0.0, "duration": 4.0})
 
 func show_salvage(amount: int, point: Vector2) -> void:
 	var label := _label(root, "+%d MATERIALS" % amount, 16, GOLD)
-	label.position = point + Vector2(-35, -30)
+	label.position = get_viewport().get_canvas_transform() * point + Vector2(-35, -30)
 	floating.append({"label": label, "time": 0.0, "duration": 1.2})
 
 func _process(delta: float) -> void:
@@ -360,7 +374,8 @@ func _refinery_status() -> String:
 
 func show_minerals(amount: int, point: Vector2) -> void:
 	var label := _label(root, "+%d MINERALS" % amount, 18, Color("cdb6ff"))
-	label.position = Vector2(clampf(point.x - 40, 32, 800), point.y + 22)
+	var screen_point: Vector2 = get_viewport().get_canvas_transform() * point
+	label.position = Vector2(clampf(screen_point.x - 40, 32, 800), screen_point.y + 22)
 	floating.append({"label": label, "time": 0.0, "duration": 2.0})
 
 func show_refining(amount: int) -> void:
@@ -406,6 +421,7 @@ func _build_ships_page() -> void:
 		button.pressed.connect(func() -> void: _buy_ship(kind))
 	sector_label = _label(page, "", 12, Color("8bcdf1"))
 	var scroll := ScrollContainer.new()
+	scroll.hide()
 	scroll.custom_minimum_size = Vector2(270, 0)
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -414,7 +430,7 @@ func _build_ships_page() -> void:
 	ship_rows = VBoxContainer.new()
 	ship_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(ship_rows)
-	var hint := _label(page, "Miner: ore · Scout: sectors · Trade: contacts", 11, MUTED)
+	var hint := _label(page, "Select an owned ship in the icon tray for commands.", 11, MUTED)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 func _buy_ship(kind: String) -> void:
@@ -423,7 +439,7 @@ func _buy_ship(kind: String) -> void:
 		message(error, true)
 		return
 	choose("")
-	message("%s #%d ready. Use its command below." % [model.ship_catalog[kind].name, model.next_ship_id])
+	message("%s #%d ready. Select its tile for commands." % [model.ship_catalog[kind].name, model.next_ship_id])
 
 func _refresh_ships() -> void:
 	for removed_id: int in ship_entries.keys():
@@ -466,6 +482,7 @@ func _refresh_ships() -> void:
 			sell.pressed.connect(func() -> void: _sell_ship(ship_id))
 			entry.add_child(sell)
 			sell_buttons[ship_id] = sell
+		ship_entries[ship_id].visible = ship_id == selected_ship_id
 		var status: String = ""
 		if fleet.transport.jobs.has(ship_id):
 			status = "In transit"
@@ -492,6 +509,8 @@ func _refresh_ships() -> void:
 			button.disabled = fleet.unit_busy(ship_id) or not work_error.is_empty()
 			if capability != "founding": button.tooltip_text = work_error
 		sell_buttons[ship_id].text = "Decommission · +%d M" % model.ship_refund(ship_id)
+
+	_refresh_tray()
 
 func _command_ship(ship_id: int, capability: String = "") -> void:
 	choose("")
@@ -624,6 +643,9 @@ func reset_after_load() -> void:
 	research_panel.refresh()
 	choose("")
 	selected_position = Vector2.INF
+	selected_ship_id = -1
+	for tile: Control in ship_tiles.values(): tile.queue_free()
+	ship_tiles.clear()
 	for item: Dictionary in floating:
 		item.label.queue_free()
 	floating.clear()
@@ -669,11 +691,25 @@ func _create_region_navigation() -> void:
 func _setup_menus() -> void:
 	tabs.tabs_visible = false
 	tabs.use_hidden_tabs_for_min_size = false
+	var top_bar := PanelContainer.new()
+	top_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	top_bar.offset_left = 28
+	top_bar.offset_right = -28
+	top_bar.offset_top = 8
+	top_bar.offset_bottom = 76
+	top_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_bar.add_theme_stylebox_override("panel", _style(Color("111d2c"), Color("253647")))
+	root.add_child(top_bar)
+	title_label.reparent(root)
 	toolbar = GridContainer.new()
 	toolbar.columns = 6
 	toolbar.add_theme_constant_override("h_separation", 8)
 	toolbar.add_theme_constant_override("v_separation", 8)
-	root.add_child(toolbar)
+	menu_scroll = ScrollContainer.new()
+	menu_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	root.add_child(menu_scroll)
+	menu_scroll.add_child(toolbar)
+	toolbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for caption: String in ["Build", "Ships", "Research", "Gate/Travel", "Outposts/Regions", "Trade/Contacts"]:
 		var button := Button.new()
 		button.text = caption
@@ -726,7 +762,7 @@ func _wrap_panel(target: PanelContainer, title: String) -> void:
 	heading.add_child(close)
 	panel_closes[target.get_instance_id()] = close
 	var view: Node = region_navigation if target == region_navigation.panel else target
-	if view != panel:
+	if view != panel and view != ship_context:
 		var old_close: Button = view.close_button
 		old_close.get_parent().hide()
 		view.close_button = close
@@ -758,17 +794,25 @@ func _touch_targets(node: Node) -> void:
 func _layout_menus() -> void:
 	if not is_instance_valid(toolbar): return
 	var viewport_size := get_viewport().get_visible_rect().size
-	toolbar.columns = 6 if viewport_size.x >= 900 else 3
-	toolbar.position = Vector2(28, 84)
-	toolbar.size = Vector2(viewport_size.x - 56, 44 if toolbar.columns == 6 else 96)
-	var top: float = toolbar.position.y + toolbar.size.y + 40
-	region_navigation.location_label.position = Vector2(40, top - 32)
+	toolbar.columns = 6
+	menu_scroll.position = Vector2(230, 12)
+	menu_scroll.size = Vector2(viewport_size.x - 258, 60)
+	toolbar.custom_minimum_size.y = 44
+	title_label.position = Vector2(42, 20)
+	var top: float = 290.0
+	if is_instance_valid(ship_tray):
+		ship_tray.position = Vector2(28, 144)
+		ship_tray.size = Vector2(viewport_size.x - 56, 94)
+		station_view_button.position = Vector2(viewport_size.x - 172, 240)
+		station_view_button.size = Vector2(144, 44)
+	region_navigation.location_label.position = Vector2(40, 252)
 	region_navigation.location_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	orbit_label.hide() # Replaced by the always-visible location indicator and Regions details.
 	for target: PanelContainer in managed_panels:
-		var width: float = minf(380 if target == panel else 820, viewport_size.x - 56)
+		var width: float = minf(380 if target == panel or target == ship_context else 820, viewport_size.x - 56)
 		target.position = Vector2(viewport_size.x - width - 28, top)
-		target.size = Vector2(width, maxf(100, viewport_size.y - top - 84))
+		var height: float = maxf(100, viewport_size.y - top - 84)
+		target.size = Vector2(width, minf(height, 360) if target == ship_context else height)
 
 func close_panels() -> void:
 	if is_instance_valid(dev_panel): dev_panel.hide()
@@ -783,7 +827,7 @@ func activate_panel(target: PanelContainer, menu: String) -> void:
 	active_menu = menu
 	for readout: Control in [refinery_label, level_label, count_label, goal_bar, goal_label]: readout.visible = menu != "Ships"
 	if target == panel: target.get_node("MenuFrame").get_child(0).get_child(0).text = menu
-	menu_buttons[menu].add_theme_stylebox_override("normal", _style(Color("25404b"), CYAN))
+	if menu_buttons.has(menu): menu_buttons[menu].add_theme_stylebox_override("normal", _style(Color("25404b"), CYAN))
 	target.show()
 	_touch_targets(target)
 	_layout_menus()
@@ -810,3 +854,92 @@ func _input(event: InputEvent) -> void:
 		close_panels()
 		choose("")
 		get_viewport().set_input_as_handled()
+
+func _setup_ship_tray() -> void:
+	ship_tray = ScrollContainer.new()
+	ship_tray.name = "OwnedShipTray"
+	ship_tray.mouse_filter = Control.MOUSE_FILTER_PASS
+	ship_tray.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	root.add_child(ship_tray)
+	tray_rows = HBoxContainer.new()
+	tray_rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tray_rows.add_theme_constant_override("separation", 8)
+	ship_tray.add_child(tray_rows)
+	empty_tray = _label(tray_rows, "No ships yet. Open Ships to buy your first ship.", 14, MUTED)
+	empty_tray.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ship_context = PanelContainer.new()
+	ship_context.name = "SelectedShipCommands"
+	ship_context.add_theme_stylebox_override("panel", _style(Color("111c2b"), CYAN))
+	root.add_child(ship_context)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 10)
+	ship_context.add_child(body)
+	context_title = _label(body, "", 18, CYAN)
+	context_detail = _label(body, "", 13, MUTED)
+	context_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ship_rows.reparent(body)
+	context_gate = Button.new()
+	context_gate.text = "Gate / Travel…"
+	context_gate.pressed.connect(_selected_ship_gate)
+	body.add_child(context_gate)
+	_wrap_panel(ship_context, "Ship commands")
+	station_view_button = Button.new()
+	station_view_button.text = "Reset view"
+	station_view_button.tooltip_text = "Reset the camera in this region. Ship locations do not change."
+	station_view_button.pressed.connect(func() -> void: get_parent().ship_camera.reset_view())
+	root.add_child(station_view_button)
+	_layout_menus()
+
+func _refresh_tray() -> void:
+	if not is_instance_valid(tray_rows): return
+	empty_tray.visible = model.ships.is_empty()
+	for id: int in ship_tiles.keys():
+		if not model.ships.has(id):
+			ship_tiles[id].queue_free()
+			ship_tiles.erase(id)
+	if selected_ship_id > 0 and not model.ships.has(selected_ship_id):
+		selected_ship_id = -1
+		if ship_context.visible: close_panels()
+	for id: int in model.ships:
+		var definition: Dictionary = model.ship_catalog[model.ships[id]]
+		if not ship_tiles.has(id):
+			var tile = preload("res://scripts/ship_tile.gd").new()
+			tile.art = definition.get("art", "scout")
+			tile.role = "%s #%d" % [definition.name.replace(" Ship", ""), id]
+			tile.add_theme_stylebox_override("normal", _style(Color("172738"), Color("304557")))
+			tile.pressed.connect(func() -> void: select_ship(id))
+			tray_rows.add_child(tile)
+			ship_tiles[id] = tile
+		var status: String = "Working" if fleet.unit_busy(id) else "Idle"
+		if fleet.collection.jobs.has(id): status = str(fleet.collection.jobs[id].status)
+		if fleet.transport.jobs.has(id): status = "In transit"
+		var tile = ship_tiles[id]
+		tile.status = status
+		tile.selected_ship = id == selected_ship_id
+		tile.tooltip_text = "%s #%d · %s · %s" % [definition.name, id, fleet.regions.catalog[fleet.transport.location(id)].name, status]
+		tile.queue_redraw()
+		if id == selected_ship_id:
+			context_title.text = "%s #%d" % [definition.name, id]
+			context_detail.text = "%s · %s" % [fleet.regions.catalog[fleet.transport.location(id)].name, status]
+			if fleet.transport.jobs.has(id): context_detail.text += " → " + str(fleet.regions.catalog[fleet.transport.jobs[id].destination].name)
+
+func select_ship(id: int) -> void:
+	if not model.ships.has(id): return
+	var region: String = fleet.transport.location(id)
+	# Viewing a discovered region is the existing presentation-location command.
+	var error: String = fleet.regions.set_location(region)
+	if not error.is_empty():
+		message(error, true)
+		return
+	selected_ship_id = id
+	activate_panel(ship_context, "Ship")
+	get_parent().ship_camera.focus_ship(id)
+	_refresh_ships()
+
+func _selected_ship_gate() -> void:
+	if not model.ships.has(selected_ship_id): return
+	gate_panel.open_panel()
+	for index in range(gate_panel.ship_picker.item_count):
+		if gate_panel.ship_picker.get_item_id(index) == selected_ship_id:
+			gate_panel.ship_picker.select(index)
+	gate_panel.refresh()

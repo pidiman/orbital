@@ -53,7 +53,7 @@ func _button(parent: Node, caption: String) -> Button:
 
 func layout() -> void:
 	var viewport_size := get_viewport().get_visible_rect().size
-	position = Vector2(28, hud.toolbar.position.y + hud.toolbar.size.y + 40)
+	position = Vector2(28, hud.ship_tray.position.y + hud.ship_tray.size.y + 28)
 	size = Vector2(minf(480, viewport_size.x - 56), maxf(100, viewport_size.y - position.y - 84))
 
 func toggle() -> void:

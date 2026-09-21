@@ -22,6 +22,7 @@ func _draw() -> void:
 	if regions.primary_station_visible():
 		return
 	var area: Vector2 = get_viewport_rect().size
+	draw_set_transform(-get_canvas_transform().origin)
 	var definition: Dictionary = regions.catalog[regions.current_region]
 	var planet: Dictionary = regions.planets[definition.planet]
 	draw_rect(Rect2(Vector2.ZERO, area), Color(planet.background))
@@ -47,6 +48,7 @@ func _draw() -> void:
 				curve.append(center + offset)
 		if curve.size() > 1:
 			draw_polyline(curve, band, 10, true)
+	draw_set_transform(Vector2.ZERO)
 	for content: Dictionary in regions.records[regions.current_region].contents:
 		if content.type != "anomaly":
 			continue
@@ -66,3 +68,6 @@ func _draw() -> void:
 		var point: Vector2 = project(structure.position, area)
 		ModuleArt.draw_module(self, point, outpost.art, 0.85)
 		draw_string(font, point + Vector2(-75, 40), "%s · %d Minerals" % [outpost.name, station.inventory.minerals], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(outpost.color))
+
+func _process(_delta: float) -> void:
+	if visible: queue_redraw()

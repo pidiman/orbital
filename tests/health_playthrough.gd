@@ -9,10 +9,10 @@ func _ready() -> void:
 	Engine.time_scale = 3.0
 	checks["runtime_2d"] = no_3d(game)
 	await select("storage")
-	await click(game.board.cell_position(Vector2i(1, 0)))
+	await click(game.get_viewport().get_canvas_transform() * (game.board.cell_position(Vector2i(1, 0))))
 	checks["zero_power_reproduced"] = game.model.power_balance() == 0
 	await use(game.hud.root.find_child("CancelButton", true, false))
-	await click(game.board.cell_position(Vector2i(1, 0)))
+	await click(game.get_viewport().get_canvas_transform() * (game.board.cell_position(Vector2i(1, 0))))
 	checks["demolish_action_available_at_zero_power"] = not game.hud.demolish_button.disabled and game.hud.demolish_button.text.contains("12 M")
 	save_frame("decommission_module")
 	var before: int = game.model.materials
@@ -20,7 +20,7 @@ func _ready() -> void:
 	checks["ui_demolition_refund_and_space"] = game.model.materials == before + 12 and game.model.power_balance() == 1 and not game.model.modules.has(Vector2(58, 0))
 	await page(0)
 	await select("solar")
-	await click(game.board.cell_position(Vector2i(1, 0)))
+	await click(game.get_viewport().get_canvas_transform() * (game.board.cell_position(Vector2i(1, 0))))
 	checks["ui_rebuild_solar_recovery"] = game.model.modules.get(Vector2(58, 0)) == "solar" and game.model.power_balance() == 6
 	await gather(45)
 	await page(1)
@@ -30,7 +30,7 @@ func _ready() -> void:
 	var miner: int = game.model.next_ship_id
 	var target: int = game.asteroids.rocks.keys()[0]
 	await use(game.hud.command_buttons[miner])
-	await click(game.asteroids.rocks[target].point)
+	await click(game.get_viewport().get_canvas_transform() * (game.asteroids.rocks[target].point))
 	checks["busy_miner_before_sale"] = game.fleet.jobs.has(miner)
 	before = game.model.materials
 	save_frame("decommission_ship")
@@ -79,13 +79,13 @@ func _ready() -> void:
 	game.model.materials = 0
 	game.model.changed.emit()
 	checks["full_station_at_zero"] = game.model.modules.size() == 81 and game.model.power_balance() == 0
-	await click(game.board.world_to_screen(positions[0]))
+	await click(game.get_viewport().get_canvas_transform() * (game.board.world_to_screen(positions[0])))
 	await use(game.hud.demolish_button)
 	checks["full_station_ui_demolition"] = game.model.modules.size() == 80 and game.model.power_balance() == 1
 	await gather(20)
 	await page(0)
 	await select("solar")
-	await click(game.board.world_to_screen(positions[0]))
+	await click(game.get_viewport().get_canvas_transform() * (game.board.world_to_screen(positions[0])))
 	checks["full_station_ui_recovered"] = game.model.modules.size() == 81 and game.model.power_balance() == 6
 	save_frame("full_station_recovered")
 	report("checks", checks)
@@ -131,16 +131,29 @@ func gather(target: int) -> void:
 		if game.debris.pieces.is_empty():
 			await get_tree().create_timer(0.4).timeout
 		else:
-			var point: Vector2 = game.debris.pieces[0].point
+			var candidates: Array = game.debris.pieces.filter(func(piece: Dictionary) -> bool:
+				var screen: Vector2 = game.get_viewport().get_canvas_transform() * piece.point
+				return screen.x > 30 and screen.x < 780 and screen.y > 275 and screen.y < game.get_viewport_rect().size.y - 85)
+			if candidates.is_empty():
+				await get_tree().create_timer(0.3).timeout
+				continue
+			var point: Vector2 = candidates[0].point
 			if point.x < 30:
 				await get_tree().create_timer(0.3).timeout
 				continue
 			var before: int = game.model.materials
-			await click(point)
+			await click(game.get_viewport().get_canvas_transform() * point)
 			if game.model.materials > before:
 				checks["debris_collection"] = true
 
 func use(button: Control) -> void:
+	if game.hud.ship_context.is_ancestor_of(button) and not button.is_visible_in_tree():
+		for ship_id: int in game.hud.ship_entries:
+			if game.hud.ship_entries[ship_id].is_ancestor_of(button):
+				game.hud.ship_tray.ensure_control_visible(game.hud.ship_tiles[ship_id])
+				await settle(2)
+				await click(game.hud.ship_tiles[ship_id].get_global_rect().get_center())
+				break
 	var hud = game.hud
 	if not button.is_visible_in_tree():
 		var menu: String = ""

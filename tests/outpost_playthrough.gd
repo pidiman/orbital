@@ -16,14 +16,14 @@ func _ready() -> void:
 	game.model.changed.emit()
 	for cell: Vector2i in [Vector2i(1, 0), Vector2i(2, 0), Vector2i(3, 0), Vector2i(4, 0)]:
 		await use(game.hud.tool_buttons.solar)
-		await click(game.board.cell_position(cell))
+		await click(game.get_viewport().get_canvas_transform() * (game.board.cell_position(cell)))
 	await use(game.hud.tool_buttons.research_lab)
-	await click(game.board.cell_position(Vector2i(0, 1)))
+	await click(game.get_viewport().get_canvas_transform() * (game.board.cell_position(Vector2i(0, 1))))
 	await use(game.hud.research_button)
 	await use(game.hud.research_panel.research_buttons.teleportation)
 	await use(game.hud.research_panel.close_button)
 	await use(game.hud.tool_buttons.teleport_gate)
-	await click(game.board.world_to_screen(Vector2(-87, -29)))
+	await click(game.get_viewport().get_canvas_transform() * (game.board.world_to_screen(Vector2(-87, -29))))
 	checks.gate_built = game.model.modules.get(Vector2(-87, -29)) == "teleport_gate"
 	if not checks.gate_built:
 		report("setup_failure", {"message": game.hud.status_label.text, "selected": game.board.selected, "modules": str(game.model.modules), "research": game.fleet.research.researched})
@@ -85,7 +85,7 @@ func _ready() -> void:
 	game.get_node("ResourceClock").set_process(false)
 	var target: int = game.fleet.regions.records.venus.asteroid_ids[0]
 	await use(game.hud.capability_buttons[miner].mining)
-	await click(game.asteroids.rocks[target].point)
+	await click(game.get_viewport().get_canvas_transform() * (game.asteroids.rocks[target].point))
 	checks.local_mining_command = game.fleet.jobs.has(miner) and game.fleet.mining_assignment(miner).destination.station_id == outpost_id
 	var home_ore: int = game.model.minerals
 	game.get_node("ResourceClock").set_process(true)
@@ -138,6 +138,13 @@ func page(index: int) -> void:
 	if game.hud.active_menu != menu: await click(game.hud.menu_buttons[menu].get_global_rect().get_center())
 
 func use(button: Control) -> void:
+	if game.hud.ship_context.is_ancestor_of(button) and not button.is_visible_in_tree():
+		for ship_id: int in game.hud.ship_entries:
+			if game.hud.ship_entries[ship_id].is_ancestor_of(button):
+				game.hud.ship_tray.ensure_control_visible(game.hud.ship_tiles[ship_id])
+				await settle(2)
+				await click(game.hud.ship_tiles[ship_id].get_global_rect().get_center())
+				break
 	if not button.is_visible_in_tree():
 		var menu: String = ""
 		if game.hud.tool_buttons.values().has(button): menu = "Build"

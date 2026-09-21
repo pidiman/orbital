@@ -27,3 +27,7 @@ func _draw() -> void:
 	for i in range(land.size()):
 		land[i] += earth
 	draw_colored_polygon(land, Color("193b4b"))
+
+func _process(_delta: float) -> void:
+	# Sky remains viewport-filling while the world camera pans.
+	position = -get_viewport().get_canvas_transform().origin

@@ -23,6 +23,7 @@ var model: StationModel
 var board: Node2D
 var debris: Node2D
 var hud: CanvasLayer
+var ship_camera: Camera2D
 var module_count: int = 1
 var material_count: int = 40
 var power_balance: int = 1
@@ -76,6 +77,10 @@ func _ready() -> void:
 	clock.model = model
 	clock.supply = supply
 	add_child(clock)
+	ship_camera = preload("res://scripts/ship_focus.gd").new()
+	ship_camera.name = "ShipCamera"
+	ship_camera.game = self
+	add_child(ship_camera)
 	hud = HUD.new()
 	hud.name = "HUD"
 	hud.model = model
@@ -168,6 +173,7 @@ func _save_on_exit() -> void:
 		persistence.save_game()
 
 func _update_region_view() -> void:
+	ship_camera.reset_view()
 	var home: bool = fleet.regions.primary_station_visible()
 	background.visible = home
 	region_view.visible = not home
