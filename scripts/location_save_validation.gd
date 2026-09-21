@@ -27,6 +27,10 @@ static func validate_graph(data: Dictionary, model: StationModel, region_data: D
 		if positions[record.station_id].has(record.position):
 			return "Duplicate structure position within a station."
 		positions[record.station_id][record.position] = id
+		if record.state.has("refinery_recipe"):
+			var recipe: Variant = record.state.refinery_recipe
+			if not recipe is String or not model.refinery_recipes.has(recipe) or not model.catalog.get(record.kind, {}).get("recipes", []).has(recipe):
+				return "Invalid refinery recipe."
 		for field: String in ["tier", "refinery_progress"]:
 			if record.state.has(field) and not integer(record.state[field], 1 if field == "tier" else 0):
 				return "Invalid structure progress."

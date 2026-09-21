@@ -230,7 +230,12 @@
         },
         "description": "6 Minerals → 18 Materials / 1s"
       }
-    ]
+    ],
+    "recipes": [
+      "minerals_materials",
+      "materials_tech"
+    ],
+    "default_recipe": "minerals_materials"
   },
   "space_depot": {
     "name": "Space Depot",

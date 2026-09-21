@@ -74,6 +74,7 @@ var sector_label: Label
 var upgrade_title: Label
 var upgrade_stats: Label
 var upgrade_detail: Label
+var refinery_selector: OptionButton
 var upgrade_button: Button
 var selected_position: Vector2 = Vector2(99, 99)
 var tool_buttons: Dictionary = {}
@@ -399,12 +400,7 @@ func _refinery_status() -> String:
 		var definition: Dictionary = model.definition_at(world_position)
 		if not definition.has("conversion"):
 			continue
-		var recipe: Dictionary = definition.conversion
-		if model.minerals < int(recipe.input):
-			return "waiting for minerals"
-		if model.capacity - model.materials < int(recipe.output):
-			return "storage full · paused"
-		return "next batch in %ds" % (int(recipe.seconds) - int(model.refinery_progress.get(world_position, 0)))
+		return model.refinery_status(world_position)
 	return "idle"
 
 func show_minerals(amount: int, point: Vector2) -> void:
@@ -593,6 +589,12 @@ func _build_upgrade_page() -> void:
 	upgrade_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	upgrade_detail = _label(page, "", 13, MUTED)
 	upgrade_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	refinery_selector = OptionButton.new()
+	refinery_selector.custom_minimum_size.y = 44
+	refinery_selector.item_selected.connect(func(index: int) -> void:
+		var error: String = model.set_refinery_recipe(selected_position, refinery_selector.get_item_metadata(index))
+		if not error.is_empty(): message(error, true))
+	page.add_child(refinery_selector)
 	upgrade_button = Button.new()
 	upgrade_button.custom_minimum_size.y = 54
 	upgrade_button.add_theme_font_size_override("font_size", 13)
@@ -617,6 +619,7 @@ func inspect_module(world_position: Vector2) -> void:
 	_refresh_upgrade()
 
 func _refresh_upgrade() -> void:
+	refinery_selector.hide()
 	if not fleet.regions.primary_station_visible():
 		upgrade_title.text = "Station at Earth"
 		upgrade_stats.text = "Jump Home to inspect or modify modules."
@@ -642,7 +645,15 @@ func _refresh_upgrade() -> void:
 		var dock_id: String = model.structure_id_at(selected_position)
 		upgrade_stats.text += "\nParking: %d / %d ships" % [fleet.docking.usage.get(dock_id, {}).size(), int(definition.docking.capacity)]
 	if definition.has("conversion"):
-		upgrade_stats.text += "\n%d Minerals → %d Materials / %ds" % [definition.conversion.input, definition.conversion.output, definition.conversion.seconds]
+		var recipe: Dictionary = model.refinery_recipe(selected_position)
+		upgrade_stats.text += "\n%d %s → %d %s / %ds\n%s" % [recipe.input, recipe.input_resource.capitalize(), recipe.output, recipe.output_resource.capitalize(), recipe.seconds, model.refinery_status(selected_position)]
+		refinery_selector.clear()
+		for recipe_id: String in definition.recipes:
+			refinery_selector.add_item(model.refinery_recipes[recipe_id].name)
+			var index: int = refinery_selector.item_count - 1
+			refinery_selector.set_item_metadata(index, recipe_id)
+			if recipe_id == model.refinery_recipe_id(selected_position): refinery_selector.select(index)
+		refinery_selector.show()
 	var current_tier: int = model.tier_at(selected_position)
 	var next: Dictionary = model.next_upgrade(selected_position)
 	if next.is_empty():
@@ -651,6 +662,9 @@ func _refresh_upgrade() -> void:
 		upgrade_button.disabled = true
 		return
 	upgrade_detail.text = "Next: %s for %s" % [next.description, model.upgrade_cost_text(next.cost)]
+	if definition.has("conversion"):
+		var next_recipe: Dictionary = model.refinery_recipe(selected_position, current_tier + 1)
+		upgrade_detail.text = "Next: %d %s → %d %s / %ds for %s" % [next_recipe.input, next_recipe.input_resource.capitalize(), next_recipe.output, next_recipe.output_resource.capitalize(), next_recipe.seconds, model.upgrade_cost_text(next.cost)]
 	upgrade_button.text = "Upgrade to T%d" % (current_tier + 1)
 	var error: String = model.upgrade_error(selected_position)
 	upgrade_button.disabled = not error.is_empty()

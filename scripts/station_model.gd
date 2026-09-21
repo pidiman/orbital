@@ -37,6 +37,7 @@ var refinery_progress: Dictionary:
 	get: return locations.position_state("refinery_progress")
 	set(value): locations.import_position_state("refinery_progress", value)
 var total_refined: int = 0
+var refinery_recipes: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/refinery_recipes.json"))
 var materials: int = 40
 var capacity: int = 100
 var power_output: int = 3
@@ -137,21 +138,58 @@ func module_count_with(capability: String) -> int:
 			count += 1
 	return count
 
+func refinery_recipe_id(world_position: Vector2) -> String:
+	var definition: Dictionary = definition_at(world_position)
+	return str(structure_state(world_position).get("refinery_recipe", definition.get("default_recipe", "minerals_materials")))
+
+func refinery_recipe(world_position: Vector2, tier: int = -1) -> Dictionary:
+	var recipe: Dictionary = refinery_recipes[refinery_recipe_id(world_position)].duplicate(true)
+	var effective_tier: int = tier_at(world_position) if tier < 0 else tier
+	if recipe.get("module_conversion", false):
+		recipe.merge(definition_for(modules[world_position], effective_tier).conversion, true)
+	elif recipe.has("tier_seconds"):
+		recipe.seconds = recipe.tier_seconds[mini(effective_tier - 1, recipe.tier_seconds.size() - 1)]
+	return recipe
+
+func set_refinery_recipe(world_position: Vector2, recipe_id: String) -> String:
+	if not modules.has(world_position) or not definition_at(world_position).get("recipes", []).has(recipe_id): return "Choose a valid Refinery recipe."
+	if refinery_recipe_id(world_position) == recipe_id: return ""
+	structure_state(world_position)["refinery_recipe"] = recipe_id
+	structure_state(world_position)["refinery_progress"] = 0
+	changed.emit()
+	return ""
+
+func refinery_pause_reason(world_position: Vector2) -> String:
+	var recipe: Dictionary = refinery_recipe(world_position)
+	if upgrade_resource_amount(recipe.input_resource) < int(recipe.input): return "waiting for " + recipe.input_resource
+	var output_stock: int = upgrade_resource_amount(recipe.output_resource)
+	if output_stock < 0: return "output inventory unavailable"
+	if recipe.get("output_capacity", "") == "station" and capacity - output_stock < int(recipe.output): return "storage full · paused"
+	return ""
+
+func refinery_status(world_position: Vector2) -> String:
+	var reason: String = refinery_pause_reason(world_position)
+	if not reason.is_empty(): return reason
+	var recipe: Dictionary = refinery_recipe(world_position)
+	return "next batch in %ds" % (int(recipe.seconds) - int(refinery_progress.get(world_position, 0)))
+
 func _refine() -> void:
 	var produced: int = 0
 	for world_position: Vector2 in modules:
-		var definition: Dictionary = definition_at(world_position)
-		if not definition.has("conversion"):
-			continue
-		var recipe: Dictionary = definition.conversion
-		# Pause without consuming input or discarding output when storage is full.
-		if minerals < int(recipe.input) or capacity - materials < int(recipe.output):
-			continue
+		if not definition_at(world_position).has("conversion"): continue
+		var recipe: Dictionary = refinery_recipe(world_position)
+		if not refinery_pause_reason(world_position).is_empty(): continue
 		var progress: int = int(refinery_progress.get(world_position, 0)) + 1
 		if progress >= int(recipe.seconds):
-			minerals -= int(recipe.input)
-			materials += int(recipe.output)
-			produced += int(recipe.output)
+			match recipe.input_resource:
+				"minerals": minerals -= int(recipe.input)
+				"materials": materials -= int(recipe.input)
+				_: research.trade.inventory[recipe.input_resource] -= int(recipe.input)
+			if recipe.output_resource == "materials":
+				materials += int(recipe.output)
+				produced += int(recipe.output)
+			elif recipe.output_resource == "minerals": add_minerals(int(recipe.output))
+			else: research.trade.receive_goods(recipe.output_resource, int(recipe.output))
 			progress = 0
 		structure_state(world_position)["refinery_progress"] = progress
 	if produced > 0:

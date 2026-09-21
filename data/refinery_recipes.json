@@ -1,0 +1,25 @@
+{
+  "minerals_materials": {
+    "name": "Minerals → Materials",
+    "input_resource": "minerals",
+    "output_resource": "materials",
+    "module_conversion": true,
+    "output_capacity": "station"
+  },
+  "materials_tech": {
+    "name": "Materials → Tech",
+    "input_resource": "materials",
+    "output_resource": "tech",
+    "input": 20,
+    "output": 1,
+    "seconds": 20,
+    "tier_seconds": [
+      20,
+      18,
+      16,
+      14,
+      12
+    ],
+    "output_capacity": "station"
+  }
+}
