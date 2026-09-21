@@ -33,26 +33,9 @@ func _init(station: StationModel) -> void:
 func _read(file: String) -> Dictionary:
 	return JSON.parse_string(FileAccess.get_file_as_string("res://data/%s.json" % file))
 
-# Additive content upgrade: old v2 sector records retain discoveries and timers.
-func enrich_sectors(sectors: Array) -> void:
-	for sector: Dictionary in sectors:
-		for anomaly_id: String in alien_catalog:
-			var definition: Dictionary = alien_catalog[anomaly_id]
-			if definition.sector_id != sector.id:
-				continue
-			var found: bool = false
-			for content: Dictionary in sector.contents:
-				if content.get("anomaly_id", "") == anomaly_id or (content.type == "anomaly" and content.get("name") == definition.name):
-					content["anomaly_id"] = anomaly_id
-					content["description"] = definition.description
-					found = true
-			if not found:
-				sector.contents.append({"type": "anomaly", "name": definition.name, "description": definition.description, "anomaly_id": anomaly_id})
-
-func discover(sector: Dictionary) -> void:
-	if not sector.revealed:
-		return
-	for content: Dictionary in sector.contents:
+func discover_region(region_id: String, record: Dictionary) -> void:
+	if not record.discovered: return
+	for content: Dictionary in record.contents:
 		var anomaly_id: String = str(content.get("anomaly_id", ""))
 		if not alien_catalog.has(anomaly_id) or processed_anomalies.has(anomaly_id):
 			continue
@@ -60,7 +43,7 @@ func discover(sector: Dictionary) -> void:
 		processed_anomalies.append(anomaly_id)
 		for contact_id: String in definition.contacts:
 			var contact: Dictionary = definition.contacts[contact_id].duplicate(true)
-			contact["sector_id"] = sector.id
+			contact["region_id"] = region_id
 			contact["anomaly_id"] = anomaly_id
 			contacts[contact_id] = contact
 			factions[contact.faction].met = true
@@ -155,7 +138,7 @@ func reward_text(offer: Dictionary) -> String:
 	return ", ".join(parts)
 
 # Validate decoded extension state before SaveStore commits any model mutation.
-func validate(data: Dictionary, station: Dictionary, mining: Dictionary) -> String:
+func validate(data: Dictionary, station: Dictionary, mining: Dictionary, region_data: Dictionary) -> String:
 	for faction_id: Variant in data.factions:
 		var faction: Variant = data.factions[faction_id]
 		if not faction_id is String or not faction is Dictionary or not faction.get("name") is String or not faction.get("met") is bool or not _integer(faction.get("standing"), -100, 100):
@@ -163,28 +146,30 @@ func validate(data: Dictionary, station: Dictionary, mining: Dictionary) -> Stri
 	for good: Variant in data.inventory:
 		if not good is String or not _integer(data.inventory[good], 0):
 			return "Invalid trade inventory."
-	var revealed: Dictionary = {}
-	for sector: Dictionary in mining.sectors:
-		if sector.revealed:
-			revealed[sector.id] = true
+	var discovered_anomalies: Dictionary = {}
+	for region_id: String in region_data.records:
+		var record: Dictionary = region_data.records[region_id]
+		if not record.discovered: continue
+		for content: Dictionary in record.contents:
+			if content.has("anomaly_id"): discovered_anomalies[content.anomaly_id] = region_id
 	var processed: Dictionary = {}
 	for anomaly: Variant in data.processed_anomalies:
 		if not anomaly is String or processed.has(anomaly):
 			return "Invalid processed anomaly."
-		if alien_catalog.has(anomaly) and not revealed.has(alien_catalog[anomaly].sector_id):
+		if alien_catalog.has(anomaly) and not discovered_anomalies.has(anomaly):
 			return "Anomaly was processed before discovery."
 		processed[anomaly] = true
 	for contact_id: Variant in data.contacts:
 		var contact: Variant = data.contacts[contact_id]
-		if not contact_id is String or not contact is Dictionary or not contact.get("name") is String or not contact.get("faction") is String or not contact.get("sector_id") is String or not contact.get("anomaly_id") is String:
+		if not contact_id is String or not contact is Dictionary or not contact.get("name") is String or not contact.get("faction") is String or not contact.get("region_id") is String or not contact.get("anomaly_id") is String:
 			return "Invalid alien contact."
-		if not data.factions.has(contact.faction) or not data.factions[contact.faction].met or not revealed.has(contact.sector_id) or not processed.has(contact.anomaly_id):
+		if not data.factions.has(contact.faction) or not data.factions[contact.faction].met or discovered_anomalies.get(contact.anomaly_id, "") != contact.region_id or not processed.has(contact.anomaly_id):
 			return "Contact references an undiscovered faction or anomaly."
 	for anomaly_id: String in processed:
 		if not alien_catalog.has(anomaly_id):
 			continue
 		for contact_id: String in alien_catalog[anomaly_id].contacts:
-			if not data.contacts.has(contact_id) or data.contacts[contact_id].faction != alien_catalog[anomaly_id].contacts[contact_id].faction or data.contacts[contact_id].sector_id != alien_catalog[anomaly_id].sector_id:
+			if not data.contacts.has(contact_id) or data.contacts[contact_id].faction != alien_catalog[anomaly_id].contacts[contact_id].faction or data.contacts[contact_id].region_id != discovered_anomalies.get(anomaly_id, ""):
 				return "Processed alien anomaly is missing its contact."
 	if not _integer(data.next_trade_id, 0):
 		return "Invalid trade ID allocator."
@@ -192,7 +177,7 @@ func validate(data: Dictionary, station: Dictionary, mining: Dictionary) -> Stri
 	for ship_id: Variant in data.jobs:
 		if not ship_id is int or not station.ships.has(ship_id) or not model.ship_catalog[station.ships[ship_id]].has("trade"):
 			return "Trade references a missing Trade Ship."
-		if mining.jobs.has(ship_id) or mining.survey_jobs.has(ship_id):
+		if mining.jobs.has(ship_id):
 			return "Ship assigned to more than one mission."
 		var error: String = _validate_record(data.jobs[ship_id], data, ids, true)
 		if not error.is_empty():

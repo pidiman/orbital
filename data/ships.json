@@ -5,7 +5,7 @@
     "power_use": 2,
     "color": "b9a6f5",
     "description": "Assign an asteroid; repeats until depleted.",
-    "effect": "18 minerals / 8s · 2 power",
+    "effect": "18 minerals / 8s \u00b7 2 power",
     "mining": {
       "seconds": 8,
       "yield": 18,
@@ -20,8 +20,8 @@
     "cost": 35,
     "power_use": 1,
     "color": "8bcdf1",
-    "description": "Travel to nearby sectors and reveal discoveries.",
-    "effect": "Sector travel · 1 power",
+    "description": "Discover adjacent planets through regional surveys.",
+    "effect": "Region exploration \u00b7 1 power",
     "survey": {
       "seconds": 5,
       "travel_speed": 1.0
@@ -35,7 +35,7 @@
     "power_use": 2,
     "color": "eebd76",
     "description": "Carry cargo to alien contacts; earn goods and standing.",
-    "effect": "Contact trade · 2 power",
+    "effect": "Contact trade \u00b7 2 power",
     "trade": {
       "seconds": 7
     },
@@ -48,7 +48,7 @@
     "power_use": 1,
     "color": "eebd76",
     "description": "Collects one Material per trip. Requires Space Depot.",
-    "effect": "Home collection · 1 power",
+    "effect": "Home collection \u00b7 1 power",
     "collection": {
       "speed": 0.22,
       "cargo_capacity": 1,
@@ -63,7 +63,7 @@
     "power_use": 2,
     "color": "6ce0d5",
     "description": "Travel through a Teleport Gate, then found a local mining outpost.",
-    "effect": "Found outpost · 2 power",
+    "effect": "Found outpost \u00b7 2 power",
     "founding": {
       "outpost": "mining_outpost"
     },
@@ -76,7 +76,7 @@
     "power_use": 3,
     "color": "72dbcb",
     "description": "Mines Xenocrystal nodes only; 1 crystal per 20-second cycle.",
-    "effect": "1 Xenocrystal / 20s · 3 power",
+    "effect": "1 Xenocrystal / 20s \u00b7 3 power",
     "mining": {
       "resource": "xenocrystal",
       "seconds": 20,
@@ -94,7 +94,7 @@
     "power_use": 2,
     "color": "eebd76",
     "description": "Assigned refinery deliveries, up to 5 finished goods per trip.",
-    "effect": "Haul refinery output · 2 power",
+    "effect": "Haul refinery output \u00b7 2 power",
     "hauling": {
       "batch_size": 5,
       "travel_seconds": 3,

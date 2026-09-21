@@ -120,7 +120,7 @@ func refresh() -> void:
 				ship_picker.select(index)
 	var contact_id: String = selected_contact()
 	var contact: Dictionary = diplomacy.contacts.get(contact_id, {})
-	standing_label.text = "No contacts yet. Send a Scout to Echo pocket using the Sector map."
+	standing_label.text = "No contacts yet. Send a Scout to explore regions and discover alien anomalies."
 	if not contact.is_empty():
 		var faction: Dictionary = diplomacy.factions[contact.faction]
 		standing_label.text = "%s · Standing %d / 100\n%s" % [faction.name, faction.standing, diplomacy.faction_catalog.get(contact.faction, {}).get("description", "Alien contact")]

@@ -88,7 +88,6 @@ func mission_key(unit: Variant) -> String:
 	if fleet.hauling.jobs.has(unit): return "hauling:" + str(fleet.hauling.jobs[unit].refinery_id)
 	if fleet.collection.jobs.has(unit): return "collection"
 	if fleet.diplomacy.jobs.has(unit): return "trade:" + str(fleet.diplomacy.jobs[unit].id)
-	if fleet.survey_jobs.has(unit): return "survey:" + str(fleet.survey_jobs[unit].sector_id)
 	if fleet.regions.survey_jobs.has(unit): return "region:" + str(fleet.regions.survey_jobs[unit].region_id)
 	return ""
 
@@ -111,7 +110,7 @@ func target_for(unit: Variant) -> Vector2:
 		var job: Dictionary = mining_jobs[unit]
 		if returning(job) or not game.asteroids.rocks.has(job.target): return origin
 		return game.asteroids.rocks[job.target].point + Vector2(0, 30)
-	for pair: Array in [[fleet.diplomacy.jobs, "trade"], [fleet.survey_jobs, "survey"], [fleet.regions.survey_jobs, "regional_survey"]]:
+	for pair: Array in [[fleet.diplomacy.jobs, "trade"], [fleet.regions.survey_jobs, "regional_survey"]]:
 		if pair[0].has(unit):
 			if returning(pair[0][unit]): return origin
 			var marker: Array = settings.mission_markers[pair[1]]

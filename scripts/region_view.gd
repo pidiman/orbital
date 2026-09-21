@@ -50,14 +50,14 @@ func _draw() -> void:
 			draw_polyline(curve, band, 10, true)
 	draw_set_transform(Vector2.ZERO)
 	for content: Dictionary in regions.records[regions.current_region].contents:
-		if content.type != "anomaly":
+		if not content.type in ["anomaly", "alien_anomaly"]:
 			continue
 		var point: Vector2 = project(content.position, area)
 		var tint := Color(definition.visuals_hint.accent)
 		draw_arc(point, 15, 0, TAU, 6, tint, 2, true)
 		draw_circle(point, 4, tint)
 		draw_string(font, point + Vector2(-40, 30), content.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, tint)
-		draw_string(font, point + Vector2(-40, 45), "Studied · +%d %s" % [content.amount, str(content.good).capitalize()], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, tint)
+		draw_string(font, point + Vector2(-40, 45), ("Alien contact · Trade/Contacts" if content.type == "alien_anomaly" else "Studied · +%d %s" % [content.amount, str(content.good).capitalize()]), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, tint)
 
 	var world: RefCounted = fleet.model.locations
 	var outpost_id: String = world.outpost_at(regions.current_region, world.rules.primary_station.owner)

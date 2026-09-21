@@ -1,6 +1,6 @@
 extends RefCounted
 const Store = preload("res://scripts/save_store.gd")
-const Supply = preload("res://scripts/sector_supply.gd")
+const Supply = preload("res://scripts/region_supply.gd")
 const Locations = preload("res://scripts/world_locations.gd")
 
 static func make_store() -> Store:

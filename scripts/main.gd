@@ -5,7 +5,7 @@ var persistence: SaveStore
 var save_path: String = SaveStore.DEFAULT_PATH
 # Used only by isolated restart probes; never exposed as a gameplay control.
 var verification_persistence: bool = false
-const Supply = preload("res://scripts/sector_supply.gd")
+const Supply = preload("res://scripts/region_supply.gd")
 var supply: Supply
 const RegionView = preload("res://scripts/region_view.gd")
 var region_view: Node2D
@@ -228,4 +228,4 @@ func _update_region_view() -> void:
 	hud.refresh()
 
 func _region_discovered(region_id: String) -> void:
-	hud.message("%s surveyed. Jump unlocked; deposits and anomaly findings recorded." % fleet.regions.catalog[region_id].name, false, 8.0)
+	hud.message("%s surveyed. Deposits and anomalies recorded; ship travel requires gates at both ends." % fleet.regions.catalog[region_id].name, false, 8.0)

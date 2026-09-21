@@ -1,6 +1,6 @@
 extends RefCounted
 const Store = preload("res://scripts/save_store.gd")
-const Supply = preload("res://scripts/sector_supply.gd")
+const Supply = preload("res://scripts/region_supply.gd")
 
 func make_store() -> Store:
 	var model := StationModel.new()

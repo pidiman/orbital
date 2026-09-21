@@ -77,8 +77,6 @@ func jump_error(destination: String) -> String:
 		return "Survey this region to unlock it."
 	if destination == current_region:
 		return "Already here."
-	if not adjacent(current_region, destination):
-		return "No direct route. Jump through an adjacent unlocked region."
 	return ""
 
 func jump(destination: String) -> String:
@@ -104,6 +102,7 @@ func generate(region_id: String) -> bool:
 		var kind: String = rules.anomaly_pool[rng.randi_range(0, rules.anomaly_pool.size() - 1)]
 		var definition: Dictionary = anomaly_catalog[kind]
 		record.contents.append({"type": "anomaly", "kind": kind, "name": definition.name, "description": definition.description, "good": definition.good, "amount": rng.randi_range(int(definition.amount[0]), int(definition.amount[1])), "position": Vector2(230 + index * 240, rng.randf_range(490, 540)), "resolved": true})
+	ensure_alien_anomalies(region_id)
 	record.rng_state = str(rng.state)
 	record.generated = true
 	record.discovered = true
@@ -133,7 +132,7 @@ func validate(data: Dictionary, station: Dictionary, fleet_data: Dictionary, tra
 				return "Invalid region RNG state."
 		if not record.generated and (not record.contents.is_empty() or not record.asteroid_ids.is_empty()):
 			return "Undiscovered region contains generated content."
-		if region_id == HOME and (not record.discovered or not record.contents.is_empty() or not record.asteroid_ids.is_empty()):
+		if region_id == HOME and not record.discovered:
 			return "Home must retain its original station and content."
 		var deposits: int = 0
 		for content: Variant in record.contents:
@@ -143,6 +142,8 @@ func validate(data: Dictionary, station: Dictionary, fleet_data: Dictionary, tra
 				if not _integer(content.get("minerals"), 1):
 					return "Invalid generated deposit."
 				deposits += 1
+			elif content.get("type") == "alien_anomaly":
+				if not content.get("anomaly_id") is String: return "Invalid regional alien anomaly."
 			elif content.get("type") == "anomaly":
 				if not content.get("kind") is String or not anomaly_catalog.has(content.kind) or not content.get("good") is String or content.good != anomaly_catalog[content.kind].good or not _integer(content.get("amount"), 1) or content.get("resolved") != true or not content.get("description") is String:
 					return "Invalid region anomaly."
@@ -170,7 +171,7 @@ func validate(data: Dictionary, station: Dictionary, fleet_data: Dictionary, tra
 		var job: Variant = data.survey_jobs[ship_id]
 		if not ship_id is int or not station.ships.has(ship_id) or not ship_catalog[station.ships[ship_id]].has("survey"):
 			return "Regional survey needs an existing Scout."
-		if fleet_data.jobs.has(ship_id) or fleet_data.survey_jobs.has(ship_id) or trade_jobs.has(ship_id):
+		if fleet_data.jobs.has(ship_id) or trade_jobs.has(ship_id):
 			return "Ship assigned to multiple mission roles."
 		if not job is Dictionary or not job.get("region_id") is String or not job.get("origin") is String or not _integer(job.get("duration"), 1) or not _integer(job.get("remaining"), 1) or job.remaining > job.duration:
 			return "Invalid regional survey timer."
@@ -192,3 +193,15 @@ func begin_survey(ship_id: int, region_id: String, duration: int, origin_region:
 func announce_discovery(region_id: String) -> void:
 	discovered.emit(region_id)
 	changed.emit()
+
+func ensure_alien_anomalies(region_id: String) -> void:
+	var definitions: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/aliens.json"))
+	for id: String in definitions:
+		if definitions[id].region_id != region_id: continue
+		var found: bool = false
+		# Legacy contacts may already reside at Home; never duplicate their anomaly.
+		for record: Dictionary in records.values():
+			for content: Dictionary in record.contents:
+				if content.get("anomaly_id", "") == id: found = true
+		if not found:
+			records[region_id].contents.append({"type": "alien_anomaly", "anomaly_id": id, "name": definitions[id].name, "description": definitions[id].description, "position": Vector2(350, 560)})

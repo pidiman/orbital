@@ -3,7 +3,7 @@ extends RefCounted
 const Regions = preload("res://scripts/region_model.gd")
 const Trade = preload("res://scripts/trade_model.gd")
 const Fleet = preload("res://scripts/mining_fleet.gd")
-const Supply = preload("res://scripts/sector_supply.gd")
+const Supply = preload("res://scripts/region_supply.gd")
 const Collection = preload("res://scripts/material_collection.gd")
 const Research = preload("res://scripts/research_model.gd")
 const Transport = preload("res://scripts/gate_transport.gd")
@@ -14,7 +14,7 @@ const Docking = preload("res://scripts/docking_model.gd")
 const VERSION: int = 2
 const DEFAULT_PATH: String = "user://orbital-save.json"
 const STATION_FIELDS: Array[String] = ["modules", "module_tiers", "ships", "next_ship_id", "materials", "minerals", "capacity", "power_output", "power_use", "level", "ticks", "tick_elapsed", "refinery_progress", "total_refined"]
-const FLEET_FIELDS: Array[String] = ["asteroids", "jobs", "survey_jobs", "sectors", "total_mined", "next_discovery_id"]
+const FLEET_FIELDS: Array[String] = ["asteroids", "jobs", "total_mined", "next_discovery_id"]
 const SUPPLY_FIELDS: Array[String] = ["rules", "debris", "home_asteroids", "next_debris_id", "next_home_id", "elapsed", "pending", "debris_elapsed", "asteroid_elapsed"]
 
 var model: StationModel
@@ -33,10 +33,10 @@ signal restored
 signal saved
 signal failed(message: String)
 
-func _init(station: StationModel, mining: Fleet, sector_supply: Supply) -> void:
+func _init(station: StationModel, mining: Fleet, region_supply: Supply) -> void:
 	model = station
 	fleet = mining
-	supply = sector_supply
+	supply = region_supply
 	fleet.hauling.changed.connect(request_autosave)
 	fleet.docking.changed.connect(request_autosave)
 	fleet.outposts.changed.connect(request_autosave)
@@ -48,8 +48,6 @@ func _init(station: StationModel, mining: Fleet, sector_supply: Supply) -> void:
 	model.module_upgraded.connect(request_autosave.unbind(1))
 	model.ship_built.connect(request_autosave.unbind(1))
 	model.ship_removed.connect(request_autosave.unbind(1))
-	fleet.surveyed.connect(request_autosave.unbind(1))
-	fleet.survey_started.connect(request_autosave.unbind(2))
 	fleet.dispatched.connect(request_autosave.unbind(2))
 	fleet.completed.connect(request_autosave.unbind(3))
 	fleet.regions.survey_started.connect(request_autosave)
@@ -104,6 +102,8 @@ func snapshot() -> Dictionary:
 		document["state"] = {}
 	_merge_fields(document.state, "station", model, STATION_FIELDS)
 	_merge_fields(document.state, "fleet", fleet, FLEET_FIELDS)
+	document.state.fleet.erase("sectors")
+	document.state.fleet.erase("survey_jobs")
 	_merge_fields(document.state, "supply", supply, SUPPLY_FIELDS)
 	# RNG is signed 64-bit; strings avoid JSON's 53-bit numeric precision ceiling.
 	document.state.supply["rng_seed"] = str(supply.rng.seed)
@@ -265,6 +265,9 @@ func restore(document: Variant) -> String:
 	decode_error = ""
 	var station_data: Dictionary = _decode_fields(state.station, STATION_FIELDS)
 	var fleet_data: Dictionary = _decode_fields(state.fleet, FLEET_FIELDS)
+	var retired_exploration: bool = state.fleet.has("sectors") or state.fleet.has("survey_jobs")
+	var old_exploration: Variant = _decode(state.fleet.get("sectors", []))
+	if not old_exploration is Array: return "Invalid retired exploration data."
 	var supply_data: Dictionary = _decode_fields(state.supply, SUPPLY_FIELDS)
 	supply_data["rng_seed"] = state.supply.get("rng_seed")
 	supply_data["rng_state"] = state.supply.get("rng_state")
@@ -300,18 +303,9 @@ func restore(document: Variant) -> String:
 		error = _field_types(trade_data, candidate_fleet.diplomacy, Trade.FIELDS)
 		if not error.is_empty():
 			return error
-		error = candidate_fleet.diplomacy.validate(trade_data, station_data, fleet_data)
-		if not error.is_empty():
-			return error
 		_apply_fields(candidate_fleet.diplomacy, trade_data, Trade.FIELDS)
 	# Accept valid older logs, then bound them before committing the candidate.
 	# Validate first so trimming cannot hide corrupt records in the old prefix.
-	candidate_fleet.diplomacy.trim_history()
-	candidate_fleet.diplomacy.add_catalog_defaults()
-	# Old v2 saves have no extension. Add content without resetting discovered ore.
-	candidate_fleet.diplomacy.enrich_sectors(fleet_data.sectors)
-	for sector: Dictionary in fleet_data.sectors:
-		candidate_fleet.diplomacy.discover(sector)
 	var region_data: Dictionary = {}
 	if migrated.get("extensions", {}).has("regions"):
 		var region_extension: Variant = migrated.extensions.regions
@@ -326,6 +320,22 @@ func restore(document: Variant) -> String:
 	else:
 		for field: String in Regions.FIELDS:
 			region_data[field] = candidate_fleet.regions.get(field)
+	error = candidate_fleet.regions.validate(region_data, station_data, fleet_data, candidate_fleet.diplomacy.jobs, candidate.ship_catalog)
+	if not error.is_empty(): return error
+	error = preload("res://scripts/legacy_exploration_migration.gd").validate_input(old_exploration, trade_data)
+	if not error.is_empty(): return error
+	preload("res://scripts/legacy_exploration_migration.gd").migrate(old_exploration, fleet_data, region_data, trade_data)
+	candidate_fleet.regions.records = region_data.records
+	for region_id: String in region_data.records:
+		if region_data.records[region_id].discovered: candidate_fleet.regions.ensure_alien_anomalies(region_id)
+	if not trade_data.is_empty():
+		error = candidate_fleet.diplomacy.validate(trade_data, station_data, fleet_data, region_data)
+		if not error.is_empty(): return error
+		_apply_fields(candidate_fleet.diplomacy, trade_data, Trade.FIELDS)
+	candidate_fleet.diplomacy.trim_history()
+	candidate_fleet.diplomacy.add_catalog_defaults()
+	for region_id: String in region_data.records:
+		candidate_fleet.diplomacy.discover_region(region_id, region_data.records[region_id])
 	error = candidate_fleet.regions.validate(region_data, station_data, fleet_data, candidate_fleet.diplomacy.jobs, candidate.ship_catalog)
 	if not error.is_empty():
 		return error
@@ -438,7 +448,7 @@ func restore(document: Variant) -> String:
 	error = candidate_fleet.hauling.validate(hauling_data)
 	if not error.is_empty(): return error
 	_apply_fields(candidate_fleet.hauling, hauling_data, Hauling.FIELDS)
-	if migrated.extensions.has("docking"):
+	if migrated.extensions.has("docking") and not retired_exploration:
 		var docking_data: Dictionary = _extension_fields(migrated.extensions, "docking", candidate_fleet.docking, Docking.FIELDS)
 		if not decode_error.is_empty(): return decode_error
 		error = candidate_fleet.docking.validate(docking_data)
@@ -558,26 +568,6 @@ func _validate(station: Dictionary, mining: Dictionary, stock: Dictionary, defin
 	for ship_id: Variant in station.ships:
 		if not ship_id is int or ship_id <= 0 or ship_id > int(station.next_ship_id) or not station.ships[ship_id] is String or not definitions.ship_catalog.has(station.ships[ship_id]):
 			return "Invalid ship or ship ID allocator."
-	var sector_ids: Dictionary = {}
-	for sector: Variant in mining.sectors:
-		if not sector is Dictionary or not sector.get("id") is String or not sector.get("name") is String or not sector.get("revealed") is bool or not sector.get("contents") is Array or not sector.get("reachable_from") is Array:
-			return "Invalid sector record."
-		if sector_ids.has(sector.id) or not _integer(sector.get("travel_seconds"), 0):
-			return "Invalid sector ID or travel duration."
-		sector_ids[sector.id] = sector
-		for content: Variant in sector.contents:
-			if not content is Dictionary or not content.get("type") is String:
-				return "Invalid sector contents."
-			if content.type == "asteroid" and not _integer(content.get("minerals"), 1):
-				return "Invalid discovery ore amount."
-			if content.type == "anomaly" and not content.get("name") is String:
-				return "Invalid anomaly record."
-		if sector.has("asteroid_ids"):
-			if not sector.asteroid_ids is Array:
-				return "Invalid discovered asteroid list."
-			for asteroid_id: Variant in sector.asteroid_ids:
-				if not _integer(asteroid_id) or asteroid_id >= -1 or asteroid_id <= mining.next_discovery_id:
-					return "Invalid discovery ID allocator."
 	for asteroid_id: Variant in mining.asteroids:
 		var rock: Variant = mining.asteroids[asteroid_id]
 		if not asteroid_id is int or not rock is Dictionary or not _integer(rock.get("minerals"), 1) or not rock.get("claimed") is bool:
@@ -586,9 +576,6 @@ func _validate(station: Dictionary, mining: Dictionary, stock: Dictionary, defin
 			return "Invalid asteroid persistence flag."
 		if rock.has("position") and not _valid_vector(rock.position):
 			return "Invalid discovery position."
-		if rock.get("persistent", false) and not rock.has("region_id"):
-			if not sector_ids.has(rock.get("sector_id")) or not sector_ids[rock.sector_id].revealed or not sector_ids[rock.sector_id].get("asteroid_ids", []).has(asteroid_id):
-				return "Discovery references an unrevealed sector."
 	var claimed: Dictionary = {}
 	for unit: Variant in mining.jobs:
 		var capability: Dictionary = {}
@@ -608,16 +595,6 @@ func _validate(station: Dictionary, mining: Dictionary, stock: Dictionary, defin
 	for asteroid_id: int in mining.asteroids:
 		if mining.asteroids[asteroid_id].claimed != claimed.has(asteroid_id):
 			return "Asteroid reservation and mission disagree."
-	var destinations: Dictionary = {}
-	for ship_id: Variant in mining.survey_jobs:
-		var job: Variant = mining.survey_jobs[ship_id]
-		if mining.jobs.has(ship_id):
-			return "Ship assigned to more than one mission."
-		if not station.ships.has(ship_id) or not definitions.ship_catalog[station.ships[ship_id]].has("survey") or not _valid_job(job):
-			return "Survey references a missing Scout or invalid timer."
-		if not job.get("sector_id") is String or not sector_ids.has(job.sector_id) or sector_ids[job.sector_id].revealed or destinations.has(job.sector_id):
-			return "Invalid or duplicate survey destination."
-		destinations[job.sector_id] = true
 	if not _integer(mining.total_mined, 0) or not _integer(mining.next_discovery_id) or mining.next_discovery_id > -1000:
 		return "Invalid mining counters."
 	if not stock.get("rng_seed") is String or not stock.rng_seed.is_valid_int() or not stock.get("rng_state") is String or not stock.rng_state.is_valid_int():
@@ -735,7 +712,7 @@ func _validate_collection(data: Dictionary, station: Dictionary, mining: Diction
 	for ship_id: Variant in data.jobs:
 		if not ship_id is int or not station.ships.has(ship_id) or not definitions.ship_catalog[station.ships[ship_id]].has("collection"):
 			return "Invalid material collection ship."
-		if mining.jobs.has(ship_id) or mining.survey_jobs.has(ship_id) or regions.survey_jobs.has(ship_id) or trade_jobs.has(ship_id):
+		if mining.jobs.has(ship_id) or regions.survey_jobs.has(ship_id) or trade_jobs.has(ship_id):
 			return "Collection ship is assigned twice."
 		var job: Variant = data.jobs[ship_id]
 		if not job is Dictionary:
@@ -806,7 +783,7 @@ func _validate_research_transport(research_data: Dictionary, transport_data: Dic
 			return "Invalid gate transit."
 		if not job.get("origin") is String or not region_data.records.has(job.origin) or transport_data.locations.get(ship_id, Regions.HOME) != job.origin:
 			return "Gate departure must match the ship region."
-		if not job.get("destination") is String or not region_data.records.has(job.destination) or not region_data.records[job.destination].discovered or not candidate.regions.adjacent(job.origin, job.destination):
+		if not job.get("destination") is String or not region_data.records.has(job.destination) or not region_data.records[job.destination].discovered:
 			return "Invalid gate route."
 		if not job.get("cost") is Dictionary:
 			return "Invalid gate cost escrow."
@@ -815,6 +792,6 @@ func _validate_research_transport(research_data: Dictionary, transport_data: Dic
 				return "Invalid gate cost escrow."
 	for ship_id: int in station.ships:
 		if transport_data.jobs.has(ship_id) or transport_data.locations.get(ship_id, Regions.HOME) != Regions.HOME:
-			if (mining.jobs.has(ship_id) and (transport_data.jobs.has(ship_id) or not allow_local_mining)) or mining.survey_jobs.has(ship_id) or region_data.survey_jobs.has(ship_id) or trades.has(ship_id) or collectors.has(ship_id):
+			if (mining.jobs.has(ship_id) and (transport_data.jobs.has(ship_id) or not allow_local_mining)) or region_data.survey_jobs.has(ship_id) or trades.has(ship_id) or collectors.has(ship_id):
 				return "Relocated or in-transit ship has a conflicting work mission."
 	return ""

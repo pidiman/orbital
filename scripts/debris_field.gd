@@ -1,10 +1,10 @@
 extends Node2D
 signal salvaged(amount: int, point: Vector2, resource: String)
 signal full_storage
-const Supply = preload("res://scripts/sector_supply.gd")
+const Supply = preload("res://scripts/region_supply.gd")
 var supply: Supply
 var art = preload("res://scripts/debris_art.gd").new()
-# Projected snapshots only; authority lives in SectorSupply.
+# Projected snapshots only; authority lives in RegionSupply.
 var pieces: Array[Dictionary] = []
 var debris_count: int = 0
 

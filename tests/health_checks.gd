@@ -1,5 +1,5 @@
 extends RefCounted
-const Supply = preload("res://scripts/sector_supply.gd")
+const Supply = preload("res://scripts/region_supply.gd")
 
 func run(check: Callable) -> void:
 	var dimensions := StationGeometry.grid_dimensions

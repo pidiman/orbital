@@ -30,7 +30,7 @@ func _ready() -> void:
 	close_button = _button(heading, "Close")
 	close_button.pressed.connect(hide)
 	inventory_label = hud._label(column, "", 15, hud.GOLD)
-	hud._label(column, "TELEPORT GATE · local departure", 16, hud.CYAN)
+	hud._label(column, "TELEPORT GATE · direct travel between discovered regions with gates", 16, hud.CYAN)
 	hud._label(column, "Departure gate", 12, hud.MUTED)
 	gate_picker = _picker(column)
 	hud._label(column, "Ship to transport", 12, hud.MUTED)

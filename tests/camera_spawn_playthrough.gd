@@ -60,7 +60,7 @@ func _ready() -> void:
 	var model := StationModel.new()
 	var fleet := MiningFleet.new(model)
 	fleet.regions.records = RegionModel.new(0).records
-	var supply := SectorSupply.new(model, fleet, 0)
+	var supply := RegionSupply.new(model, fleet, 0)
 	supply.advance(180.0)
 	checks.natural_xeno = not fleet.resource_targets.is_empty()
 	var target: int = fleet.resource_targets.keys()[0]

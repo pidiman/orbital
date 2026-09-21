@@ -1,6 +1,6 @@
 extends SceneTree
 const Fleet = preload("res://scripts/mining_fleet.gd")
-const Supply = preload("res://scripts/sector_supply.gd")
+const Supply = preload("res://scripts/region_supply.gd")
 const Store = preload("res://scripts/save_store.gd")
 var checks: Dictionary = {}
 

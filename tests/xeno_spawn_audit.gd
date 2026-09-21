@@ -17,7 +17,7 @@ func _ready() -> void:
 		var fleet := MiningFleet.new(model)
 		fleet.regions.records = RegionModel.new(0).records
 		fleet._discover_region("venus")
-		var seeded := SectorSupply.new(model, fleet, 0)
+		var seeded := RegionSupply.new(model, fleet, 0)
 		var store = preload("res://scripts/save_store.gd").new(model, fleet, seeded)
 		checks.fixture = game.persistence.restore(store.snapshot()).is_empty()
 	var counts: Dictionary = {}

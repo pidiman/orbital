@@ -7,13 +7,13 @@ func _ready() -> void:
 	var a := StationModel.new()
 	var af := MiningFleet.new(a)
 	af.regions.records = RegionModel.new(42).records
-	var sa := SectorSupply.new(a, af, 42)
+	var sa := RegionSupply.new(a, af, 42)
 	var b := StationModel.new()
 	var bf := MiningFleet.new(b)
 	bf.regions.records = RegionModel.new(42).records
 	var rules: Dictionary = sa.floating_rules.duplicate(true)
 	rules.types.materials.erase("visual_variants")
-	var sb := SectorSupply.new(b, bf, 42, {}, rules)
+	var sb := RegionSupply.new(b, bf, 42, {}, rules)
 	var found: Dictionary = {}
 	var economics_match: bool = true
 	for i in range(500):

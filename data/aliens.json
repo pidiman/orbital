@@ -1,6 +1,5 @@
 {
   "quiet_signal": {
-    "sector_id": "echo",
     "name": "Quiet signal",
     "description": "A shared relay answers: two alien envoys offer peaceful exchange.",
     "contacts": {
@@ -13,15 +12,16 @@
         "faction": "concord"
       }
     },
-    "reward": {}
+    "reward": {},
+    "region_id": "venus"
   },
   "ion_chorus": {
-    "sector_id": "twilight",
     "name": "Ion chorus",
     "description": "A natural resonance yields one Tech through spectral analysis.",
     "contacts": {},
     "reward": {
       "tech": 1
-    }
+    },
+    "region_id": "mars"
   }
 }

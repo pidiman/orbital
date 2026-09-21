@@ -1,5 +1,5 @@
 extends Node
-const Supply = preload("res://scripts/sector_supply.gd")
+const Supply = preload("res://scripts/region_supply.gd")
 var supply: Supply
 var model: StationModel
 

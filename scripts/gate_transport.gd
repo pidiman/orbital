@@ -50,7 +50,12 @@ func jump_error(gate: Variant, ship_id: int, destination: String) -> String:
 	if location(ship_id) != structure.region: return "Ship must be in the departure gate's region."
 	if fleet.unit_busy(ship_id): return "Ship is busy. Choose an idle ship."
 	if not fleet.regions.is_discovered(destination): return "Survey the destination region first."
-	if destination == structure.region or not fleet.regions.adjacent(structure.region, destination): return "No direct gate route from this region."
+	if destination == structure.region: return "Choose another region."
+	var destination_gate: bool = false
+	for other_id: String in all_gates():
+		var other: Dictionary = fleet.model.locations.structures[other_id]
+		if other.region == destination and other.owner == structure.owner: destination_gate = true
+	if not destination_gate: return "The destination region needs a Teleport Gate."
 	var base: StationModel = fleet.model.scoped_station(structure.station_id)
 	if base.power_balance() < 0: return "Departure station needs more Solar power."
 	var inventory: Dictionary = fleet.diplomacy.inventory if structure.station_id == fleet.model.locations.primary_station() else fleet.model.locations.stations[structure.station_id].inventory

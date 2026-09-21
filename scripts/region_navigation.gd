@@ -184,9 +184,9 @@ func refresh() -> void:
 		_fill(miner_picker, "mining")
 	for region_id: String in regions.catalog:
 		var state: String = regions.state(region_id)
-		var caption: String = "Here" if region_id == regions.current_region else ("Jump" if regions.jump_error(region_id).is_empty() else state.capitalize())
+		var caption: String = "Here" if region_id == regions.current_region else ("View" if regions.jump_error(region_id).is_empty() else state.capitalize())
 		region_buttons[region_id].text = "%s · %s" % [regions.catalog[region_id].name, caption]
-		region_buttons[region_id].tooltip_text = "Click to jump" if caption == "Jump" else "Open region details and Scout routes"
+		region_buttons[region_id].tooltip_text = "View this region" if caption == "View" else "Open region details and Scout routes"
 		route_buttons[region_id].text = "%s\n%s" % [regions.catalog[region_id].name, caption]
 	var definition: Dictionary = regions.catalog[selected_region]
 	var record: Dictionary = regions.records[selected_region]
@@ -196,15 +196,17 @@ func refresh() -> void:
 	var routes: Array[String] = []
 	for neighbor: String in definition.neighbors:
 		routes.append(regions.catalog[neighbor].name)
-	detail_label.text = "Routes: " + ", ".join(routes) + ". "
+	detail_label.text = "Scout routes: " + ", ".join(routes) + ". "
 	if not record.discovered:
 		detail_label.text += "Unsurveyed. Send a Scout from an adjacent region to reveal its contents."
 	elif selected_region == regions.HOME:
-		detail_label.text += "Your permanent Earth station. Existing Home sectors, salvage, mining and trade remain available."
+		detail_label.text += "Your permanent Earth station. Local salvage, mining and trade remain available."
 	else:
 		var anomalies: Array[String] = []
 		for content: Dictionary in record.contents:
-			if content.type == "anomaly":
+			if content.type == "alien_anomaly":
+				anomalies.append(content.name + " · Trade/Contacts")
+			elif content.type == "anomaly":
 				anomalies.append("%s: +%d %s" % [content.name, content.amount, str(content.good).capitalize()])
 		detail_label.text += fleet.outposts.summary(selected_region) + "\n"
 		detail_label.text += "%d deposits. Studied: %s." % [record.asteroid_ids.size(), "; ".join(anomalies)]

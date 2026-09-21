@@ -1,5 +1,5 @@
 extends RefCounted
-const Supply = preload("res://scripts/sector_supply.gd")
+const Supply = preload("res://scripts/region_supply.gd")
 const Store = preload("res://scripts/save_store.gd")
 
 static func run() -> Dictionary:

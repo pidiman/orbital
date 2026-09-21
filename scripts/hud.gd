@@ -43,10 +43,7 @@ var panel_closes: Dictionary = {}
 var active_menu: String = ""
 var footer: PanelContainer
 var capability_buttons: Dictionary = {}
-const SHIP_ACTIONS: Dictionary = {"hauling": "Assign refinery", "mining": "Assign asteroid", "survey": "Survey sector", "trade": "Trade with contact", "collection": "Deploy at Home", "founding": "Found outpost"}
-const SectorMap = preload("res://scripts/sector_map.gd")
-var sector_map: PanelContainer
-var map_button: Button
+const SHIP_ACTIONS: Dictionary = {"hauling": "Assign refinery", "mining": "Assign asteroid", "survey": "Explore regions", "trade": "Trade with contact", "collection": "Deploy at Home", "founding": "Found outpost"}
 const Fleet = preload("res://scripts/mining_fleet.gd")
 signal save_requested
 signal load_requested
@@ -74,7 +71,6 @@ var sell_buttons: Dictionary = {}
 var ship_entries: Dictionary = {}
 var demolish_button: Button
 var ship_rows: VBoxContainer
-var sector_label: Label
 var upgrade_title: Label
 var upgrade_stats: Label
 var upgrade_detail: Label
@@ -232,11 +228,6 @@ func _ready() -> void:
 		tool_buttons[kind] = button
 	_build_ships_page()
 	_build_upgrade_page()
-	map_button = Button.new()
-	map_button.text = "Sector map / Exploration"
-	map_button.custom_minimum_size.y = 34
-	map_button.pressed.connect(func() -> void: sector_map.open_map())
-	column.add_child(map_button)
 	research_button = Button.new()
 	research_button.text = "Research"
 	research_button.custom_minimum_size.y = 34
@@ -279,10 +270,6 @@ func _ready() -> void:
 	orbit_label.position = Vector2(42, 0)
 	orbit_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	orbit_label.position = Vector2(42, get_viewport().get_visible_rect().size.y - 124)
-	sector_map = SectorMap.new()
-	sector_map.hud = self
-	sector_map.fleet = fleet
-	root.add_child(sector_map)
 	trade_panel = TradePanel.new()
 	trade_panel.hud = self
 	trade_panel.fleet = fleet
@@ -465,7 +452,6 @@ func _build_ships_page() -> void:
 		var button: Button = _catalog_button(catalog_rows, definition)
 		ship_buttons[kind] = button
 		button.pressed.connect(func() -> void: _buy_ship(kind))
-	sector_label = _label(page, "", 12, Color("8bcdf1"))
 	var scroll := ScrollContainer.new()
 	scroll.hide()
 	scroll.custom_minimum_size = Vector2(270, 0)
@@ -496,7 +482,6 @@ func _refresh_ships() -> void:
 			command_buttons.erase(removed_id)
 			capability_buttons.erase(removed_id)
 			sell_buttons.erase(removed_id)
-	sector_label.text = "SECTORS  %d / %d revealed" % [fleet.revealed_count(), fleet.sectors.size()]
 	for ship_id: int in model.ships:
 		var definition: Dictionary = model.ship_catalog[model.ships[ship_id]]
 		if not ship_entries.has(ship_id):
@@ -538,8 +523,6 @@ func _refresh_ships() -> void:
 			status = "Mining · %ds" % fleet.jobs[ship_id].remaining
 		elif fleet.regions.survey_jobs.has(ship_id):
 			status = "Scouting · %ds" % fleet.regions.survey_jobs[ship_id].remaining
-		elif fleet.survey_jobs.has(ship_id):
-			status = "Surveying · %ds" % fleet.survey_jobs[ship_id].remaining
 		elif fleet.diplomacy.jobs.has(ship_id):
 			status = "Trading · %ds" % fleet.diplomacy.jobs[ship_id].remaining
 		for capability: String in capability_buttons[ship_id]:
@@ -591,12 +574,8 @@ func _command_ship(ship_id: int, capability: String = "") -> void:
 			ship_assignment_requested.emit(ship_id)
 			message("%s #%d selected. Click a %s; mining repeats until depleted." % [definition.name, ship_id, definition.mining.get("target_label", "violet Ore asteroid")], false, 8.0)
 		"survey":
-			if not fleet.regions.primary_station_visible():
-				region_navigation.open_region(fleet.regions.current_region, ship_id)
-				message("Choose an adjacent region and send your Scout.")
-				return
-			var error: String = fleet.survey(ship_id)
-			message("Scout exploring the next sector. Open Sector map to view its destination." if error.is_empty() else error, not error.is_empty())
+			region_navigation.open_region(fleet.regions.current_region, ship_id)
+			message("Choose an adjacent undiscovered region for this Scout.")
 		"trade":
 			region_navigation.panel.hide()
 			trade_panel.open_contacts(ship_id)
@@ -766,14 +745,6 @@ func reset_after_load() -> void:
 	command_buttons.clear()
 	capability_buttons.clear()
 	sell_buttons.clear()
-	fleet.changed.disconnect(sector_map.refresh)
-	model.changed.disconnect(sector_map.refresh)
-	root.remove_child(sector_map)
-	sector_map.queue_free()
-	sector_map = SectorMap.new()
-	sector_map.hud = self
-	sector_map.fleet = fleet
-	root.add_child(sector_map)
 	fleet.changed.disconnect(trade_panel.refresh)
 	model.changed.disconnect(trade_panel.refresh)
 	root.remove_child(trade_panel)
@@ -876,14 +847,8 @@ func _install_secondary_panels() -> void:
 	for id: int in panel_closes.keys():
 		if not is_instance_valid(panel_closes[id]) or not panel_closes[id].is_inside_tree(): panel_closes.erase(id)
 	managed_panels = managed_panels.filter(func(item: PanelContainer) -> bool: return is_instance_valid(item) and item.is_inside_tree())
-	_wrap_panel(sector_map, "Home sectors / Exploration")
 	_wrap_panel(trade_panel, "Trade / Contacts")
 	_wrap_panel(region_navigation.panel, "Outposts / Regions")
-	# The existing Home-sector action lives alongside the region overview.
-	map_button.reparent(region_navigation.panel.get_node("MenuFrame/Content/Body"))
-	map_button.get_parent().move_child(map_button, 0)
-	map_button.text = "Home sectors / Exploration"
-	map_button.custom_minimum_size.y = 44
 	_layout_menus()
 
 func _wrap_panel(target: PanelContainer, title: String) -> void:
@@ -907,9 +872,6 @@ func _wrap_panel(target: PanelContainer, title: String) -> void:
 		var old_close: Button = view.close_button
 		old_close.get_parent().hide()
 		view.close_button = close
-		if target == sector_map:
-			sector_map.contacts_button.reparent(heading)
-			heading.move_child(sector_map.contacts_button, 1)
 	var scroll := ScrollContainer.new()
 	scroll.name = "Content"
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL

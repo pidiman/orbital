@@ -1,7 +1,7 @@
-class_name SectorSupply
+class_name RegionSupply
 extends RefCounted
 
-# Dimensionless sector coordinates; no viewport, camera, nodes, or screen pixels.
+# Dimensionless region coordinates; no viewport, camera, nodes, or screen pixels.
 const Collection = preload("res://scripts/material_collection.gd")
 const FLOATING_FIELDS: Array[String] = ["floating"]
 var floating: Dictionary = {}
@@ -233,5 +233,5 @@ func validate_mining_nodes(bindings: Dictionary, pools: Dictionary, fleet_data: 
 		if seen.has(key): return "Duplicate floating mining node."
 		seen[key] = true
 		var rock: Dictionary = fleet_data.asteroids[id]
-		if rock.minerals != piece.amount or rock.has("region_id") or rock.has("sector_id") or rock.get("persistent", false): return "Mining node quantity or ownership mismatch."
+		if rock.minerals != piece.amount or rock.has("region_id") or rock.get("persistent", false): return "Mining node quantity or ownership mismatch."
 	return ""

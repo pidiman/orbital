@@ -41,7 +41,7 @@ func _ready() -> void:
 		for tier in range(1, 6):
 			var old := StationModel.new()
 			var fleet := MiningFleet.new(old)
-			var supply := SectorSupply.new(old, fleet, 42)
+			var supply := RegionSupply.new(old, fleet, 42)
 			old.materials = 10000
 			for x in range(1, 9): old.build(Vector2(x * 58, 0), "solar")
 			var stable_id: String = old.locations.add_structure(old.locations.primary_station(), kind, dock)

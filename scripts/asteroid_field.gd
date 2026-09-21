@@ -4,7 +4,7 @@ const Fleet = preload("res://scripts/mining_fleet.gd")
 signal notice(text: String, error: bool)
 signal minerals_delivered(amount: int, point: Vector2)
 
-const Supply = preload("res://scripts/sector_supply.gd")
+const Supply = preload("res://scripts/region_supply.gd")
 var supply: Supply
 var fleet: Fleet
 var board: Node2D
@@ -18,7 +18,6 @@ const ORE := Color("baa1f5")
 
 func _ready() -> void:
 	fleet.completed.connect(_on_completed)
-	fleet.surveyed.connect(_on_surveyed)
 	fleet.model.ship_removed.connect(func(ship_id: int) -> void:
 		if selected_ship == ship_id:
 			selected_ship = -1)
@@ -105,8 +104,6 @@ func _draw() -> void:
 			var text: String = "%s #%d" % [definition.name, ship_id]
 			if fleet.regions.survey_jobs.has(ship_id):
 				text = "Scouting %ds" % fleet.regions.survey_jobs[ship_id].remaining
-			elif fleet.survey_jobs.has(ship_id):
-				text = "Survey %ds" % fleet.survey_jobs[ship_id].remaining
 				draw_arc(point, 26, 0, TAU, 32, Color("8bcdf1"), 1.5, true)
 			elif fleet.diplomacy.jobs.has(ship_id):
 				text = "Trade %ds" % fleet.diplomacy.jobs[ship_id].remaining
@@ -161,10 +158,6 @@ func home_position(unit: Variant) -> Vector2:
 		return board.world_to_screen(unit)
 	var index: int = int(unit) - 1
 	return Vector2(get_viewport_rect().size.x - 410.0 - int(index / 7.0) * 62, 235 + (index % 7) * 63)
-
-func _on_surveyed(sector: Dictionary) -> void:
-	_sync_view()
-	notice.emit("%s revealed. Open Sector map for the discovery report." % sector.name, false)
 
 func _add_discovery_marker(asteroid_id: int) -> void:
 	if fleet.asteroids[asteroid_id].has("region_id"):

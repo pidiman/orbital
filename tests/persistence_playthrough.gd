@@ -82,7 +82,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var model := StationModel.new()
 	var fleet := MiningFleet.new(model)
-	var supply := preload("res://scripts/sector_supply.gd").new(model, fleet)
+	var supply := preload("res://scripts/region_supply.gd").new(model, fleet)
 	var reader := Store.new(model, fleet, supply)
 	reader.path = test_path
 	checks["graceful_exit_saves_last_state"] = reader.load_game().is_empty() and reader.snapshot() == final_state

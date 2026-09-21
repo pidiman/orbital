@@ -1,5 +1,5 @@
 extends RefCounted
-# Home-only logical sector movement. Cross-region hauling is future scope.
+# Home-only logical region movement. Cross-region hauling is future scope.
 signal changed
 signal notice(message: String)
 const FIELDS: Array[String] = ["jobs", "depots"]
