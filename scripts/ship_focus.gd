@@ -28,10 +28,16 @@ func ship_point(id: int) -> Vector2:
 func pan_view(direction: Vector2) -> void:
 	pan_pixels(direction * 120.0)
 
-func zoom_view(factor: float) -> void:
+func zoom_view(factor: float, focus_point: Vector2 = Vector2.INF) -> void:
 	ship_id = -1
+	var anchored: bool = focus_point.is_finite()
+	var world_point: Vector2 = get_canvas_transform().affine_inverse() * focus_point if anchored else Vector2.ZERO
 	zoom = Vector2.ONE * clampf(zoom.x * factor, 0.15, 2.0)
 	force_update_scroll()
+	if anchored:
+		var bounds: Rect2 = pan_bounds()
+		position = (position + world_point - get_canvas_transform().affine_inverse() * focus_point).clamp(bounds.position, bounds.end)
+		force_update_scroll()
 
 func fit_grid() -> void:
 	ship_id = -1

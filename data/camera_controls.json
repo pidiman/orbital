@@ -17,5 +17,8 @@
       "default": true
     }
   ],
-  "keyboard_zoom_rate": 1.5
+  "keyboard_zoom_rate": 1.5,
+  "pinch_sensitivity": 1.0,
+  "scroll_zoom_sensitivity": 0.08,
+  "wheel_zoom_sensitivity": 0.12
 }

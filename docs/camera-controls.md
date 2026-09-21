@@ -22,3 +22,11 @@ Settings → “Show Fit grid & zoom controls” persists `show_grid_controls` i
 `tests/menu_controls_playthrough.gd` verifies nesting, relocation, centered messages, visibility persistence, both zoom limits, hidden-controls keyboard zoom, and the smaller desktop/touch layout.
 
 `tests/camera_spawn_playthrough.gd` verifies unchanged framing on same-region selection and dispatch, cross-region centering with preserved zoom, live button/keyboard zoom text, and naturally spawned Xeno mining/save continuation.
+
+## Trackpad and wheel zoom
+
+Pinch uses Godot `InputEventMagnifyGesture.factor`; spreading fingers zooms in. Vertical `InputEventPanGesture.delta.y` and wheel up/down provide alternative zoom inputs. Fractional wheel factors are preserved for high-resolution scrolling. All call `zoom_view`, with the same 0.15–2.0 limits and live footer multiplier as buttons/brackets. The cursor's world point stays fixed unless camera bounds prevent it; buttons and brackets retain center-based zoom.
+
+Tune `data/camera_controls.json`: `pinch_sensitivity` = 1.0 (exponent on native magnification), `scroll_zoom_sensitivity` = 0.08 (log zoom per vertical gesture unit), `wheel_zoom_sensitivity` = 0.12 (log zoom per notch, about 12.75% in). Lower values reduce sensitivity; zero disables that input. No gameplay save or preference schema changes.
+
+Gestures use unhandled input so UI scrolling takes priority, plus the existing HUD hit test blocks panels, tray, bars and buttons. Zoom is ignored during a pending left-click/drag and while unfocused. `tests/gesture_zoom_playthrough.gd` injects all three native Godot event types through the viewport and checks cursor anchoring, directions, limits, UI blocking, live labels and unchanged model snapshots. Physical MacBook trackpad feel is not measured by these automated tests.

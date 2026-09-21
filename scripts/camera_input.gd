@@ -25,6 +25,7 @@ func _notification(what: int) -> void:
 		focused = true
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _gesture_zoom(event): return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed and not game.hud.pointer_over_ui(event.position):
 		pending = true
 		dragging = false
@@ -86,3 +87,28 @@ func _process(delta: float) -> void:
 	if direction == Vector2.ZERO: direction = edge_direction(pointer)
 	if direction != Vector2.ZERO:
 		game.ship_camera.pan_pixels(direction.normalized() * float(game.preferences.definitions.pan_speed) * minf(delta, 0.05))
+
+# GUI handles scrolling first; map gestures reuse the button/keyboard zoom command.
+func _gesture_zoom(event: InputEvent) -> bool:
+	if not focused or pending: return false
+	var point: Vector2
+	var factor: float = 1.0
+	var settings: Dictionary = game.preferences.definitions
+	if event is InputEventMagnifyGesture:
+		if not is_finite(event.factor) or event.factor <= 0.0: return false
+		point = event.position
+		factor = pow(event.factor, float(settings.pinch_sensitivity))
+	elif event is InputEventPanGesture:
+		point = event.position
+		factor = exp(-event.delta.y * float(settings.scroll_zoom_sensitivity))
+	elif event is InputEventMouseButton and event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		point = event.position
+		var direction: float = 1.0 if event.button_index == MOUSE_BUTTON_WHEEL_UP else -1.0
+		factor = exp(direction * event.factor * float(settings.wheel_zoom_sensitivity))
+	else:
+		return false
+	if game.hud.pointer_over_ui(point) or not is_finite(factor) or factor <= 0.0: return false
+	pointer = point
+	game.ship_camera.zoom_view(factor, point)
+	get_viewport().set_input_as_handled()
+	return true
