@@ -70,10 +70,11 @@ func _ready() -> void:
 	await click(game.asteroids.rocks[second_id].point)
 	checks["returned_ship_can_dispatch_again"] = game.fleet.jobs.size() == 1
 	# Every catalog entry remains fully visible and clickable above the footer.
-	var buttons_visible: bool = true
-	for button: Button in game.hud.tool_buttons.values():
-		buttons_visible = buttons_visible and button.get_global_rect().end.y < get_viewport().get_visible_rect().size.y - 68
-	checks["all_five_buttons_visible"] = buttons_visible and game.hud.tool_buttons.size() == 5
+	await use(game.hud.menu_buttons.Build)
+	var buttons_match_catalog: bool = true
+	for kind: String in game.model.catalog:
+		buttons_match_catalog = buttons_match_catalog and game.hud.tool_buttons.has(kind) and game.hud.tool_buttons[kind].visible == game.model.module_unlocked(kind)
+	checks["module_catalog_reachable_in_build"] = buttons_match_catalog and game.hud.tool_buttons.size() == game.model.catalog.size()
 	report("checks", checks)
 	report("timeline", timeline)
 	finish()
@@ -106,7 +107,7 @@ func click(point: Vector2) -> void:
 
 func select(kind: String) -> void:
 	var button: Button = game.hud.tool_buttons[kind]
-	await click(button.get_global_rect().get_center())
+	await use(button)
 
 func gather(target: int) -> void:
 	var attempts: int = 0
@@ -123,3 +124,23 @@ func gather(target: int) -> void:
 			await click(point)
 			if game.model.materials > before:
 				checks["debris_collection"] = true
+
+func use(button: Control) -> void:
+	var hud = game.hud
+	if not button.is_visible_in_tree():
+		var menu: String = ""
+		if hud.tool_buttons.values().has(button): menu = "Build"
+		elif hud.region_navigation.panel.is_ancestor_of(button) or button == hud.map_button: menu = "Outposts/Regions"
+		elif hud.panel.is_ancestor_of(button): menu = "Ships"
+		elif hud.gate_panel.is_ancestor_of(button): menu = "Gate/Travel"
+		elif hud.research_panel.is_ancestor_of(button): menu = "Research"
+		elif hud.trade_panel.is_ancestor_of(button): menu = "Trade/Contacts"
+		if not menu.is_empty():
+			if hud.active_menu == menu: await click(hud.menu_buttons[menu].get_global_rect().get_center())
+			await click(hud.menu_buttons[menu].get_global_rect().get_center())
+	var ancestor: Node = button.get_parent()
+	while ancestor != null:
+		if ancestor is ScrollContainer: ancestor.ensure_control_visible(button)
+		ancestor = ancestor.get_parent()
+	await settle(2)
+	await click(button.get_global_rect().get_center())

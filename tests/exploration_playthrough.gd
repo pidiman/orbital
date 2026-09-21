@@ -14,16 +14,16 @@ func _ready() -> void:
 	await page(1)
 	game.hud.ship_buttons.scout.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.scout)
 	await settle(2)
-	await click(game.hud.ship_buttons.scout.get_global_rect().get_center())
+	await use(game.hud.ship_buttons.scout)
 	var scout: int = game.model.next_ship_id
 	checks["scout_built"] = game.model.ships.get(scout) == "scout" and game.model.power_balance() == 5
-	await click(game.hud.map_button.get_global_rect().get_center())
+	await use(game.hud.map_button)
 	var map: PanelContainer = game.hud.sector_map
-	checks["map_open_and_fits"] = map.visible and map.get_global_rect().end.x < game.hud.panel.get_global_rect().position.x and map.get_global_rect().end.y < 780
-	await click(map.sector_buttons.dawn.get_global_rect().get_center())
+	checks["map_open_and_fits"] = map.visible and map.get_global_rect().end.x <= game.get_viewport_rect().size.x - 28 and map.get_global_rect().end.y < 780
+	await use(map.sector_buttons.dawn)
 	checks["unexplored_contents_hidden"] = map.result_label.text.contains("Contents unknown") and game.fleet.asteroids.size() == game.asteroids.home_asteroid_count()
 	checks["scout_and_travel_visible"] = map.scout_picker.get_selected_id() == scout and map.send_button.text.contains("5s")
-	await click(map.send_button.get_global_rect().get_center())
+	await use(map.send_button)
 	checks["selected_scout_launched"] = game.fleet.survey_jobs.has(scout) and game.fleet.survey_jobs[scout].sector_id == "dawn"
 	checks["exploring_state_and_timer"] = map.state_label.text.contains("EXPLORING") and map.progress.visible and map.send_button.disabled
 	await get_tree().create_timer(2.0).timeout
@@ -36,15 +36,15 @@ func _ready() -> void:
 	checks["scout_returned_no_duplicate"] = not game.fleet.survey_jobs.has(scout) and map.send_button.disabled
 	checks["no_miner_button_disabled"] = map.target_buttons[target].disabled
 	save_frame("discovery")
-	await click(map.close_button.get_global_rect().get_center())
+	await use(map.close_button)
 	await gather(45)
 	game.hud.ship_buttons.miner.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.miner)
 	await settle(2)
-	await click(game.hud.ship_buttons.miner.get_global_rect().get_center())
+	await use(game.hud.ship_buttons.miner)
 	var miner: int = game.model.next_ship_id
 	checks["miner_built"] = game.model.ships.get(miner) == "miner"
-	await click(game.hud.map_button.get_global_rect().get_center())
-	await click(map.target_buttons[target].get_global_rect().get_center())
+	await use(game.hud.map_button)
+	await use(map.target_buttons[target])
 	checks["miner_assigned_discovery"] = game.fleet.jobs.has(miner) and game.fleet.jobs[miner].target == target and map.target_buttons[target].disabled
 	var attempts: int = 0
 	while game.fleet.total_mined < 18 and attempts < 150:
@@ -54,16 +54,16 @@ func _ready() -> void:
 	checks["auto_mining_continues"] = game.fleet.jobs.has(miner) and game.fleet.asteroids[target].minerals == 36
 	checks["map_ore_updates"] = map.target_buttons[target].text.contains("36 Minerals")
 	save_frame("discovery_mining")
-	await click(map.sector_buttons.echo.get_global_rect().get_center())
-	await click(map.send_button.get_global_rect().get_center())
+	await use(map.sector_buttons.echo)
+	await use(map.send_button)
 	await wait_reveal("echo")
 	checks["anomaly_report"] = map.result_label.text.contains("Anomaly: Quiet signal") and game.fleet.sector_by_id("echo").asteroid_ids.is_empty()
 	save_frame("anomaly")
-	await click(map.sector_buttons.quiet.get_global_rect().get_center())
-	await click(map.send_button.get_global_rect().get_center())
+	await use(map.sector_buttons.quiet)
+	await use(map.send_button)
 	await wait_reveal("quiet")
 	checks["empty_report"] = map.result_label.text.contains("Empty sector") and game.fleet.sector_by_id("quiet").asteroid_ids.is_empty()
-	await click(map.close_button.get_global_rect().get_center())
+	await use(map.close_button)
 	checks["map_closes"] = not map.visible
 	report("checks", checks)
 	finish()
@@ -76,8 +76,8 @@ func wait_reveal(sector_id: String) -> void:
 	await settle(2)
 
 func page(index: int) -> void:
-	var bar: TabBar = game.hud.tabs.get_tab_bar()
-	await click(bar.global_position + bar.get_tab_rect(index).get_center())
+	var menu: String = "Build" if index == 0 else "Ships"
+	if game.hud.active_menu != menu: await click(game.hud.menu_buttons[menu].get_global_rect().get_center())
 
 func no_3d(node: Node) -> bool:
 	if node.is_class("Node3D"):
@@ -106,7 +106,7 @@ func click(point: Vector2) -> void:
 
 func select(kind: String) -> void:
 	var button: Button = game.hud.tool_buttons[kind]
-	await click(button.get_global_rect().get_center())
+	await use(button)
 
 func gather(target: int) -> void:
 	var attempts: int = 0
@@ -123,3 +123,23 @@ func gather(target: int) -> void:
 			await click(point)
 			if game.model.materials > before:
 				checks["debris_collection"] = true
+
+func use(button: Control) -> void:
+	var hud = game.hud
+	if not button.is_visible_in_tree():
+		var menu: String = ""
+		if hud.tool_buttons.values().has(button): menu = "Build"
+		elif hud.region_navigation.panel.is_ancestor_of(button) or button == hud.map_button: menu = "Outposts/Regions"
+		elif hud.panel.is_ancestor_of(button): menu = "Ships"
+		elif hud.gate_panel.is_ancestor_of(button): menu = "Gate/Travel"
+		elif hud.research_panel.is_ancestor_of(button): menu = "Research"
+		elif hud.trade_panel.is_ancestor_of(button): menu = "Trade/Contacts"
+		if not menu.is_empty():
+			if hud.active_menu == menu: await click(hud.menu_buttons[menu].get_global_rect().get_center())
+			await click(hud.menu_buttons[menu].get_global_rect().get_center())
+	var ancestor: Node = button.get_parent()
+	while ancestor != null:
+		if ancestor is ScrollContainer: ancestor.ensure_control_visible(button)
+		ancestor = ancestor.get_parent()
+	await settle(2)
+	await click(button.get_global_rect().get_center())

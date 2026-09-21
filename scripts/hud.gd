@@ -1,4 +1,6 @@
 extends CanvasLayer
+const DevConfig = preload("res://scripts/dev_config.gd")
+var dev_panel: PanelContainer
 const RegionNavigation = preload("res://scripts/region_navigation.gd")
 var region_navigation: Control
 var orbit_label: Label
@@ -6,6 +8,15 @@ const TradePanel = preload("res://scripts/trade_panel.gd")
 var trade_panel: PanelContainer
 var research_panel: PanelContainer
 var research_button: Button
+var gate_panel: PanelContainer
+var tech_label: Label
+var xenocrystal_label: Label
+var toolbar: GridContainer
+var menu_buttons: Dictionary = {}
+var managed_panels: Array[PanelContainer] = []
+var panel_closes: Dictionary = {}
+var active_menu: String = ""
+var footer: PanelContainer
 var capability_buttons: Dictionary = {}
 const SHIP_ACTIONS: Dictionary = {"mining": "Assign asteroid", "survey": "Survey sector", "trade": "Trade with contact", "collection": "Deploy at Home", "founding": "Found outpost"}
 const SectorMap = preload("res://scripts/sector_map.gd")
@@ -64,9 +75,9 @@ func _ready() -> void:
 	var header := PanelContainer.new()
 	header.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	header.offset_left = 28
-	header.offset_top = 24
+	header.offset_top = 12
 	header.offset_right = -28
-	header.offset_bottom = 108
+	header.offset_bottom = 76
 	header.add_theme_stylebox_override("panel", _style(Color("111d2c"), Color("253647")))
 	root.add_child(header)
 	var header_margin := MarginContainer.new()
@@ -74,27 +85,27 @@ func _ready() -> void:
 		header_margin.add_theme_constant_override("margin_" + side, 24)
 	header.add_child(header_margin)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 24)
+	row.add_theme_constant_override("separation", 16)
 	header_margin.add_child(row)
 	var branding := VBoxContainer.new()
 	branding.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	branding.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(branding)
-	_label(branding, "O R B I T A L", 28, INK)
-	_label(branding, "LOW EARTH ORBIT  /  COLONY PROGRAM", 11, MUTED)
+	_label(branding, "O R B I T A L", 22, INK)
+	_label(branding, "COLONY PROGRAM", 11, MUTED)
 	var persistence := HBoxContainer.new()
 	persistence.alignment = BoxContainer.ALIGNMENT_CENTER
 	persistence.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(persistence)
 	save_button = Button.new()
 	save_button.text = "Save"
-	save_button.custom_minimum_size = Vector2(62, 34)
+	save_button.custom_minimum_size = Vector2(62, 44)
 	save_button.tooltip_text = "Save latest checkpoint. Autosaves also run after actions and every 10 seconds."
 	save_button.pressed.connect(func() -> void: save_requested.emit())
 	persistence.add_child(save_button)
 	load_button = Button.new()
 	load_button.text = "Load"
-	load_button.custom_minimum_size = Vector2(62, 34)
+	load_button.custom_minimum_size = Vector2(62, 44)
 	load_button.tooltip_text = "Restore the latest manual or automatic checkpoint."
 	load_button.pressed.connect(func() -> void: load_requested.emit())
 	persistence.add_child(load_button)
@@ -118,6 +129,14 @@ func _ready() -> void:
 	row.add_child(power)
 	power_label = _label(power, "", 24, CYAN)
 	power_detail = _label(power, "", 11, MUTED)
+	for good: String in ["Tech", "Xenocrystals"]:
+		var group := VBoxContainer.new()
+		group.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_child(group)
+		_label(group, good.to_upper(), 11, GOLD)
+		var value := _label(group, "0", 24, INK)
+		if good == "Tech": tech_label = value
+		else: xenocrystal_label = value
 	panel = PanelContainer.new()
 	panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	panel.offset_left = -332
@@ -170,10 +189,10 @@ func _ready() -> void:
 	map_button = Button.new()
 	map_button.text = "Sector map / Exploration"
 	map_button.custom_minimum_size.y = 34
-	map_button.pressed.connect(func() -> void: research_panel.hide(); region_navigation.panel.hide(); trade_panel.hide(); sector_map.open_map())
+	map_button.pressed.connect(func() -> void: sector_map.open_map())
 	column.add_child(map_button)
 	research_button = Button.new()
-	research_button.text = "Research / Teleport Gates"
+	research_button.text = "Research"
 	research_button.custom_minimum_size.y = 34
 	research_button.pressed.connect(func() -> void: research_panel.open_panel())
 	column.add_child(research_button)
@@ -183,7 +202,7 @@ func _ready() -> void:
 	cancel.custom_minimum_size.y = 34
 	cancel.add_theme_stylebox_override("normal", _style(Color("111c2b"), Color("314254")))
 	cancel.add_theme_stylebox_override("hover", _style(Color("20374a"), CYAN))
-	cancel.pressed.connect(func() -> void: choose(""))
+	cancel.pressed.connect(func() -> void: choose(""); close_panels())
 	column.add_child(cancel)
 	fleet_label = _label(column, "", 12, Color("baa1f5"))
 	refinery_label = _label(column, "", 12, GOLD)
@@ -197,7 +216,7 @@ func _ready() -> void:
 	column.add_child(goal_bar)
 	goal_label = _label(column, "", 13, CYAN)
 	goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var footer := PanelContainer.new()
+	footer = PanelContainer.new()
 	footer.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	footer.offset_left = 28
 	footer.offset_right = -28
@@ -207,6 +226,7 @@ func _ready() -> void:
 	root.add_child(footer)
 	status_label = _label(footer, "", 14, INK)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	orbit_label = _label(root, "EARTH  /  408 KM\nA small beginning. An infinite horizon.", 13, Color("6894aa"))
 	orbit_label.position = Vector2(42, 0)
 	orbit_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
@@ -224,6 +244,15 @@ func _ready() -> void:
 	research_panel.hud = self
 	research_panel.fleet = fleet
 	root.add_child(research_panel)
+	gate_panel = preload("res://scripts/gate_panel.gd").new()
+	gate_panel.hud = self
+	gate_panel.fleet = fleet
+	root.add_child(gate_panel)
+	_setup_menus()
+	if DevConfig.DEBUG_MODE:
+		dev_panel = preload("res://scripts/dev_panel.gd").new()
+		dev_panel.hud = self
+		root.add_child(dev_panel)
 	fleet.transport.arrived.connect(func(ship_id: int, region_id: String) -> void: message("Ship #%d arrived at %s. Use Ships commands for local operations." % [ship_id, fleet.regions.catalog[region_id].name]))
 	fleet.diplomacy.mission_completed.connect(_trade_completed)
 	model.changed.connect(refresh)
@@ -253,6 +282,7 @@ func choose(kind: String) -> void:
 	if not kind.is_empty() and not fleet.regions.primary_station_visible():
 		message("Jump Home to construct station modules.", true)
 		return
+	if not kind.is_empty(): close_panels()
 	selected = kind
 	for id: String in tool_buttons:
 		tool_buttons[id].add_theme_stylebox_override("normal", _style(Color("1f3a3c") if id == selected else Color("172738"), CYAN if id == selected else Color("304557")))
@@ -265,6 +295,8 @@ func refresh() -> void:
 		tool_buttons[kind].visible = model.module_unlocked(kind)
 		tool_buttons[kind].disabled = not home
 	orbit_label.text = "EARTH  /  408 KM\nA small beginning. An infinite horizon." if home else "%s / EXPLORATION\n%s" % [str(fleet.regions.catalog[fleet.regions.current_region].name).to_upper(), fleet.outposts.short_summary(fleet.regions.current_region)]
+	tech_label.text = str(fleet.diplomacy.inventory.get("tech", 0))
+	xenocrystal_label.text = str(fleet.diplomacy.inventory.get("xenocrystal", 0))
 	minerals_label.text = str(model.minerals)
 	fleet_label.text = "MINERS  %d idle / %d total" % [fleet.idle_count(), fleet.mining_units().size()]
 	var refinery_count: int = model.module_count_with("conversion")
@@ -288,7 +320,7 @@ func message(text: String, error: bool = false, duration: float = 4.0) -> void:
 func _level_up(level: int) -> void:
 	message("COLONY ESTABLISHED  ·  Your little corner of the cosmos is thriving." if level == 3 else "LEVEL %d REACHED  ·  A new chapter above Earth." % level, false, 8.0)
 	var title := _label(root, "COLONY ESTABLISHED" if level == 3 else "LEVEL %d REACHED" % level, 30, CYAN)
-	title.position = Vector2(150, 160)
+	title.position = Vector2(150, 250)
 	floating.append({"label": title, "time": 0.0, "duration": 4.0})
 
 func show_salvage(amount: int, point: Vector2) -> void:
@@ -299,7 +331,7 @@ func show_salvage(amount: int, point: Vector2) -> void:
 func _process(delta: float) -> void:
 	status_time -= delta
 	if status_time <= 0:
-		status_label.text = "Amber: salvage  ·  Violet: mine  ·  Inspect a module to upgrade  ·  Ships tab: fleet commands" if fleet.regions.primary_station_visible() else "Violet: mine  ·  Top overview: Scout / jump  ·  Station construction and salvage remain at Home"
+		status_label.text = "Amber: salvage  ·  Violet: mine  ·  Inspect a module to upgrade  ·  Ships: fleet commands" if fleet.regions.primary_station_visible() else "Violet: mine  ·  Outposts/Regions: Scout / view region  ·  Station construction and salvage remain at Home"
 		if fleet.collection != null and not fleet.collection.waiting_message().is_empty():
 			status_label.text = fleet.collection.waiting_message()
 		status_label.add_theme_color_override("font_color", MUTED)
@@ -360,7 +392,8 @@ func _build_ships_page() -> void:
 	tabs.add_child(page)
 	_label(page, "Independent ships · no grid cell needed", 12, MUTED)
 	var catalog_scroll := ScrollContainer.new()
-	catalog_scroll.custom_minimum_size.y = 120
+	catalog_scroll.custom_minimum_size.y = 0
+	catalog_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	catalog_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	page.add_child(catalog_scroll)
 	var catalog_rows := VBoxContainer.new()
@@ -373,7 +406,8 @@ func _build_ships_page() -> void:
 		button.pressed.connect(func() -> void: _buy_ship(kind))
 	sector_label = _label(page, "", 12, Color("8bcdf1"))
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(270, 135)
+	scroll.custom_minimum_size = Vector2(270, 0)
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	page.add_child(scroll)
@@ -412,7 +446,7 @@ func _refresh_ships() -> void:
 				if not definition.has(capability):
 					continue
 				var button := Button.new()
-				button.custom_minimum_size.y = 39
+				button.custom_minimum_size.y = 44
 				button.add_theme_font_size_override("font_size", 12)
 				button.add_theme_color_override("font_disabled_color", Color("b9a6f5"))
 				button.add_theme_stylebox_override("disabled", _style(Color("172738"), Color("304557")))
@@ -426,7 +460,7 @@ func _refresh_ships() -> void:
 			if capability_buttons[ship_id].is_empty():
 				_label(entry, "%s #%d · No commands" % [definition.name, ship_id], 12, MUTED)
 			var sell := Button.new()
-			sell.custom_minimum_size.y = 28
+			sell.custom_minimum_size.y = 44
 			sell.add_theme_font_size_override("font_size", 12)
 			sell.tooltip_text = "Cancels missions; refunds trade cargo and frees power. Refunds survive full storage."
 			sell.pressed.connect(func() -> void: _sell_ship(ship_id))
@@ -477,6 +511,7 @@ func _command_ship(ship_id: int, capability: String = "") -> void:
 			var error: String = fleet.collection.deploy(ship_id)
 			message("Material Ship deployed at Earth." if error.is_empty() else error, not error.is_empty())
 		"mining":
+			close_panels()
 			ship_assignment_requested.emit(ship_id)
 			message("Miner #%d selected. Click a violet asteroid; mining repeats until depleted." % ship_id, false, 8.0)
 		"survey":
@@ -523,6 +558,7 @@ func _build_upgrade_page() -> void:
 func inspect_module(world_position: Vector2) -> void:
 	choose("")
 	selected_position = world_position
+	activate_panel(panel, "Build")
 	tabs.current_tab = 2
 	_refresh_upgrade()
 
@@ -582,7 +618,9 @@ func _sell_ship(ship_id: int) -> void:
 
 func reset_after_load() -> void:
 	research_panel.hide()
-	research_panel.picker_signature = ""
+	close_panels()
+	gate_panel.picker_signature = ""
+	gate_panel.refresh()
 	research_panel.refresh()
 	choose("")
 	selected_position = Vector2.INF
@@ -614,9 +652,11 @@ func reset_after_load() -> void:
 	root.add_child(trade_panel)
 	fleet.changed.disconnect(region_navigation.refresh)
 	model.changed.disconnect(region_navigation.refresh)
+	region_navigation.location_label.queue_free()
 	root.remove_child(region_navigation)
 	region_navigation.queue_free()
 	_create_region_navigation()
+	_install_secondary_panels()
 	refresh()
 
 func _create_region_navigation() -> void:
@@ -624,3 +664,149 @@ func _create_region_navigation() -> void:
 	region_navigation.hud = self
 	region_navigation.fleet = fleet
 	root.add_child(region_navigation)
+
+# All menu state is presentation-only. Model calls remain in the original handlers.
+func _setup_menus() -> void:
+	tabs.tabs_visible = false
+	tabs.use_hidden_tabs_for_min_size = false
+	toolbar = GridContainer.new()
+	toolbar.columns = 6
+	toolbar.add_theme_constant_override("h_separation", 8)
+	toolbar.add_theme_constant_override("v_separation", 8)
+	root.add_child(toolbar)
+	for caption: String in ["Build", "Ships", "Research", "Gate/Travel", "Outposts/Regions", "Trade/Contacts"]:
+		var button := Button.new()
+		button.text = caption
+		button.custom_minimum_size.y = 44
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.add_theme_font_size_override("font_size", 14)
+		button.add_theme_stylebox_override("normal", _style(Color("172738"), Color("304557")))
+		button.add_theme_stylebox_override("hover", _style(Color("25404b"), CYAN))
+		button.pressed.connect(func() -> void: open_menu(caption))
+		toolbar.add_child(button)
+		menu_buttons[caption] = button
+	research_button.get_parent().remove_child(research_button)
+	research_button.queue_free()
+	research_button = menu_buttons["Research"]
+	_wrap_panel(panel, "Build / Ships")
+	_wrap_panel(research_panel, "Research")
+	_wrap_panel(gate_panel, "Gate / Travel")
+	_install_secondary_panels()
+	get_viewport().size_changed.connect(_layout_menus)
+	close_panels()
+	_layout_menus()
+
+func _install_secondary_panels() -> void:
+	for id: int in panel_closes.keys():
+		if not is_instance_valid(panel_closes[id]) or not panel_closes[id].is_inside_tree(): panel_closes.erase(id)
+	managed_panels = managed_panels.filter(func(item: PanelContainer) -> bool: return is_instance_valid(item) and item.is_inside_tree())
+	_wrap_panel(sector_map, "Home sectors / Exploration")
+	_wrap_panel(trade_panel, "Trade / Contacts")
+	_wrap_panel(region_navigation.panel, "Outposts / Regions")
+	# The existing Home-sector action lives alongside the region overview.
+	map_button.reparent(region_navigation.panel.get_node("MenuFrame/Content/Body"))
+	map_button.get_parent().move_child(map_button, 0)
+	map_button.text = "Home sectors / Exploration"
+	map_button.custom_minimum_size.y = 44
+	_layout_menus()
+
+func _wrap_panel(target: PanelContainer, title: String) -> void:
+	var children := target.get_children()
+	var frame := VBoxContainer.new()
+	frame.name = "MenuFrame"
+	target.add_child(frame)
+	var heading := HBoxContainer.new()
+	frame.add_child(heading)
+	var label := _label(heading, title, 18, CYAN)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var close := Button.new()
+	close.text = "Close ×"
+	close.custom_minimum_size = Vector2(88, 44)
+	close.pressed.connect(close_panels)
+	heading.add_child(close)
+	panel_closes[target.get_instance_id()] = close
+	var view: Node = region_navigation if target == region_navigation.panel else target
+	if view != panel:
+		var old_close: Button = view.close_button
+		old_close.get_parent().hide()
+		view.close_button = close
+		if target == sector_map:
+			sector_map.contacts_button.reparent(heading)
+			heading.move_child(sector_map.contacts_button, 1)
+	var scroll := ScrollContainer.new()
+	scroll.name = "Content"
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	frame.add_child(scroll)
+	var body := VBoxContainer.new()
+	body.name = "Body"
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(body)
+	for child: Node in children: child.reparent(body)
+	target.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	target.custom_minimum_size = Vector2.ZERO
+	var panel_style := target.get_theme_stylebox("panel").duplicate()
+	for side: String in ["left", "right", "top", "bottom"]: panel_style.set("content_margin_" + side, 10.0)
+	target.add_theme_stylebox_override("panel", panel_style)
+	managed_panels.append(target)
+	_touch_targets(target)
+	target.hide()
+
+func _touch_targets(node: Node) -> void:
+	if node is BaseButton: node.custom_minimum_size.y = maxf(node.custom_minimum_size.y, 44)
+	for child: Node in node.get_children(): _touch_targets(child)
+
+func _layout_menus() -> void:
+	if not is_instance_valid(toolbar): return
+	var viewport_size := get_viewport().get_visible_rect().size
+	toolbar.columns = 6 if viewport_size.x >= 900 else 3
+	toolbar.position = Vector2(28, 84)
+	toolbar.size = Vector2(viewport_size.x - 56, 44 if toolbar.columns == 6 else 96)
+	var top: float = toolbar.position.y + toolbar.size.y + 40
+	region_navigation.location_label.position = Vector2(40, top - 32)
+	region_navigation.location_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	orbit_label.hide() # Replaced by the always-visible location indicator and Regions details.
+	for target: PanelContainer in managed_panels:
+		var width: float = minf(380 if target == panel else 820, viewport_size.x - 56)
+		target.position = Vector2(viewport_size.x - width - 28, top)
+		target.size = Vector2(width, maxf(100, viewport_size.y - top - 84))
+
+func close_panels() -> void:
+	if is_instance_valid(dev_panel): dev_panel.hide()
+	for target: PanelContainer in managed_panels:
+		if is_instance_valid(target): target.hide()
+	active_menu = ""
+	for button: Button in menu_buttons.values(): button.add_theme_stylebox_override("normal", _style(Color("172738"), Color("304557")))
+
+func activate_panel(target: PanelContainer, menu: String) -> void:
+	close_panels()
+	choose("")
+	active_menu = menu
+	for readout: Control in [refinery_label, level_label, count_label, goal_bar, goal_label]: readout.visible = menu != "Ships"
+	if target == panel: target.get_node("MenuFrame").get_child(0).get_child(0).text = menu
+	menu_buttons[menu].add_theme_stylebox_override("normal", _style(Color("25404b"), CYAN))
+	target.show()
+	_touch_targets(target)
+	_layout_menus()
+
+func open_menu(menu: String) -> void:
+	if active_menu == menu and managed_panels.any(func(target: PanelContainer) -> bool: return target.visible):
+		close_panels()
+		return
+	match menu:
+		"Build", "Ships":
+			activate_panel(panel, menu)
+			tabs.current_tab = 0 if menu == "Build" else 1
+		"Research": research_panel.open_panel()
+		"Gate/Travel": gate_panel.open_panel()
+		"Outposts/Regions": region_navigation.open_region(fleet.regions.current_region)
+		"Trade/Contacts": trade_panel.open_contacts()
+
+func _input(event: InputEvent) -> void:
+	if DevConfig.DEBUG_MODE and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F9:
+		dev_panel.toggle()
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("ui_cancel"):
+		close_panels()
+		choose("")
+		get_viewport().set_input_as_handled()

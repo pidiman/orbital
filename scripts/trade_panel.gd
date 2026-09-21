@@ -80,10 +80,7 @@ func selected_contact() -> String:
 	return str(contact_picker.get_item_metadata(contact_picker.selected)) if contact_picker.selected >= 0 else ""
 
 func open_contacts(ship_id: int = -1) -> void:
-	if is_instance_valid(hud.research_panel):
-		hud.research_panel.hide()
-	hud.choose("")
-	hud.sector_map.hide()
+	hud.activate_panel(self, "Trade/Contacts")
 	refresh()
 	if ship_id > 0:
 		for index in range(ship_picker.item_count):

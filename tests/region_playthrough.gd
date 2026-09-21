@@ -17,12 +17,12 @@ func _ready() -> void:
 	await page(1)
 	game.hud.ship_buttons.scout.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.scout)
 	await settle(2)
-	await click(game.hud.ship_buttons.scout.get_global_rect().get_center())
+	await use(game.hud.ship_buttons.scout)
 	var scout: int = game.model.next_ship_id
 	await gather(45)
 	game.hud.ship_buttons.miner.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.miner)
 	await settle(2)
-	await click(game.hud.ship_buttons.miner.get_global_rect().get_center())
+	await use(game.hud.ship_buttons.miner)
 	var miner: int = game.model.next_ship_id
 	var nav: Control = game.hud.region_navigation
 	checks["home_indicator_and_overview"] = nav.location_label.text.contains("HOME") and nav.region_buttons.size() == 4
@@ -30,15 +30,15 @@ func _ready() -> void:
 	var legacy: Dictionary = game.persistence.snapshot()
 	legacy.extensions.erase("regions")
 	var station_positions: Dictionary = game.model.modules.duplicate(true)
-	await click(nav.region_buttons.venus.get_global_rect().get_center())
+	await use(nav.region_buttons.venus)
 	checks["unexplored_region_panel"] = nav.panel.visible and nav.status_label.text == "UNKNOWN" and nav.jump_button.disabled
 	checks["scout_travel_duration"] = nav.scout_picker.get_selected_id() == scout and nav.send_button.text.contains("6s")
-	await click(nav.send_button.get_global_rect().get_center())
+	await use(nav.send_button)
 	checks["adjacent_survey_started"] = game.fleet.regions.survey_jobs.has(scout) and nav.status_label.text.contains("SURVEYING")
 	checks["region_survey_autosaved"] = not game.persistence.dirty and FileAccess.file_exists(test_path)
 	await wait_region("venus")
 	checks["survey_unlocks_random_content"] = not nav.jump_button.disabled and game.fleet.regions.records.venus.asteroid_ids.size() >= 2
-	await click(nav.jump_button.get_global_rect().get_center())
+	await use(nav.jump_button)
 	checks["jump_changes_indicator"] = game.fleet.regions.current_region == "venus" and nav.location_label.text.contains("VENUS")
 	checks["planet_replaces_home_view"] = not game.background.visible and not game.board.visible and game.region_view.visible and not game.debris.visible
 	checks["regional_asteroids_rendered"] = game.asteroids.rocks.size() == game.fleet.regions.records.venus.asteroid_ids.size()
@@ -46,17 +46,17 @@ func _ready() -> void:
 	await settle(3)
 	save_frame("venus_region")
 	var target: int = game.fleet.regions.records.venus.asteroid_ids[0]
-	await click(game.hud.command_buttons[miner].get_global_rect().get_center())
+	await use(game.hud.command_buttons[miner])
 	await click(game.asteroids.rocks[target].point)
 	checks["regional_click_requires_local_miner"] = not game.fleet.jobs.has(miner) and game.hud.status_label.text.contains("Teleport Gate")
 	game.get_node("ResourceClock").set_process(false)
-	await click(game.hud.save_button.get_global_rect().get_center())
+	await use(game.hud.save_button)
 	var expected: Dictionary = game.persistence.snapshot()
 	var markers: Dictionary = game.asteroids.rocks.duplicate(true)
 	game.persistence.autosave_blocked = true
-	await click(nav.region_buttons.home.get_global_rect().get_center())
+	await use(nav.region_buttons.home)
 	checks["home_return_restores_original_view"] = game.background.visible and game.board.visible and game.fleet.regions.current_region == "home"
-	await click(game.hud.load_button.get_global_rect().get_center())
+	await use(game.hud.load_button)
 	nav = game.hud.region_navigation
 	checks["save_load_exact_remote_state"] = game.persistence.snapshot() == expected
 	checks["save_load_location_and_content_visible"] = nav.location_label.text.contains("VENUS") and game.asteroids.rocks == markers and not game.board.visible
@@ -78,7 +78,7 @@ func _ready() -> void:
 	checks["remote_startup_rebuilds_planet_view"] = nav.location_label.text.contains("VENUS") and not game.board.visible and game.region_view.visible
 	game.get_node("ResourceClock").set_process(false)
 	game.process_mode = Node.PROCESS_MODE_INHERIT
-	await click(nav.region_buttons.home.get_global_rect().get_center())
+	await use(nav.region_buttons.home)
 	game.get_node("ResourceClock").set_process(true)
 	var before: int = game.model.minerals
 	var attempts: int = 0
@@ -87,19 +87,19 @@ func _ready() -> void:
 		await get_tree().create_timer(0.1).timeout
 	checks["blocked_remote_mining_does_not_credit_home"] = game.model.minerals == before and game.fleet.regions.current_region == "home"
 	# Multi-hop route: survey Mars, visit it, then scout Pluto.
-	await click(nav.region_buttons.pluto.get_global_rect().get_center())
+	await use(nav.region_buttons.pluto)
 	checks["pluto_blocked_from_home"] = nav.send_button.disabled and nav.jump_button.disabled
-	await click(nav.route_buttons.mars.get_global_rect().get_center())
-	await click(nav.send_button.get_global_rect().get_center())
+	await use(nav.route_buttons.mars)
+	await use(nav.send_button)
 	await wait_region("mars")
-	await click(nav.jump_button.get_global_rect().get_center())
+	await use(nav.jump_button)
 	await settle(3)
 	save_frame("mars_region")
-	await click(nav.region_buttons.pluto.get_global_rect().get_center())
+	await use(nav.region_buttons.pluto)
 	checks["pluto_adjacent_from_mars"] = not nav.send_button.disabled
-	await click(nav.send_button.get_global_rect().get_center())
+	await use(nav.send_button)
 	await wait_region("pluto")
-	await click(nav.jump_button.get_global_rect().get_center())
+	await use(nav.jump_button)
 	checks["multi_hop_pluto_location"] = nav.location_label.text.contains("PLUTO") and game.fleet.regions.current_region == "pluto"
 	await settle(3)
 	save_frame("pluto_region")
@@ -109,7 +109,7 @@ func _ready() -> void:
 	var file := FileAccess.open(test_path, FileAccess.WRITE)
 	file.store_string(JSON.stringify(legacy, "\t", false, true))
 	file.close()
-	await click(game.hud.load_button.get_global_rect().get_center())
+	await use(game.hud.load_button)
 	checks["old_save_loads_home_ui"] = game.fleet.regions.current_region == "home" and game.hud.region_navigation.location_label.text.contains("HOME") and game.board.visible and game.background.visible
 	checks["old_save_preserves_core_state"] = game.persistence.snapshot().state == legacy.state
 	checks["runtime_stays_2d"] = no_3d(game)
@@ -128,8 +128,8 @@ func wait_region(region_id: String) -> void:
 	await settle(3)
 
 func page(index: int) -> void:
-	var bar: TabBar = game.hud.tabs.get_tab_bar()
-	await click(bar.global_position + bar.get_tab_rect(index).get_center())
+	var menu: String = "Build" if index == 0 else "Ships"
+	if game.hud.active_menu != menu: await click(game.hud.menu_buttons[menu].get_global_rect().get_center())
 
 func no_3d(node: Node) -> bool:
 	if node.is_class("Node3D"):
@@ -158,6 +158,26 @@ func click(point: Vector2) -> void:
 
 func select(kind: String) -> void:
 	var button: Button = game.hud.tool_buttons[kind]
+	await use(button)
+
+func use(button: Control) -> void:
+	var hud = game.hud
+	if not button.is_visible_in_tree():
+		var menu: String = ""
+		if hud.tool_buttons.values().has(button): menu = "Build"
+		elif hud.region_navigation.panel.is_ancestor_of(button) or button == hud.map_button: menu = "Outposts/Regions"
+		elif hud.panel.is_ancestor_of(button): menu = "Ships"
+		elif hud.gate_panel.is_ancestor_of(button): menu = "Gate/Travel"
+		elif hud.research_panel.is_ancestor_of(button): menu = "Research"
+		elif hud.trade_panel.is_ancestor_of(button): menu = "Trade/Contacts"
+		if not menu.is_empty():
+			if hud.active_menu == menu: await click(hud.menu_buttons[menu].get_global_rect().get_center())
+			await click(hud.menu_buttons[menu].get_global_rect().get_center())
+	var ancestor: Node = button.get_parent()
+	while ancestor != null:
+		if ancestor is ScrollContainer: ancestor.ensure_control_visible(button)
+		ancestor = ancestor.get_parent()
+	await settle(2)
 	await click(button.get_global_rect().get_center())
 
 func gather(target: int) -> void:

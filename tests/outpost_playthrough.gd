@@ -43,11 +43,11 @@ func _ready() -> void:
 	checks.home_message = game.hud.status_label.text.contains("non-Home")
 	game.fleet._discover_region("venus")
 	game.fleet.diplomacy.inventory.xenocrystal = 2
-	await use(game.hud.research_button)
+	await use(game.hud.menu_buttons["Gate/Travel"])
 	pick_ship(jump)
-	await use(game.hud.research_panel.jump_button)
+	await use(game.hud.gate_panel.jump_button)
 	checks.jump_paid = game.fleet.transport.jobs.has(jump) and game.fleet.diplomacy.inventory.xenocrystal == 1
-	await use(game.hud.research_panel.close_button)
+	await use(game.hud.gate_panel.close_button)
 	checks.transit_blocks_founding = game.hud.capability_buttons[jump].founding.disabled
 	game.get_node("ResourceClock").set_process(true)
 	await arrive(jump)
@@ -75,11 +75,11 @@ func _ready() -> void:
 	save_frame("outpost_founded")
 	checks.panel_fits = game.hud.panel.get_global_rect().end.y <= game.get_viewport_rect().size.y - 68
 	report("panel_geometry", {"panel":str(game.hud.panel.get_global_rect()), "viewport":str(game.get_viewport_rect())})
-	await use(game.hud.research_button)
+	await use(game.hud.menu_buttons["Gate/Travel"])
 	pick_ship(miner)
-	await use(game.hud.research_panel.jump_button)
+	await use(game.hud.gate_panel.jump_button)
 	checks.miner_gate_paid = game.fleet.transport.jobs.has(miner) and game.fleet.diplomacy.inventory.xenocrystal == 0
-	await use(game.hud.research_panel.close_button)
+	await use(game.hud.gate_panel.close_button)
 	game.get_node("ResourceClock").set_process(true)
 	await arrive(miner)
 	game.get_node("ResourceClock").set_process(false)
@@ -121,7 +121,7 @@ func _ready() -> void:
 	finish()
 
 func pick_ship(ship_id: int) -> void:
-	var panel: PanelContainer = game.hud.research_panel
+	var panel: PanelContainer = game.hud.gate_panel
 	for i in range(panel.ship_picker.item_count):
 		if panel.ship_picker.get_item_id(i) == ship_id: panel.ship_picker.select(i)
 	panel.refresh()
@@ -134,10 +134,17 @@ func arrive(ship_id: int) -> void:
 	await settle(2)
 
 func page(index: int) -> void:
-	var bar: TabBar = game.hud.tabs.get_tab_bar()
-	await click(bar.global_position + bar.get_tab_rect(index).get_center())
+	var menu: String = "Build" if index == 0 else "Ships"
+	if game.hud.active_menu != menu: await click(game.hud.menu_buttons[menu].get_global_rect().get_center())
 
 func use(button: Control) -> void:
+	if not button.is_visible_in_tree():
+		var menu: String = ""
+		if game.hud.tool_buttons.values().has(button): menu = "Build"
+		elif game.hud.region_navigation.region_buttons.values().has(button): menu = "Outposts/Regions"
+		elif game.hud.panel.is_ancestor_of(button): menu = "Ships"
+		if not menu.is_empty():
+			await click(game.hud.menu_buttons[menu].get_global_rect().get_center())
 	var ancestor: Node = button.get_parent()
 	while ancestor != null:
 		if ancestor is ScrollContainer:

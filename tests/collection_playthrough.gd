@@ -13,9 +13,9 @@ func _ready() -> void:
 	await page(1)
 	game.hud.ship_buttons.material_ship.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.material_ship)
 	await settle(2)
-	await click(game.hud.ship_buttons.material_ship.get_global_rect().get_center())
+	await use(game.hud.ship_buttons.material_ship)
 	var ship_id: int = game.model.next_ship_id
-	await click(game.hud.command_buttons[ship_id].get_global_rect().get_center())
+	await use(game.hud.command_buttons[ship_id])
 	checks.no_depot_message = game.hud.status_label.text.contains("Space Depot")
 	await gather(35)
 	await page(0)
@@ -23,7 +23,7 @@ func _ready() -> void:
 	await click(game.board.cell_position(Vector2i(-1, 0)))
 	checks.depot_built = game.model.modules.get(Vector2(-58, 0)) == "space_depot"
 	await page(1)
-	await click(game.hud.command_buttons[ship_id].get_global_rect().get_center())
+	await use(game.hud.command_buttons[ship_id])
 	checks.deployed = game.supply.collection.jobs.has(ship_id)
 	var attempts: int = 0
 	while game.supply.collection.depots[Vector2(-58, 0)].delivered < 3 and attempts < 800:
@@ -48,7 +48,7 @@ func _ready() -> void:
 	game.get_node("ResourceClock").set_process(true)
 	game.hud.ship_buttons.scout.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.scout)
 	await settle(2)
-	await click(game.hud.ship_buttons.scout.get_global_rect().get_center())
+	await use(game.hud.ship_buttons.scout)
 	await settle(15)
 	checks.resume_after_purchase = not game.supply.collection.jobs[ship_id].waiting
 	checks.only_2d = no_3d(game)
@@ -57,8 +57,8 @@ func _ready() -> void:
 	finish()
 
 func page(index: int) -> void:
-	var bar: TabBar = game.hud.tabs.get_tab_bar()
-	await click(bar.global_position + bar.get_tab_rect(index).get_center())
+	var menu: String = "Build" if index == 0 else "Ships"
+	if game.hud.active_menu != menu: await click(game.hud.menu_buttons[menu].get_global_rect().get_center())
 
 func no_3d(node: Node) -> bool:
 	if node.is_class("Node3D"):
@@ -87,6 +87,26 @@ func click(point: Vector2) -> void:
 
 func select(kind: String) -> void:
 	var button: Button = game.hud.tool_buttons[kind]
+	await use(button)
+
+func use(button: Control) -> void:
+	var hud = game.hud
+	if not button.is_visible_in_tree():
+		var menu: String = ""
+		if hud.tool_buttons.values().has(button): menu = "Build"
+		elif hud.region_navigation.panel.is_ancestor_of(button) or button == hud.map_button: menu = "Outposts/Regions"
+		elif hud.panel.is_ancestor_of(button): menu = "Ships"
+		elif hud.gate_panel.is_ancestor_of(button): menu = "Gate/Travel"
+		elif hud.research_panel.is_ancestor_of(button): menu = "Research"
+		elif hud.trade_panel.is_ancestor_of(button): menu = "Trade/Contacts"
+		if not menu.is_empty():
+			if hud.active_menu == menu: await click(hud.menu_buttons[menu].get_global_rect().get_center())
+			await click(hud.menu_buttons[menu].get_global_rect().get_center())
+	var ancestor: Node = button.get_parent()
+	while ancestor != null:
+		if ancestor is ScrollContainer: ancestor.ensure_control_visible(button)
+		ancestor = ancestor.get_parent()
+	await settle(2)
 	await click(button.get_global_rect().get_center())
 
 func gather(target: int) -> void:

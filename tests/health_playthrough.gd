@@ -11,12 +11,12 @@ func _ready() -> void:
 	await select("storage")
 	await click(game.board.cell_position(Vector2i(1, 0)))
 	checks["zero_power_reproduced"] = game.model.power_balance() == 0
-	await click(game.hud.root.find_child("CancelButton", true, false).get_global_rect().get_center())
+	await use(game.hud.root.find_child("CancelButton", true, false))
 	await click(game.board.cell_position(Vector2i(1, 0)))
 	checks["demolish_action_available_at_zero_power"] = not game.hud.demolish_button.disabled and game.hud.demolish_button.text.contains("12 M")
 	save_frame("decommission_module")
 	var before: int = game.model.materials
-	await click(game.hud.demolish_button.get_global_rect().get_center())
+	await use(game.hud.demolish_button)
 	checks["ui_demolition_refund_and_space"] = game.model.materials == before + 12 and game.model.power_balance() == 1 and not game.model.modules.has(Vector2(58, 0))
 	await page(0)
 	await select("solar")
@@ -26,24 +26,24 @@ func _ready() -> void:
 	await page(1)
 	game.hud.ship_buttons.miner.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.miner)
 	await settle(2)
-	await click(game.hud.ship_buttons.miner.get_global_rect().get_center())
+	await use(game.hud.ship_buttons.miner)
 	var miner: int = game.model.next_ship_id
 	var target: int = game.asteroids.rocks.keys()[0]
-	await click(game.hud.command_buttons[miner].get_global_rect().get_center())
+	await use(game.hud.command_buttons[miner])
 	await click(game.asteroids.rocks[target].point)
 	checks["busy_miner_before_sale"] = game.fleet.jobs.has(miner)
 	before = game.model.materials
 	save_frame("decommission_ship")
-	await click(game.hud.sell_buttons[miner].get_global_rect().get_center())
+	await use(game.hud.sell_buttons[miner])
 	checks["ui_ship_sale"] = not game.model.ships.has(miner) and game.model.materials == before + 22 and game.model.power_balance() == 6
 	checks["ui_busy_mission_release"] = not game.fleet.asteroids[target].claimed and game.fleet.jobs.is_empty() and not game.hud.command_buttons.has(miner)
 	await gather(35)
 	game.hud.ship_buttons.scout.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.scout)
 	await settle(2)
-	await click(game.hud.ship_buttons.scout.get_global_rect().get_center())
+	await use(game.hud.ship_buttons.scout)
 	var scout: int = game.model.next_ship_id
-	await click(game.hud.command_buttons[scout].get_global_rect().get_center())
-	await click(game.hud.sell_buttons[scout].get_global_rect().get_center())
+	await use(game.hud.command_buttons[scout])
+	await use(game.hud.sell_buttons[scout])
 	checks["ui_scout_sale_releases_sector"] = game.fleet.survey_jobs.is_empty() and game.fleet.sector_state("dawn") == "unexplored"
 	# Removing both visual fields must not stop supply simulation or create duplicate spawns.
 	var supply_time: float = game.supply.elapsed
@@ -80,7 +80,7 @@ func _ready() -> void:
 	game.model.changed.emit()
 	checks["full_station_at_zero"] = game.model.modules.size() == 81 and game.model.power_balance() == 0
 	await click(game.board.world_to_screen(positions[0]))
-	await click(game.hud.demolish_button.get_global_rect().get_center())
+	await use(game.hud.demolish_button)
 	checks["full_station_ui_demolition"] = game.model.modules.size() == 80 and game.model.power_balance() == 1
 	await gather(20)
 	await page(0)
@@ -92,8 +92,8 @@ func _ready() -> void:
 	finish()
 
 func page(index: int) -> void:
-	var bar: TabBar = game.hud.tabs.get_tab_bar()
-	await click(bar.global_position + bar.get_tab_rect(index).get_center())
+	var menu: String = "Build" if index == 0 else "Ships"
+	if game.hud.active_menu != menu: await click(game.hud.menu_buttons[menu].get_global_rect().get_center())
 
 func no_3d(node: Node) -> bool:
 	if node.is_class("Node3D"):
@@ -122,7 +122,7 @@ func click(point: Vector2) -> void:
 
 func select(kind: String) -> void:
 	var button: Button = game.hud.tool_buttons[kind]
-	await click(button.get_global_rect().get_center())
+	await use(button)
 
 func gather(target: int) -> void:
 	var attempts: int = 0
@@ -139,3 +139,23 @@ func gather(target: int) -> void:
 			await click(point)
 			if game.model.materials > before:
 				checks["debris_collection"] = true
+
+func use(button: Control) -> void:
+	var hud = game.hud
+	if not button.is_visible_in_tree():
+		var menu: String = ""
+		if hud.tool_buttons.values().has(button): menu = "Build"
+		elif hud.region_navigation.panel.is_ancestor_of(button) or button == hud.map_button: menu = "Outposts/Regions"
+		elif hud.panel.is_ancestor_of(button): menu = "Ships"
+		elif hud.gate_panel.is_ancestor_of(button): menu = "Gate/Travel"
+		elif hud.research_panel.is_ancestor_of(button): menu = "Research"
+		elif hud.trade_panel.is_ancestor_of(button): menu = "Trade/Contacts"
+		if not menu.is_empty():
+			if hud.active_menu == menu: await click(hud.menu_buttons[menu].get_global_rect().get_center())
+			await click(hud.menu_buttons[menu].get_global_rect().get_center())
+	var ancestor: Node = button.get_parent()
+	while ancestor != null:
+		if ancestor is ScrollContainer: ancestor.ensure_control_visible(button)
+		ancestor = ancestor.get_parent()
+	await settle(2)
+	await click(button.get_global_rect().get_center())

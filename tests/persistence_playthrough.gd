@@ -19,20 +19,20 @@ func _ready() -> void:
 	await page(1)
 	game.hud.ship_buttons.miner.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.miner)
 	await settle(2)
-	await click(game.hud.ship_buttons.miner.get_global_rect().get_center())
+	await use(game.hud.ship_buttons.miner)
 	var miner: int = game.model.next_ship_id
 	await gather(35)
 	game.hud.ship_buttons.scout.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.scout)
 	await settle(2)
-	await click(game.hud.ship_buttons.scout.get_global_rect().get_center())
+	await use(game.hud.ship_buttons.scout)
 	var scout: int = game.model.next_ship_id
-	await click(game.hud.command_buttons[miner].get_global_rect().get_center())
+	await use(game.hud.command_buttons[miner])
 	var asteroid_id: int = game.asteroids.rocks.keys()[0]
 	await click(game.asteroids.rocks[asteroid_id].point)
-	await click(game.hud.command_buttons[scout].get_global_rect().get_center())
+	await use(game.hud.command_buttons[scout])
 	game.get_node("ResourceClock").set_process(false)
 	checks["active_jobs_before_save"] = game.fleet.jobs.has(miner) and game.fleet.survey_jobs.has(scout)
-	await click(game.hud.save_button.get_global_rect().get_center())
+	await use(game.hud.save_button)
 	checks["save_button_feedback"] = game.hud.status_label.text.contains("Colony saved")
 	var expected: Dictionary = game.persistence.snapshot()
 	var next_id: int = game.model.next_ship_id
@@ -41,11 +41,11 @@ func _ready() -> void:
 	save_frame("saved_active_jobs")
 	# Simulate an unsaved change without allowing autosave to replace the checkpoint.
 	game.persistence.enabled = false
-	await click(game.hud.sell_buttons[miner].get_global_rect().get_center())
+	await use(game.hud.sell_buttons[miner])
 	checks["session_changed_after_save"] = not game.model.ships.has(miner)
 	game.persistence.enabled = true
 	game.persistence.autosave_blocked = true
-	await click(game.hud.load_button.get_global_rect().get_center())
+	await use(game.hud.load_button)
 	checks["load_button_restores_exact_state"] = game.persistence.snapshot() == expected
 	checks["load_restores_jobs_and_ids"] = game.fleet.jobs[miner].remaining == mining_remaining and game.fleet.survey_jobs[scout].remaining == survey_remaining and game.model.next_ship_id == next_id
 	checks["load_refreshes_hud_and_views"] = game.hud.command_buttons.has(miner) and game.asteroids.rocks.has(asteroid_id) and game.hud.materials_label.text.begins_with(str(game.model.materials) + " /")
@@ -91,8 +91,8 @@ func _ready() -> void:
 	finish()
 
 func page(index: int) -> void:
-	var bar: TabBar = game.hud.tabs.get_tab_bar()
-	await click(bar.global_position + bar.get_tab_rect(index).get_center())
+	var menu: String = "Build" if index == 0 else "Ships"
+	if game.hud.active_menu != menu: await click(game.hud.menu_buttons[menu].get_global_rect().get_center())
 
 func no_3d(node: Node) -> bool:
 	if node.is_class("Node3D"):
@@ -121,7 +121,7 @@ func click(point: Vector2) -> void:
 
 func select(kind: String) -> void:
 	var button: Button = game.hud.tool_buttons[kind]
-	await click(button.get_global_rect().get_center())
+	await use(button)
 
 func gather(target: int) -> void:
 	var attempts: int = 0
@@ -138,3 +138,23 @@ func gather(target: int) -> void:
 			await click(point)
 			if game.model.materials > before:
 				checks["debris_collection"] = true
+
+func use(button: Control) -> void:
+	var hud = game.hud
+	if not button.is_visible_in_tree():
+		var menu: String = ""
+		if hud.tool_buttons.values().has(button): menu = "Build"
+		elif hud.region_navigation.panel.is_ancestor_of(button) or button == hud.map_button: menu = "Outposts/Regions"
+		elif hud.panel.is_ancestor_of(button): menu = "Ships"
+		elif hud.gate_panel.is_ancestor_of(button): menu = "Gate/Travel"
+		elif hud.research_panel.is_ancestor_of(button): menu = "Research"
+		elif hud.trade_panel.is_ancestor_of(button): menu = "Trade/Contacts"
+		if not menu.is_empty():
+			if hud.active_menu == menu: await click(hud.menu_buttons[menu].get_global_rect().get_center())
+			await click(hud.menu_buttons[menu].get_global_rect().get_center())
+	var ancestor: Node = button.get_parent()
+	while ancestor != null:
+		if ancestor is ScrollContainer: ancestor.ensure_control_visible(button)
+		ancestor = ancestor.get_parent()
+	await settle(2)
+	await click(button.get_global_rect().get_center())

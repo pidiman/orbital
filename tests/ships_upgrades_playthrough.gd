@@ -7,8 +7,8 @@ func mark(label: String) -> void:
 	timeline.append({"label": label, "frame": Engine.get_process_frames(), "materials": game.model.materials, "minerals": game.model.minerals, "modules": game.model.modules.size(), "ships": game.model.ships.size(), "power": game.model.power_balance(), "mined": game.fleet.total_mined})
 
 func page(index: int) -> void:
-	var bar: TabBar = game.hud.tabs.get_tab_bar()
-	await click(bar.global_position + bar.get_tab_rect(index).get_center())
+	var menu: String = "Build" if index == 0 else "Ships"
+	if game.hud.active_menu != menu: await click(game.hud.menu_buttons[menu].get_global_rect().get_center())
 
 func _ready() -> void:
 	await super._ready()
@@ -39,7 +39,7 @@ func _ready() -> void:
 	var materials_before: int = game.model.materials
 	game.hud.ship_buttons.miner.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.miner)
 	await settle(2)
-	await click(game.hud.ship_buttons.miner.get_global_rect().get_center())
+	await use(game.hud.ship_buttons.miner)
 	var miner: int = game.model.next_ship_id
 	checks["independent_miner_purchased"] = game.model.ships.get(miner) == "miner" and game.model.materials == materials_before - 45
 	checks["ship_uses_power_not_grid"] = game.model.power_balance() == 4 and game.model.modules.size() == 2 and game.model.level == 1
@@ -47,10 +47,10 @@ func _ready() -> void:
 	await gather(35)
 	game.hud.ship_buttons.scout.get_parent().get_parent().ensure_control_visible(game.hud.ship_buttons.scout)
 	await settle(2)
-	await click(game.hud.ship_buttons.scout.get_global_rect().get_center())
+	await use(game.hud.ship_buttons.scout)
 	var scout: int = game.model.next_ship_id
 	checks["scout_purchased"] = game.model.ships.get(scout) == "scout" and game.model.power_balance() == 3
-	await click(game.hud.command_buttons[scout].get_global_rect().get_center())
+	await use(game.hud.command_buttons[scout])
 	checks["scout_survey_started"] = game.fleet.survey_jobs.has(scout)
 	await gather(30)
 	var attempts: int = 0
@@ -67,7 +67,7 @@ func _ready() -> void:
 		report("checks", checks)
 		finish()
 		return
-	await click(game.hud.command_buttons[miner].get_global_rect().get_center())
+	await use(game.hud.command_buttons[miner])
 	checks["explicit_miner_selected"] = game.asteroids.selected_ship == miner
 	await click(game.asteroids.rocks[rich_target].point)
 	checks["assigned_target_reserved"] = game.fleet.jobs.has(miner) and game.fleet.jobs[miner].target == rich_target and game.fleet.asteroids[rich_target].claimed
@@ -98,7 +98,7 @@ func _ready() -> void:
 	materials_before = game.model.materials
 	var mineral_before: int = game.model.minerals
 	var power_before: int = game.model.power_balance()
-	await click(game.hud.upgrade_button.get_global_rect().get_center())
+	await use(game.hud.upgrade_button)
 	checks["upgrade_applies_stats"] = game.model.tier_at(Vector2(58, 0)) == 2 and game.model.power_balance() == power_before + 4
 	checks["upgrade_pays_both_costs"] = game.model.materials == materials_before - 30 and game.model.minerals == mineral_before - 8
 	checks["tier_and_max_shown"] = game.hud.upgrade_title.text.contains("Tier 2") and game.hud.upgrade_button.disabled and game.hud.upgrade_button.text == "Maximum tier"
@@ -137,7 +137,7 @@ func click(point: Vector2) -> void:
 
 func select(kind: String) -> void:
 	var button: Button = game.hud.tool_buttons[kind]
-	await click(button.get_global_rect().get_center())
+	await use(button)
 
 func gather(target: int) -> void:
 	var attempts: int = 0
@@ -154,3 +154,23 @@ func gather(target: int) -> void:
 			await click(point)
 			if game.model.materials > before:
 				checks["debris_collection"] = true
+
+func use(button: Control) -> void:
+	var hud = game.hud
+	if not button.is_visible_in_tree():
+		var menu: String = ""
+		if hud.tool_buttons.values().has(button): menu = "Build"
+		elif hud.region_navigation.panel.is_ancestor_of(button) or button == hud.map_button: menu = "Outposts/Regions"
+		elif hud.panel.is_ancestor_of(button): menu = "Ships"
+		elif hud.gate_panel.is_ancestor_of(button): menu = "Gate/Travel"
+		elif hud.research_panel.is_ancestor_of(button): menu = "Research"
+		elif hud.trade_panel.is_ancestor_of(button): menu = "Trade/Contacts"
+		if not menu.is_empty():
+			if hud.active_menu == menu: await click(hud.menu_buttons[menu].get_global_rect().get_center())
+			await click(hud.menu_buttons[menu].get_global_rect().get_center())
+	var ancestor: Node = button.get_parent()
+	while ancestor != null:
+		if ancestor is ScrollContainer: ancestor.ensure_control_visible(button)
+		ancestor = ancestor.get_parent()
+	await settle(2)
+	await click(button.get_global_rect().get_center())

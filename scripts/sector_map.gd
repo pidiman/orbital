@@ -109,7 +109,7 @@ func make_button(parent: Node, text: String) -> Button:
 	return button
 
 func open_map() -> void:
-	hud.choose("")
+	hud.activate_panel(self, "Outposts/Regions")
 	refresh()
 	show()
 

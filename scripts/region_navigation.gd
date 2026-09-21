@@ -103,6 +103,11 @@ func _ready() -> void:
 	fleet.changed.connect(refresh)
 	fleet.model.changed.connect(refresh)
 	refresh()
+	# Keep location persistent; region shortcuts belong inside the Regions menu.
+	location_label.reparent(hud.root)
+	overview.reparent(column)
+	overview.custom_minimum_size = Vector2.ZERO
+	column.move_child(overview, 1)
 	panel.hide()
 
 func _button(parent: Node, text: String) -> Button:
@@ -118,11 +123,7 @@ func _button(parent: Node, text: String) -> Button:
 	return button
 
 func open_region(region_id: String, ship_id: int = -1) -> void:
-	if is_instance_valid(hud.research_panel):
-		hud.research_panel.hide()
-	hud.choose("")
-	hud.sector_map.hide()
-	hud.trade_panel.hide()
+	hud.activate_panel(panel, "Outposts/Regions")
 	selected_region = region_id
 	refresh()
 	for index in range(scout_picker.item_count):
@@ -144,10 +145,7 @@ func _overview(region_id: String) -> void:
 func _jump(region_id: String) -> void:
 	var error: String = fleet.regions.jump(region_id)
 	if error.is_empty():
-		panel.hide()
-		hud.sector_map.hide()
-		hud.trade_panel.hide()
-		hud.research_panel.hide()
+		hud.close_panels()
 		hud.message("Location: %s. The station remains at Earth." % fleet.regions.catalog[region_id].name)
 	else:
 		hud.message(error, true)
