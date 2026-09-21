@@ -21,15 +21,15 @@ func _ready() -> void:
 	indicator.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	indicator.offset_left = -240
 	indicator.offset_right = 240
-	indicator.offset_top = 185
+	indicator.offset_top = 142
 	indicator.add_theme_font_size_override("font_size", 24)
 	indicator.add_theme_color_override("font_outline_color", Color("09111e"))
 	indicator.add_theme_constant_override("outline_size", 5)
 	indicator.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(indicator)
 	button = Button.new()
-	button.position = Vector2(220, 20)
-	button.size = Vector2(44, 44)
+	button.position = Vector2(112, 8)
+	button.size = Vector2(28, 28)
 	button.focus_mode = Control.FOCUS_NONE
 	button.pressed.connect(toggle)
 	add_child(button)

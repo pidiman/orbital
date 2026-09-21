@@ -138,6 +138,9 @@ func page(index: int) -> void:
 	if game.hud.active_menu != menu: await click(game.hud.menu_buttons[menu].get_global_rect().get_center())
 
 func use(button: Control) -> void:
+	if game.hud.menu_buttons.values().has(button) and not button.is_visible_in_tree():
+		await click(game.hud.more_button.get_global_rect().get_center())
+		await settle(2)
 	if game.hud.ship_context.is_ancestor_of(button) and not button.is_visible_in_tree():
 		for ship_id: int in game.hud.ship_entries:
 			if game.hud.ship_entries[ship_id].is_ancestor_of(button):
@@ -159,7 +162,9 @@ func use(button: Control) -> void:
 			ancestor.ensure_control_visible(button)
 		ancestor = ancestor.get_parent()
 	await settle(2)
-	await click(button.get_global_rect().get_center())
+	var point: Vector2 = button.get_global_rect().get_center()
+	if button.get_window() != game.get_window(): point += Vector2(button.get_window().position)
+	await click(point)
 
 func click(point: Vector2) -> void:
 	var down := InputEventMouseButton.new()

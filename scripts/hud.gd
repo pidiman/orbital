@@ -12,6 +12,8 @@ var gate_panel: PanelContainer
 var tech_label: Label
 var xenocrystal_label: Label
 var menu_scroll: ScrollContainer
+var more_button: Button
+var more_popup: PopupPanel
 var toolbar: GridContainer
 var title_label: Label
 var ship_tray: ScrollContainer
@@ -84,6 +86,7 @@ var tool_buttons: Dictionary = {}
 var selected: String = ""
 var status_time: float = 0.0
 var floating: Array[Dictionary] = []
+var compact_resources: HBoxContainer
 var resource_bar: PanelContainer
 var resource_status: HFlowContainer
 var panel: PanelContainer
@@ -344,16 +347,18 @@ func refresh() -> void:
 		tool_buttons[kind].visible = model.module_unlocked(kind)
 		tool_buttons[kind].disabled = not home
 	orbit_label.text = "EARTH  /  408 KM\nA small beginning. An infinite horizon." if home else "%s / EXPLORATION\n%s" % [str(fleet.regions.catalog[fleet.regions.current_region].name).to_upper(), fleet.outposts.short_summary(fleet.regions.current_region)]
-	tech_label.text = str(fleet.diplomacy.inventory.get("tech", 0))
-	xenocrystal_label.text = str(fleet.diplomacy.inventory.get("xenocrystal", 0))
-	minerals_label.text = str(model.minerals)
-	fleet_label.text = "MINERS  %d idle / %d total" % [fleet.idle_count(), fleet.mining_units().size()]
+	tech_label.text = "%s" % fleet.diplomacy.inventory.get("tech", 0)
+	xenocrystal_label.text = "%s" % fleet.diplomacy.inventory.get("xenocrystal", 0)
+	minerals_label.text = "%d" % model.minerals
+	fleet_label.text = "Miners %d idle / %d" % [fleet.idle_count(), fleet.mining_units().size()]
 	var refinery_count: int = model.module_count_with("conversion")
-	refinery_label.text = "REFINERIES  %d · %s" % [refinery_count, _refinery_status()]
-	materials_label.text = "%d / %d" % [model.materials, model.capacity]
-	power_label.text = "+%d POWER" % model.power_balance()
+	refinery_label.text = "Refineries %d · %s" % [refinery_count, _refinery_status()]
+	materials_label.text = "%d" % model.materials
+	materials_label.tooltip_text = "Materials: %d / %d capacity" % [model.materials, model.capacity]
+	power_label.text = "%+d" % model.power_balance()
+	power_label.tooltip_text = "Power: %d generated / %d used" % [model.power_output, model.power_use]
 	power_detail.text = "%d generated  /  %d used" % [model.power_output, model.power_use]
-	level_label.text = "Level %02d  ·  %s" % [model.level, "Outpost" if model.level == 1 else ("Settlement" if model.level == 2 else "Colony")]
+	level_label.text = "Lv %02d · %s" % [model.level, "Outpost" if model.level == 1 else ("Settlement" if model.level == 2 else "Colony")]
 	count_label.text = ("" if home else "HOME / ") + "%02d modules connected" % model.modules.size()
 	goal_bar.max_value = 9
 	goal_bar.value = mini(model.modules.size(), 9)
@@ -797,34 +802,75 @@ func _setup_menus() -> void:
 	tabs.use_hidden_tabs_for_min_size = false
 	var top_bar := PanelContainer.new()
 	top_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	top_bar.offset_left = 28
-	top_bar.offset_right = -28
+	top_bar.offset_left = 12
+	top_bar.offset_right = -12
 	top_bar.offset_top = 8
-	top_bar.offset_bottom = 76
+	top_bar.offset_bottom = 56
 	top_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_bar.add_theme_stylebox_override("panel", _style(Color("111d2c"), Color("253647")))
 	root.add_child(top_bar)
 	title_label.reparent(root)
+	title_label.text = "ORBITAL"
+	title_label.add_theme_font_size_override("font_size", 14)
+	title_label.add_theme_color_override("font_color", CYAN)
+	# Reuse the live readout labels; remove the tall label/value groups.
+	resource_status.reparent(root)
+	resource_status.add_theme_constant_override("h_separation", 20)
+	for label: Label in [fleet_label, refinery_label, level_label]: label.add_theme_font_size_override("font_size", 11)
+	for child: Node in resource_bar.get_children(): child.hide()
+	compact_resources = HBoxContainer.new()
+	compact_resources.add_theme_constant_override("separation", 10)
+	root.add_child(compact_resources)
+	var names: Array = ["Materials / capacity", "Minerals", "Power", "Tech", "Xenocrystals"]
+	var readouts: Array = [materials_label, minerals_label, power_label, tech_label, xenocrystal_label]
+	for i in range(readouts.size()):
+		var label: Label = readouts[i]
+		var group := HBoxContainer.new()
+		group.add_theme_constant_override("separation", 4)
+		compact_resources.add_child(group)
+		var icon = preload("res://scripts/resource_icon.gd").new()
+		icon.kind = i
+		icon.tint = [GOLD, Color("baa1f5"), CYAN, Color("e4bc70"), Color("67f5e1")][i]
+		group.add_child(icon)
+		label.reparent(group)
+		label.add_theme_font_size_override("font_size", 12)
+		label.tooltip_text = names[i]
+		label.mouse_filter = Control.MOUSE_FILTER_STOP
+	resource_bar.hide()
 	toolbar = GridContainer.new()
-	toolbar.columns = 7
-	toolbar.add_theme_constant_override("h_separation", 8)
+	toolbar.columns = 4
+	toolbar.add_theme_constant_override("h_separation", 3)
 	toolbar.add_theme_constant_override("v_separation", 8)
 	menu_scroll = ScrollContainer.new()
 	menu_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	root.add_child(menu_scroll)
 	menu_scroll.add_child(toolbar)
 	toolbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	more_popup = PopupPanel.new()
+	more_popup.name = "MoreMenus"
+	root.add_child(more_popup)
+	var overflow := VBoxContainer.new()
+	more_popup.add_child(overflow)
 	for caption: String in ["Build", "Ships", "Research", "Gate/Travel", "Outposts/Regions", "Trade/Contacts", "Menu"]:
 		var button := Button.new()
 		button.text = caption
-		button.custom_minimum_size.y = 44
+		button.custom_minimum_size.y = 28 if caption in ["Build", "Ships", "Research"] else 36
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.add_theme_font_size_override("font_size", 14)
+		button.add_theme_font_size_override("font_size", 11)
 		button.add_theme_stylebox_override("normal", _style(Color("172738"), Color("304557")))
 		button.add_theme_stylebox_override("hover", _style(Color("25404b"), CYAN))
-		button.pressed.connect(func() -> void: open_menu(caption))
-		toolbar.add_child(button)
+		button.pressed.connect(func() -> void: more_popup.hide(); open_menu(caption))
+		if caption in ["Build", "Ships", "Research"]: toolbar.add_child(button)
+		else: overflow.add_child(button)
 		menu_buttons[caption] = button
+	more_button = Button.new()
+	more_button.text = "···"
+	more_button.tooltip_text = "Travel, regions, contacts and Menu"
+	more_button.custom_minimum_size = Vector2(32, 28)
+	more_button.add_theme_stylebox_override("normal", _style(Color("14232e"), Color("293d46"), 5))
+	more_button.pressed.connect(func() -> void:
+		more_popup.popup(Rect2i(Vector2i(more_button.global_position + Vector2(0, 32)), Vector2i(205, 160))))
+	toolbar.add_child(more_button)
 	research_button.get_parent().remove_child(research_button)
 	research_button.queue_free()
 	research_button = menu_buttons["Research"]
@@ -902,19 +948,25 @@ func _touch_targets(node: Node) -> void:
 func _layout_menus() -> void:
 	if not is_instance_valid(toolbar): return
 	var viewport_size := get_viewport().get_visible_rect().size
-	toolbar.columns = 7
-	menu_scroll.position = Vector2(278, 12)
-	menu_scroll.size = Vector2(viewport_size.x - 306, 60)
-	toolbar.custom_minimum_size.y = 44
-	title_label.position = Vector2(42, 20)
-	var tray_top: float = resource_bar.position.y + resource_bar.size.y + 8.0
-	var top: float = tray_top + 146.0
+	toolbar.columns = 4
+	menu_scroll.position = Vector2(150, 8)
+	menu_scroll.size = Vector2(252, 28)
+	toolbar.custom_minimum_size.y = 28
+	title_label.position = Vector2(22, 13)
+	if is_instance_valid(compact_resources):
+		compact_resources.position = Vector2(viewport_size.x - 346, 12)
+		compact_resources.size = Vector2(330, 24)
+	resource_status.position = Vector2(24, 39)
+	resource_status.size = Vector2(viewport_size.x - 48, 16)
+	var tray_top: float = 61.0
+	var top: float = 137.0
 	if is_instance_valid(ship_tray):
-		ship_tray.position = Vector2(28, tray_top)
-		ship_tray.size = Vector2(viewport_size.x - 56, 94)
-		station_view_button.position = Vector2(viewport_size.x - 172, tray_top + 96)
-		station_view_button.size = Vector2(144, 44)
-	region_navigation.location_label.position = Vector2(40, tray_top + 108)
+		ship_tray.position = Vector2(24, tray_top)
+		ship_tray.size = Vector2(viewport_size.x - 48, 42)
+		station_view_button.position = Vector2(viewport_size.x - 150, 104)
+		station_view_button.size = Vector2(126, 32)
+		station_view_button.add_theme_font_size_override("font_size", 12)
+	region_navigation.location_label.position = Vector2(24, 113)
 	region_navigation.location_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	orbit_label.hide() # Replaced by the always-visible location indicator and Regions details.
 	for target: PanelContainer in managed_panels:
@@ -924,6 +976,7 @@ func _layout_menus() -> void:
 		target.size = Vector2(width, minf(height, 220) if target == menu_panel else (minf(height, 360) if target == ship_context else height))
 
 func close_panels() -> void:
+	if is_instance_valid(more_popup): more_popup.hide()
 	if is_instance_valid(dev_panel): dev_panel.hide()
 	for target: PanelContainer in managed_panels:
 		if is_instance_valid(target): target.hide()
@@ -1020,8 +1073,8 @@ func _refresh_tray() -> void:
 		if not ship_tiles.has(id):
 			var tile = preload("res://scripts/ship_tile.gd").new()
 			tile.art = definition.get("art", "scout")
-			tile.role = "%s #%d" % [definition.name.replace(" Ship", ""), id]
-			tile.add_theme_stylebox_override("normal", _style(Color("172738"), Color("304557")))
+			tile.role = "%s %d" % [definition.name.replace(" Ship", "").replace("Xeno Miner", "Xeno"), id]
+			tile.add_theme_stylebox_override("normal", _style(Color("111e29"), Color("304557"), 12))
 			tile.pressed.connect(func() -> void: select_ship(id))
 			tray_rows.add_child(tile)
 			ship_tiles[id] = tile
@@ -1031,7 +1084,10 @@ func _refresh_tray() -> void:
 		if fleet.transport.jobs.has(id): status = "In transit"
 		var tile = ship_tiles[id]
 		tile.status = status
+		tile.status_color = GOLD if status.to_lower().contains("wait") or status.to_lower().contains("full") else (CYAN if fleet.unit_busy(id) else MUTED)
 		tile.selected_ship = id == selected_ship_id
+		tile.add_theme_stylebox_override("normal", _style(Color("111e29"), CYAN if tile.selected_ship else tile.status_color.darkened(0.2), 12))
+		tile.add_theme_stylebox_override("hover", _style(Color("1c303b"), CYAN if tile.selected_ship else tile.status_color, 12))
 		tile.tooltip_text = "%s #%d · %s · %s" % [definition.name, id, fleet.regions.catalog[fleet.transport.location(id)].name, status]
 		tile.queue_redraw()
 		if id == selected_ship_id:
@@ -1175,13 +1231,13 @@ func _setup_settings() -> void:
 	_wrap_panel(settings_panel, "Settings")
 
 func has_open_panel() -> bool:
-	return managed_panels.any(func(item: PanelContainer) -> bool: return item.visible) or (is_instance_valid(dev_panel) and dev_panel.visible)
+	return (is_instance_valid(more_popup) and more_popup.visible) or managed_panels.any(func(item: PanelContainer) -> bool: return item.visible) or (is_instance_valid(dev_panel) and dev_panel.visible)
 
 func pointer_over_ui(point: Vector2) -> bool:
 	var viewport_size := get_viewport().get_visible_rect().size
 	if not Rect2(Vector2.ZERO, viewport_size).has_point(point): return true
-	if Rect2(28, 8, viewport_size.x - 56, 68).has_point(point): return true
-	var controls: Array[Control] = [resource_bar, ship_tray, station_view_button, region_navigation.location_label, footer]
+	if Rect2(28, 8, viewport_size.x - 56, 48).has_point(point): return true
+	var controls: Array[Control] = [compact_resources, resource_status, ship_tray, station_view_button, region_navigation.location_label, footer]
 	for target: PanelContainer in managed_panels: controls.append(target)
 	if is_instance_valid(dev_panel): controls.append(dev_panel)
 	for control: Control in controls:
