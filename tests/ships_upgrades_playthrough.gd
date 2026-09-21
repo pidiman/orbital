@@ -92,7 +92,7 @@ func _ready() -> void:
 	# Click existing Solar in inspect mode; no build tool remains selected after purchase.
 	await click(game.get_viewport().get_canvas_transform() * (game.board.cell_position(Vector2i(1, 0))))
 	checks["module_inspector_opens"] = game.hud.tabs.current_tab == 2 and game.hud.upgrade_title.text.contains("Tier 1")
-	checks["upgrade_cost_visible"] = game.hud.upgrade_button.text.contains("30 M + 8 Minerals") and not game.hud.upgrade_button.disabled
+	checks["upgrade_cost_visible"] = game.hud.upgrade_button.text.contains("30 Materials + 8 Minerals") and not game.hud.upgrade_button.disabled
 	await settle(2)
 	save_frame("upgrade_before")
 	materials_before = game.model.materials
@@ -101,7 +101,7 @@ func _ready() -> void:
 	await use(game.hud.upgrade_button)
 	checks["upgrade_applies_stats"] = game.model.tier_at(Vector2(58, 0)) == 2 and game.model.power_balance() == power_before + 4
 	checks["upgrade_pays_both_costs"] = game.model.materials == materials_before - 30 and game.model.minerals == mineral_before - 8
-	checks["tier_and_max_shown"] = game.hud.upgrade_title.text.contains("Tier 2") and game.hud.upgrade_button.disabled and game.hud.upgrade_button.text == "Maximum tier"
+	checks["tier_and_next_shown"] = game.hud.upgrade_title.text.contains("Tier 2") and game.hud.upgrade_button.text.contains("Upgrade to T3") and game.hud.upgrade_detail.text.contains("T5")
 	checks["no_upgrade_module_count_bonus"] = game.model.modules.size() == 2 and game.model.level == 1
 	mark("solar upgraded")
 	await settle(2)

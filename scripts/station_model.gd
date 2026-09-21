@@ -160,9 +160,16 @@ func tier_at(world_position: Vector2) -> int:
 	return int(module_tiers.get(world_position, 1))
 
 func definition_at(world_position: Vector2) -> Dictionary:
-	var definition: Dictionary = catalog[modules[world_position]].duplicate(true)
+	return definition_for(modules[world_position], tier_at(world_position))
+
+func structure_definition(structure_id: String) -> Dictionary:
+	var structure: Dictionary = locations.structures[structure_id]
+	return definition_for(structure.kind, int(structure.state.get("tier", 1)))
+
+func definition_for(kind: String, tier: int) -> Dictionary:
+	var definition: Dictionary = catalog.get(kind, {}).duplicate(true)
 	var upgrades: Array = definition.get("upgrades", [])
-	for index in range(mini(tier_at(world_position) - 1, upgrades.size())):
+	for index in range(mini(tier - 1, upgrades.size())):
 		definition.merge(upgrades[index].stats, true)
 	return definition
 
@@ -173,14 +180,27 @@ func next_upgrade(world_position: Vector2) -> Dictionary:
 	var index: int = tier_at(world_position) - 1
 	return upgrades[index] if index < upgrades.size() else {}
 
+func upgrade_resource_amount(resource: String) -> int:
+	match resource:
+		"materials": return materials
+		"minerals": return minerals
+	return int(research.trade.inventory.get(resource, -1)) if research != null else -1
+
+func upgrade_cost_text(cost: Dictionary) -> String:
+	var parts: PackedStringArray = []
+	for resource: String in cost:
+		parts.append("%d %s" % [int(cost[resource]), resource.capitalize()])
+	return " + ".join(parts) if not parts.is_empty() else "Free"
+
 func upgrade_error(world_position: Vector2) -> String:
 	if not modules.has(world_position):
 		return "Select an existing station module."
 	var upgrade: Dictionary = next_upgrade(world_position)
 	if upgrade.is_empty():
 		return "Maximum tier reached."
-	if materials < int(upgrade.cost.materials) or minerals < int(upgrade.cost.minerals):
-		return "Upgrade needs %d Materials and %d Minerals." % [upgrade.cost.materials, upgrade.cost.minerals]
+	for resource: String in upgrade.cost:
+		if upgrade_resource_amount(resource) < int(upgrade.cost[resource]):
+			return "Upgrade needs " + upgrade_cost_text(upgrade.cost) + "."
 	var current: Dictionary = definition_at(world_position)
 	var future: Dictionary = current.duplicate(true)
 	future.merge(upgrade.stats, true)
@@ -194,8 +214,12 @@ func upgrade_module(world_position: Vector2) -> String:
 	if not error.is_empty():
 		return error
 	var upgrade: Dictionary = next_upgrade(world_position)
-	materials -= int(upgrade.cost.materials)
-	minerals -= int(upgrade.cost.minerals)
+	for resource: String in upgrade.cost:
+		var amount: int = int(upgrade.cost[resource])
+		match resource:
+			"materials": materials -= amount
+			"minerals": minerals -= amount
+			_: research.trade.inventory[resource] -= amount
 	structure_state(world_position)["tier"] = tier_at(world_position) + 1
 	recalculate()
 	module_upgraded.emit(world_position)
@@ -232,7 +256,7 @@ func module_refund(world_position: Vector2) -> int:
 	if decommission_rules.refund_upgrade_materials:
 		var upgrades: Array = definition.get("upgrades", [])
 		for index in range(mini(tier_at(world_position) - 1, upgrades.size())):
-			invested += int(upgrades[index].cost.materials)
+			invested += int(upgrades[index].cost.get("materials", 0))
 	return int(floor(invested * float(definition.get("refund_ratio", decommission_rules.materials_refund_ratio))))
 
 func demolition_error(world_position: Vector2) -> String:

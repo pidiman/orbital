@@ -18,6 +18,33 @@
           "capacity": 25
         },
         "description": "+25 material capacity"
+      },
+      {
+        "cost": {
+          "materials": 45
+        },
+        "stats": {
+          "capacity": 60
+        },
+        "description": "Material capacity bonus: +60"
+      },
+      {
+        "cost": {
+          "materials": 80
+        },
+        "stats": {
+          "capacity": 110
+        },
+        "description": "Material capacity bonus: +110"
+      },
+      {
+        "cost": {
+          "materials": 125
+        },
+        "stats": {
+          "capacity": 175
+        },
+        "description": "Material capacity bonus: +175"
       }
     ]
   },
@@ -40,6 +67,33 @@
           "power_output": 10
         },
         "description": "Generation: 6 → 10 power"
+      },
+      {
+        "cost": {
+          "materials": 55
+        },
+        "stats": {
+          "power_output": 16
+        },
+        "description": "Generation: 16 Power"
+      },
+      {
+        "cost": {
+          "materials": 90
+        },
+        "stats": {
+          "power_output": 24
+        },
+        "description": "Generation: 24 Power"
+      },
+      {
+        "cost": {
+          "materials": 140
+        },
+        "stats": {
+          "power_output": 34
+        },
+        "description": "Generation: 34 Power"
       }
     ]
   },
@@ -62,6 +116,33 @@
           "capacity": 150
         },
         "description": "Storage bonus: 75 → 150"
+      },
+      {
+        "cost": {
+          "materials": 50
+        },
+        "stats": {
+          "capacity": 250
+        },
+        "description": "Material capacity bonus: +250"
+      },
+      {
+        "cost": {
+          "materials": 85
+        },
+        "stats": {
+          "capacity": 375
+        },
+        "description": "Material capacity bonus: +375"
+      },
+      {
+        "cost": {
+          "materials": 130
+        },
+        "stats": {
+          "capacity": 525
+        },
+        "description": "Material capacity bonus: +525"
       }
     ]
   },
@@ -107,6 +188,45 @@
           }
         },
         "description": "Refining cycle: 3s → 2s"
+      },
+      {
+        "cost": {
+          "materials": 65
+        },
+        "stats": {
+          "conversion": {
+            "seconds": 1,
+            "input": 2,
+            "output": 6
+          }
+        },
+        "description": "2 Minerals → 6 Materials / 1s"
+      },
+      {
+        "cost": {
+          "materials": 110
+        },
+        "stats": {
+          "conversion": {
+            "seconds": 1,
+            "input": 4,
+            "output": 12
+          }
+        },
+        "description": "4 Minerals → 12 Materials / 1s"
+      },
+      {
+        "cost": {
+          "materials": 170
+        },
+        "stats": {
+          "conversion": {
+            "seconds": 1,
+            "input": 6,
+            "output": 18
+          }
+        },
+        "description": "6 Minerals → 18 Materials / 1s"
       }
     ]
   },
@@ -168,7 +288,57 @@
       "ship_type": "miner",
       "capacity": 2
     },
-    "art": "ship_dock"
+    "art": "ship_dock",
+    "upgrades": [
+      {
+        "cost": {
+          "materials": 30
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "miner",
+            "capacity": 3
+          }
+        },
+        "description": "Parking capacity: 3 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 55
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "miner",
+            "capacity": 4
+          }
+        },
+        "description": "Parking capacity: 4 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 90
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "miner",
+            "capacity": 6
+          }
+        },
+        "description": "Parking capacity: 6 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 140
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "miner",
+            "capacity": 8
+          }
+        },
+        "description": "Parking capacity: 8 matching ships"
+      }
+    ]
   },
   "scout_dock": {
     "name": "Scout Dock",
@@ -183,7 +353,57 @@
       "ship_type": "scout",
       "capacity": 2
     },
-    "art": "ship_dock"
+    "art": "ship_dock",
+    "upgrades": [
+      {
+        "cost": {
+          "materials": 30
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "scout",
+            "capacity": 3
+          }
+        },
+        "description": "Parking capacity: 3 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 55
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "scout",
+            "capacity": 4
+          }
+        },
+        "description": "Parking capacity: 4 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 90
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "scout",
+            "capacity": 6
+          }
+        },
+        "description": "Parking capacity: 6 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 140
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "scout",
+            "capacity": 8
+          }
+        },
+        "description": "Parking capacity: 8 matching ships"
+      }
+    ]
   },
   "trader_dock": {
     "name": "Trade Dock",
@@ -198,7 +418,57 @@
       "ship_type": "trader",
       "capacity": 2
     },
-    "art": "ship_dock"
+    "art": "ship_dock",
+    "upgrades": [
+      {
+        "cost": {
+          "materials": 30
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "trader",
+            "capacity": 3
+          }
+        },
+        "description": "Parking capacity: 3 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 55
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "trader",
+            "capacity": 4
+          }
+        },
+        "description": "Parking capacity: 4 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 90
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "trader",
+            "capacity": 6
+          }
+        },
+        "description": "Parking capacity: 6 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 140
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "trader",
+            "capacity": 8
+          }
+        },
+        "description": "Parking capacity: 8 matching ships"
+      }
+    ]
   },
   "material_ship_dock": {
     "name": "Material Dock",
@@ -213,7 +483,57 @@
       "ship_type": "material_ship",
       "capacity": 2
     },
-    "art": "ship_dock"
+    "art": "ship_dock",
+    "upgrades": [
+      {
+        "cost": {
+          "materials": 30
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "material_ship",
+            "capacity": 3
+          }
+        },
+        "description": "Parking capacity: 3 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 55
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "material_ship",
+            "capacity": 4
+          }
+        },
+        "description": "Parking capacity: 4 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 90
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "material_ship",
+            "capacity": 6
+          }
+        },
+        "description": "Parking capacity: 6 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 140
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "material_ship",
+            "capacity": 8
+          }
+        },
+        "description": "Parking capacity: 8 matching ships"
+      }
+    ]
   },
   "jump_ship_dock": {
     "name": "Jump Dock",
@@ -228,6 +548,56 @@
       "ship_type": "jump_ship",
       "capacity": 2
     },
-    "art": "ship_dock"
+    "art": "ship_dock",
+    "upgrades": [
+      {
+        "cost": {
+          "materials": 30
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "jump_ship",
+            "capacity": 3
+          }
+        },
+        "description": "Parking capacity: 3 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 55
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "jump_ship",
+            "capacity": 4
+          }
+        },
+        "description": "Parking capacity: 4 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 90
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "jump_ship",
+            "capacity": 6
+          }
+        },
+        "description": "Parking capacity: 6 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 140
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "jump_ship",
+            "capacity": 8
+          }
+        },
+        "description": "Parking capacity: 8 matching ships"
+      }
+    ]
   }
 }

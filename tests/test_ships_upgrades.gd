@@ -76,7 +76,7 @@ func _initialize() -> void:
 	check(model.materials == before - 30 and model.minerals == minerals_before - 8, "upgrade exact dual-resource cost")
 	before = model.materials
 	minerals_before = model.minerals
-	check(not model.upgrade_module(solar).is_empty() and model.materials == before and model.minerals == minerals_before, "max tier no double spend")
+	check(model.next_upgrade(solar).stats.power_output == 16 and model.materials == before and model.minerals == minerals_before, "T3 preview does not spend")
 	fund(model)
 	check(model.upgrade_module(Vector2.ZERO).is_empty() and model.capacity == 125, "habitat extra capacity")
 	fund(model)
@@ -95,7 +95,7 @@ func _initialize() -> void:
 	model.tick()
 	check(model.materials == 6 and model.minerals == 8, "upgraded refinery converts after two ticks")
 	# Extra tiers and ship types plug into the existing algorithms through data.
-	model.catalog.solar.upgrades.append({"cost":{"materials":1,"minerals":1},"stats":{"power_output":12},"description":"test tier"})
+	model.catalog.solar.upgrades[1] = {"cost":{"materials":1,"minerals":1},"stats":{"power_output":12},"description":"test tier"}
 	fund(model)
 	check(model.upgrade_module(solar).is_empty() and model.tier_at(solar) == 3 and model.definition_at(solar).power_output == 12, "future tier needs only data")
 	model.ship_catalog["custom_miner"] = model.ship_catalog.miner.duplicate(true)

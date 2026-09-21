@@ -616,17 +616,26 @@ func _refresh_upgrade() -> void:
 		upgrade_stats.text += "\nParking: %d / %d ships" % [fleet.docking.usage.get(dock_id, {}).size(), int(definition.docking.capacity)]
 	if definition.has("conversion"):
 		upgrade_stats.text += "\n%d Minerals → %d Materials / %ds" % [definition.conversion.input, definition.conversion.output, definition.conversion.seconds]
+	var rows: PackedStringArray = []
+	var kind: String = model.modules[selected_position]
+	var current_tier: int = model.tier_at(selected_position)
+	rows.append("T1%s · Base · %s" % [" [CURRENT]" if current_tier == 1 else "", model.catalog[kind].effect])
+	var tiers: Array = model.catalog[kind].get("upgrades", [])
+	for index in range(tiers.size()):
+		rows.append("T%d%s · %s\n%s" % [index + 2, " [CURRENT]" if current_tier == index + 2 else "", model.upgrade_cost_text(tiers[index].cost), tiers[index].description])
+	upgrade_detail.text = "\n\n".join(rows)
 	var next: Dictionary = model.next_upgrade(selected_position)
 	if next.is_empty():
-		upgrade_detail.text = "This module is at its maximum available tier."
+		upgrade_detail.text += "\n\nMaximum tier reached."
 		upgrade_button.text = "Maximum tier"
 		upgrade_button.disabled = true
 		return
-	upgrade_detail.text = "NEXT TIER\n" + str(next.description)
-	upgrade_button.text = "Upgrade to T%d · %d M + %d Minerals" % [model.tier_at(selected_position) + 1, next.cost.materials, next.cost.minerals]
+	upgrade_detail.text += "\n\nNEXT T%d\n" % (current_tier + 1) + str(next.description)
+	upgrade_button.text = "Upgrade to T%d · %s" % [current_tier + 1, model.upgrade_cost_text(next.cost)]
 	var error: String = model.upgrade_error(selected_position)
 	upgrade_button.disabled = not error.is_empty()
 	upgrade_button.tooltip_text = error
+	if not error.is_empty(): upgrade_detail.text += "\n\n" + error
 
 func _upgrade_selected() -> void:
 	var error: String = model.upgrade_module(selected_position)

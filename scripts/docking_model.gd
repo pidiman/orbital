@@ -17,8 +17,7 @@ func _init(owner_fleet: RefCounted) -> void:
 func docks() -> Dictionary:
 	var result: Dictionary = {}
 	for id: String in fleet.model.locations.structures:
-		var structure: Dictionary = fleet.model.locations.structures[id]
-		var definition: Dictionary = fleet.model.catalog.get(structure.kind, {})
+		var definition: Dictionary = fleet.model.structure_definition(id)
 		if definition.has("docking"):
 			result[id] = definition.docking
 	return result

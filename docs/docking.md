@@ -77,3 +77,6 @@ Reservations persist without repacking valid occupied slots.
 Parking movement now uses the shared view-only `ShipMotion` controller and
 `data/ship_motion.json` speed settings; the earlier parking-specific 400 px/s
 animation has been replaced. Reservation/parking model rules are unchanged.
+
+Typed docks now upgrade through T5, with capacities 2/3/4/6/8. See
+[tier5-upgrades.md](tier5-upgrades.md) for costs and the complete progression.
