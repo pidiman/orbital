@@ -42,6 +42,10 @@ func _ready() -> void:
 	preferences = preload("res://scripts/client_preferences.gd").new()
 	preferences.enabled = not OS.get_cmdline_args().has("--summer-verify") and not get_tree().root.has_node("SummerProbe")
 	preferences.load_preferences()
+	var music := preload("res://scripts/ambient_music.gd").new()
+	music.name = "AmbientMusic"
+	music.preferences = preferences
+	add_child(music)
 	var floating_configuration: Dictionary = preferences.floating_defaults.duplicate(true)
 	preferences.apply_tuning(floating_configuration)
 	supply = Supply.new(model, fleet, -1, {}, floating_configuration)

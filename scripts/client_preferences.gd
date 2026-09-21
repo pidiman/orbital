@@ -1,6 +1,9 @@
 extends RefCounted
 # Local presentation preferences, entirely separate from OrbitalSaveStore.
 var definitions: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/camera_controls.json"))
+signal music_changed
+var music_enabled: bool = true
+var music_volume: float = 0.3
 signal tuning_changed
 var values: Dictionary = {}
 var tuning: Dictionary = {}
@@ -18,6 +21,12 @@ func load_preferences() -> void:
 	for option: Dictionary in definitions.options:
 		var value: Variant = config.get_value("camera", option.id, option.default)
 		if typeof(value) == typeof(option.default): values[option.id] = value
+	var music: Variant = config.get_value("audio", "music_enabled", true)
+	if music is bool: music_enabled = music
+	var volume: Variant = config.get_value("audio", "music_volume", 0.3)
+	if (volume is float or volume is int) and is_finite(float(volume)):
+		music_volume = clampf(float(volume), 0.0, 1.0)
+	music_changed.emit()
 	tuning.clear()
 	for option: Dictionary in definitions.get("tuning_options", []):
 		if not config.has_section_key("supply_tuning", option.id): continue
@@ -52,4 +61,16 @@ func set_tuning(option: Dictionary, value: float) -> Error:
 	var config := ConfigFile.new()
 	config.load(path)
 	for id: String in tuning: config.set_value("supply_tuning", id, tuning[id])
+	return config.save(path)
+
+func set_music(on: bool, volume: float) -> Error:
+	if not is_finite(volume): return ERR_INVALID_PARAMETER
+	music_enabled = on
+	music_volume = clampf(volume, 0.0, 1.0)
+	music_changed.emit()
+	if not enabled: return OK
+	var config := ConfigFile.new()
+	config.load(path)
+	config.set_value("audio", "music_enabled", music_enabled)
+	config.set_value("audio", "music_volume", music_volume)
 	return config.save(path)

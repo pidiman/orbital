@@ -1155,6 +1155,29 @@ func _setup_settings() -> void:
 				message("Could not save local settings."))
 		body.add_child(toggle)
 		settings_toggles[option.id] = toggle
+	_label(body, "Audio", 18, INK)
+	var music_toggle := CheckButton.new()
+	music_toggle.text = "Music"
+	music_toggle.custom_minimum_size.y = 44
+	music_toggle.button_pressed = get_parent().preferences.music_enabled
+	body.add_child(music_toggle)
+	settings_toggles["music"] = music_toggle
+	var volume := HSlider.new()
+	volume.min_value = 0
+	volume.max_value = 100
+	volume.step = 1
+	volume.value = get_parent().preferences.music_volume * 100.0
+	volume.custom_minimum_size = Vector2(200, 44)
+	var volume_label: Label = _label(body, "Music volume · %d%%" % volume.value, 14, MUTED)
+	body.add_child(volume)
+	settings_numbers["music_volume"] = volume
+	music_toggle.toggled.connect(func(on: bool) -> void:
+		if get_parent().preferences.set_music(on, volume.value / 100.0) != OK:
+			message("Could not save audio settings."))
+	volume.value_changed.connect(func(value: float) -> void:
+		volume_label.text = "Music volume · %d%%" % value
+		if get_parent().preferences.set_music(music_toggle.button_pressed, value / 100.0) != OK:
+			message("Could not save audio settings."))
 	var tuning_section: String = ""
 	for option: Dictionary in get_parent().preferences.definitions.get("tuning_options", []):
 		if option.section != tuning_section:
