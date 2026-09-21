@@ -10,6 +10,9 @@ func _ready() -> void:
 	await settle(2)
 	checks.height_30 = is_equal_approx(hud.footer.size.y, 30)
 	checks.transparent = hud.footer.get_theme_stylebox("panel") is StyleBoxEmpty
+	checks.left_panel_only = hud.grid_controls_panel.is_ancestor_of(hud.grid_controls) and not hud.grid_controls_panel.is_ancestor_of(hud.status_label)
+	checks.translucent = hud.grid_controls_panel.get_theme_stylebox("panel").bg_color.a < 1.0
+	checks.panel_clear = not hud.grid_controls_panel.get_global_rect().intersects(hud.status_label.get_global_rect())
 	checks.centered = is_equal_approx(hud.status_label.get_global_rect().get_center().x, hud.footer.get_global_rect().get_center().x)
 	checks.no_overlap = not hud.status_label.get_global_rect().intersects(hud.grid_controls.get_global_rect())
 	checks.outline = hud.status_label.get_theme_constant("outline_size") == 3 and hud.zoom_label.get_theme_constant("outline_size") == 3
@@ -19,9 +22,9 @@ func _ready() -> void:
 	await use(hud.menu_buttons.Menu)
 	await use(hud.settings_button)
 	await use(hud.settings_toggles.show_grid_controls)
-	checks.hidden = not hud.grid_controls.visible
+	checks.hidden = not hud.grid_controls.visible and not hud.grid_controls_panel.visible and hud.status_label.is_visible_in_tree()
 	await use(hud.settings_toggles.show_grid_controls)
-	checks.shown = hud.grid_controls.visible
+	checks.shown = hud.grid_controls.visible and hud.grid_controls_panel.visible
 	hud.close_panels()
 	await use(hud.grid_buttons["+"])
 	checks.zoom = game.ship_camera.zoom.x > 1.0

@@ -25,6 +25,7 @@ var selected_ship_id: int = -1
 var context_gate: Button
 var station_view_button: Button
 var zoom_label: Label
+var grid_controls_panel: PanelContainer
 var grid_controls: HBoxContainer
 var grid_buttons: Dictionary = {}
 var menu_buttons: Dictionary = {}
@@ -379,6 +380,7 @@ func _process(delta: float) -> void:
 		zoom_label.text = ("%.2f" % get_parent().ship_camera.zoom.x).trim_suffix("0") + "x"
 	if is_instance_valid(grid_controls):
 		grid_controls.visible = get_parent().preferences.values.show_grid_controls
+		grid_controls_panel.visible = grid_controls.visible
 		footer_balance.visible = grid_controls.visible
 	status_time -= delta
 	if status_time <= 0:
@@ -1026,9 +1028,20 @@ func _setup_grid_controls() -> void:
 	var row := HBoxContainer.new()
 	footer.add_child(row)
 	status_label.reparent(row)
-	row.add_child(grid_controls)
-	row.move_child(grid_controls, 0)
-	grid_controls.custom_minimum_size.x = 250
+	grid_controls_panel = PanelContainer.new()
+	grid_controls_panel.name = "GridControlsPanel"
+	grid_controls_panel.custom_minimum_size.x = 250
+	var backdrop := StyleBoxFlat.new()
+	backdrop.bg_color = Color(0.04, 0.08, 0.12, 0.68)
+	backdrop.set_corner_radius_all(5)
+	backdrop.content_margin_left = 6
+	backdrop.content_margin_right = 6
+	backdrop.content_margin_top = 0
+	backdrop.content_margin_bottom = 0
+	grid_controls_panel.add_theme_stylebox_override("panel", backdrop)
+	row.add_child(grid_controls_panel)
+	row.move_child(grid_controls_panel, 0)
+	grid_controls_panel.add_child(grid_controls)
 	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -1058,6 +1071,7 @@ func _setup_grid_controls() -> void:
 	get_viewport().size_changed.connect(_layout_grid_controls)
 	_layout_grid_controls()
 	grid_controls.visible = get_parent().preferences.values.show_grid_controls
+	grid_controls_panel.visible = grid_controls.visible
 	footer_balance.visible = grid_controls.visible
 
 func _layout_grid_controls() -> void:
