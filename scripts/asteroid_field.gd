@@ -44,17 +44,16 @@ func _sync_view() -> void:
 			_add_discovery_marker(asteroid_id)
 	asteroid_count = rocks.size()
 
-func _unhandled_input(event: InputEvent) -> void:
-	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
-		return
+func handle_click(point: Vector2) -> bool:
 	for asteroid_id: int in rocks:
-		if (get_canvas_transform().affine_inverse() * event.position).distance_to(rocks[asteroid_id].point) <= 34.0:
+		if (get_canvas_transform().affine_inverse() * point).distance_to(rocks[asteroid_id].point) <= 34.0:
 			var error: String = fleet.dispatch(asteroid_id, selected_ship)
 			notice.emit("Mining Ship dispatched. Minerals arrive when the timer ends." if error.is_empty() else error, not error.is_empty())
 			if error.is_empty():
 				selected_ship = -1
 			get_viewport().set_input_as_handled()
-			return
+			return true
+	return false
 
 func _on_completed(unit: Variant, asteroid_id: int, amount: int) -> void:
 	var point: Vector2 = rocks[asteroid_id].point if rocks.has(asteroid_id) else board.center

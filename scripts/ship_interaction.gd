@@ -21,16 +21,16 @@ func hits_at(screen_point: Vector2) -> Array[int]:
 		return first.distance_squared_to(screen_point) < second.distance_squared_to(screen_point))
 	return hits
 
-func _unhandled_input(event: InputEvent) -> void:
-	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT): return
-	var hits: Array[int] = hits_at(event.position)
-	if hits.is_empty(): return
+func handle_click(point: Vector2) -> bool:
+	var hits: Array[int] = hits_at(point)
+	if hits.is_empty(): return false
 	var id: int = hits[0]
 	# Overlapping transit sprites at the same gate are individually reachable.
 	if hits.size() > 1 and hits.has(game.hud.selected_ship_id):
 		id = hits[(hits.find(game.hud.selected_ship_id) + 1) % hits.size()]
 	game.hud.select_ship(id)
 	get_viewport().set_input_as_handled()
+	return true
 
 func _draw() -> void:
 	var id: int = game.hud.selected_ship_id

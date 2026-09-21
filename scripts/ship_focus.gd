@@ -1,4 +1,5 @@
 extends Camera2D
+const RegionView = preload("res://scripts/region_view.gd")
 # Presentation coordinates only; never writes ship, station, or mission state.
 var game: Node2D
 var ship_id: int = -1
@@ -36,9 +37,7 @@ func ship_point(id: int) -> Vector2:
 	return game.ship_motion.position_for(id)
 
 func pan_view(direction: Vector2) -> void:
-	ship_id = -1
-	position += direction * 120.0 / zoom
-	force_update_scroll()
+	pan_pixels(direction * 120.0)
 
 func zoom_view(factor: float) -> void:
 	ship_id = -1
@@ -52,4 +51,21 @@ func fit_grid() -> void:
 	var grid_size: Vector2 = Vector2(StationGeometry.grid_dimensions) * game.board.cell_size
 	zoom = Vector2.ONE * minf(area.size.x / grid_size.x, area.size.y / grid_size.y)
 	position = game.board.center + (viewport_size * 0.5 - area.get_center()) / zoom
+	force_update_scroll()
+
+func pan_bounds() -> Rect2:
+	var area := Rect2(Vector2.ZERO, get_viewport_rect().size)
+	if game.fleet.regions.primary_station_visible():
+		var extent: Vector2 = Vector2(StationGeometry.grid_dimensions) * game.board.cell_size * 0.5
+		area = area.merge(Rect2(game.board.center - extent, extent * 2.0))
+	else:
+		for content: Dictionary in game.fleet.regions.records[game.fleet.regions.current_region].contents:
+			if content.has("position"):
+				area = area.expand(RegionView.project(content.position, get_viewport_rect().size))
+	return area.grow(float(game.preferences.definitions.bounds_margin))
+
+func pan_pixels(offset: Vector2) -> void:
+	ship_id = -1
+	var bounds: Rect2 = pan_bounds()
+	position = (position + offset / zoom).clamp(bounds.position, bounds.end)
 	force_update_scroll()

@@ -43,17 +43,17 @@ func _process(delta: float) -> void:
 func _on_built(world_position: Vector2, _kind: String) -> void:
 	pulses.append({"position": world_position, "time": 0.0})
 
-func _unhandled_input(event: InputEvent) -> void:
-	if model.region_context != null and not model.region_context.primary_station_visible():
-		return
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if not selected.is_empty():
-			requested_build.emit(placement_position(get_canvas_transform().affine_inverse() * event.position))
-			get_viewport().set_input_as_handled()
-		elif module_at_screen(get_canvas_transform().affine_inverse() * event.position) != Vector2.INF:
-			inspected_position = module_at_screen(get_canvas_transform().affine_inverse() * event.position)
-			module_selected.emit(inspected_position)
-			get_viewport().set_input_as_handled()
+func handle_click(point: Vector2) -> bool:
+	if model.region_context != null and not model.region_context.primary_station_visible(): return false
+	var world_point: Vector2 = get_canvas_transform().affine_inverse() * point
+	if not selected.is_empty():
+		requested_build.emit(placement_position(world_point))
+		return true
+	if module_at_screen(world_point) != Vector2.INF:
+		inspected_position = module_at_screen(world_point)
+		module_selected.emit(inspected_position)
+		return true
+	return false
 
 func _draw() -> void:
 	var grid_color := Color(0.39, 0.57, 0.68, 0.10 if selected.is_empty() else 0.21)

@@ -1,0 +1,9 @@
+{
+  "pan_speed": 600.0,
+  "drag_threshold": 7.0,
+  "edge_width": 24.0,
+  "bounds_margin": 240.0,
+  "options": [
+    {"id": "edge_scrolling", "label": "Edge scrolling", "type": "bool", "default": false}
+  ]
+}

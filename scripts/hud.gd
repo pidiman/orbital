@@ -27,6 +27,8 @@ var station_view_button: Button
 var grid_controls: HBoxContainer
 var grid_buttons: Dictionary = {}
 var menu_buttons: Dictionary = {}
+var settings_panel: PanelContainer
+var settings_toggles: Dictionary = {}
 var managed_panels: Array[PanelContainer] = []
 var panel_closes: Dictionary = {}
 var active_menu: String = ""
@@ -729,7 +731,7 @@ func _setup_menus() -> void:
 	root.add_child(top_bar)
 	title_label.reparent(root)
 	toolbar = GridContainer.new()
-	toolbar.columns = 6
+	toolbar.columns = 7
 	toolbar.add_theme_constant_override("h_separation", 8)
 	toolbar.add_theme_constant_override("v_separation", 8)
 	menu_scroll = ScrollContainer.new()
@@ -737,7 +739,7 @@ func _setup_menus() -> void:
 	root.add_child(menu_scroll)
 	menu_scroll.add_child(toolbar)
 	toolbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for caption: String in ["Build", "Ships", "Research", "Gate/Travel", "Outposts/Regions", "Trade/Contacts"]:
+	for caption: String in ["Build", "Ships", "Research", "Gate/Travel", "Outposts/Regions", "Trade/Contacts", "Settings"]:
 		var button := Button.new()
 		button.text = caption
 		button.custom_minimum_size.y = 44
@@ -751,6 +753,7 @@ func _setup_menus() -> void:
 	research_button.get_parent().remove_child(research_button)
 	research_button.queue_free()
 	research_button = menu_buttons["Research"]
+	_setup_settings()
 	_wrap_panel(panel, "Build / Ships")
 	_wrap_panel(research_panel, "Research")
 	_wrap_panel(gate_panel, "Gate / Travel")
@@ -790,7 +793,7 @@ func _wrap_panel(target: PanelContainer, title: String) -> void:
 	heading.add_child(close)
 	panel_closes[target.get_instance_id()] = close
 	var view: Node = region_navigation if target == region_navigation.panel else target
-	if view != panel and view != ship_context:
+	if view != panel and view != ship_context and view != settings_panel:
 		var old_close: Button = view.close_button
 		old_close.get_parent().hide()
 		view.close_button = close
@@ -822,7 +825,7 @@ func _touch_targets(node: Node) -> void:
 func _layout_menus() -> void:
 	if not is_instance_valid(toolbar): return
 	var viewport_size := get_viewport().get_visible_rect().size
-	toolbar.columns = 6
+	toolbar.columns = 7
 	menu_scroll.position = Vector2(230, 12)
 	menu_scroll.size = Vector2(viewport_size.x - 258, 60)
 	toolbar.custom_minimum_size.y = 44
@@ -838,7 +841,7 @@ func _layout_menus() -> void:
 	region_navigation.location_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	orbit_label.hide() # Replaced by the always-visible location indicator and Regions details.
 	for target: PanelContainer in managed_panels:
-		var width: float = minf(380 if target == panel or target == ship_context else 820, viewport_size.x - 56)
+		var width: float = minf(380 if target == panel or target == ship_context or target == settings_panel else 820, viewport_size.x - 56)
 		target.position = Vector2(viewport_size.x - width - 28, top)
 		var height: float = maxf(100, viewport_size.y - top - 84)
 		target.size = Vector2(width, minf(height, 360) if target == ship_context else height)
@@ -869,6 +872,7 @@ func open_menu(menu: String) -> void:
 		"Build", "Ships":
 			activate_panel(panel, menu)
 			tabs.current_tab = 0 if menu == "Build" else 1
+		"Settings": activate_panel(settings_panel, "Settings")
 		"Research": research_panel.open_panel()
 		"Gate/Travel": gate_panel.open_panel()
 		"Outposts/Regions": region_navigation.open_region(fleet.regions.current_region)
@@ -1003,3 +1007,37 @@ func _grid_action(caption: String) -> void:
 		"→": camera.pan_view(Vector2.RIGHT)
 		"↑": camera.pan_view(Vector2.UP)
 		"↓": camera.pan_view(Vector2.DOWN)
+
+func _setup_settings() -> void:
+	settings_panel = PanelContainer.new()
+	settings_panel.name = "Settings"
+	root.add_child(settings_panel)
+	var body := VBoxContainer.new()
+	settings_panel.add_child(body)
+	for option: Dictionary in get_parent().preferences.definitions.options:
+		if option.type != "bool": continue
+		var toggle := CheckButton.new()
+		toggle.text = option.label
+		toggle.button_pressed = get_parent().preferences.values[option.id]
+		toggle.toggled.connect(func(value: bool) -> void:
+			if get_parent().preferences.set_value(option.id, value) != OK:
+				message("Could not save local settings."))
+		body.add_child(toggle)
+		settings_toggles[option.id] = toggle
+	_label(body, "Drag the field or use W/A/S/D to pan.", 14, MUTED)
+	_wrap_panel(settings_panel, "Settings")
+
+func has_open_panel() -> bool:
+	return managed_panels.any(func(item: PanelContainer) -> bool: return item.visible) or (is_instance_valid(dev_panel) and dev_panel.visible)
+
+func pointer_over_ui(point: Vector2) -> bool:
+	var viewport_size := get_viewport().get_visible_rect().size
+	if not Rect2(Vector2.ZERO, viewport_size).has_point(point): return true
+	if Rect2(28, 8, viewport_size.x - 56, 68).has_point(point): return true
+	var controls: Array[Control] = [resource_bar, ship_tray, station_view_button, region_navigation.location_label, footer]
+	for target: PanelContainer in managed_panels: controls.append(target)
+	if is_instance_valid(dev_panel): controls.append(dev_panel)
+	for control: Control in controls:
+		if control.is_visible_in_tree() and control.get_global_rect().has_point(point): return true
+	var hovered := get_viewport().gui_get_hovered_control()
+	return is_instance_valid(hovered) and hovered != root and hovered.mouse_filter != Control.MOUSE_FILTER_IGNORE

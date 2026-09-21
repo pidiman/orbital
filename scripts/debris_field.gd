@@ -26,14 +26,12 @@ func _sync_view() -> void:
 		pieces.append({"id": debris_id, "point": point, "angle": fmod(debris_id * 2.399, TAU) + supply.elapsed * 0.2})
 	debris_count = pieces.size()
 
-func _unhandled_input(event: InputEvent) -> void:
+func handle_click(point: Vector2) -> bool:
 	if not supply.fleet.regions.primary_station_visible():
-		return
-	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
-		return
+		return false
 	for i in range(pieces.size() - 1, -1, -1):
 		var piece: Dictionary = pieces[i]
-		if (get_canvas_transform().affine_inverse() * event.position).distance_to(piece.point) <= 27:
+		if (get_canvas_transform().affine_inverse() * point).distance_to(piece.point) <= 27:
 			var collected: int = supply.salvage(int(piece.id))
 			if collected == 0:
 				full_storage.emit()
@@ -42,7 +40,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_sync_view()
 			get_viewport().set_input_as_handled()
 			queue_redraw()
-			return
+			return true
+	return false
 
 func _draw() -> void:
 	for piece: Dictionary in pieces:

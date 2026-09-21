@@ -22,6 +22,8 @@ var mineral_count: int = 0
 var model: StationModel
 var board: Node2D
 var debris: Node2D
+var preferences: RefCounted
+var camera_input: Node
 var ship_motion: Node
 var hud: CanvasLayer
 var ship_camera: Camera2D
@@ -39,6 +41,9 @@ func _ready() -> void:
 	# Disposable playtests must never read or overwrite the player's checkpoint.
 	persistence.path = save_path
 	persistence.enabled = verification_persistence or (not OS.get_cmdline_args().has("--summer-verify") and not get_tree().root.has_node("SummerProbe"))
+	preferences = preload("res://scripts/client_preferences.gd").new()
+	preferences.enabled = not OS.get_cmdline_args().has("--summer-verify") and not get_tree().root.has_node("SummerProbe")
+	preferences.load_preferences()
 	var resume_error: String = ""
 	var resumed: bool = false
 	if persistence.enabled and FileAccess.file_exists(persistence.path):
@@ -95,6 +100,10 @@ func _ready() -> void:
 	ship_interaction.name = "ShipInteraction"
 	ship_interaction.game = self
 	add_child(ship_interaction)
+	camera_input = preload("res://scripts/camera_input.gd").new()
+	camera_input.name = "CameraInput"
+	camera_input.game = self
+	add_child(camera_input)
 	supply.collection.notice.connect(hud.message)
 	hud.tool_selected.connect(_select_tool)
 	hud.ship_assignment_requested.connect(func(ship_id: int) -> void: asteroids.selected_ship = ship_id)
