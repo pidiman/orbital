@@ -52,3 +52,25 @@ Ship-tray verification additionally covers all role icons and commands, remote
 region selection without moving the ship/station, native touch selection, a
 crowded scrollable tray, camera-adjusted salvage/placement/mining hit tests,
 and reconstruction after save/load (`tests/ship_tray_playthrough.gd`).
+
+## Expanded grid and map selection
+
+The build grid is now 17×17 (289 cells), configured by `data/station_grid.json`.
+See `docs/station-grid.md` for bounds and save compatibility. Build mode exposes
+Fit grid, zoom ±, and four pan buttons at the lower left, above the message bar.
+These are camera-only controls with mouse/touch targets; Reset view restores the
+original camera. Backgrounds remain viewport-filling when zoomed or panned.
+
+The owned-ship tray is unchanged. Clicking/tapping a ship sprite additionally
+calls the exact same `HUD.select_ship(id)` handler as its tile. Both paths open
+the existing commands and show a cyan tile border plus a ring on the selected
+map ship. The hit target is 44 screen pixels across at any zoom. Coincident ships
+at a gate can be cycled by repeated clicks. GUI controls take priority over map
+selection. Close/Escape closes the command panel; selection remains highlighted
+until another ship is selected, it is decommissioned, or a save is loaded.
+
+`tests/grid_ship_map_playthrough.gd` verifies all five roles via both entry
+points, native touch, remote selection, command visibility, footer clearance,
+outer-cell construction, mining, outer-depot collection, and save/load. Existing
+tray and HUD playthroughs also pass. Runtime probes report no script errors;
+existing static-call, local-variable and Control-focus warnings remain.

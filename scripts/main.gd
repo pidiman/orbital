@@ -86,6 +86,10 @@ func _ready() -> void:
 	hud.model = model
 	hud.fleet = fleet
 	add_child(hud)
+	var ship_interaction := preload("res://scripts/ship_interaction.gd").new()
+	ship_interaction.name = "ShipInteraction"
+	ship_interaction.game = self
+	add_child(ship_interaction)
 	supply.collection.notice.connect(hud.message)
 	hud.tool_selected.connect(_select_tool)
 	hud.ship_assignment_requested.connect(func(ship_id: int) -> void: asteroids.selected_ship = ship_id)

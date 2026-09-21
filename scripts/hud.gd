@@ -24,6 +24,8 @@ var context_detail: Label
 var selected_ship_id: int = -1
 var context_gate: Button
 var station_view_button: Button
+var grid_controls: HBoxContainer
+var grid_buttons: Dictionary = {}
 var menu_buttons: Dictionary = {}
 var managed_panels: Array[PanelContainer] = []
 var panel_closes: Dictionary = {}
@@ -263,6 +265,7 @@ func _ready() -> void:
 	root.add_child(gate_panel)
 	_setup_menus()
 	_setup_ship_tray()
+	_setup_grid_controls()
 	if DevConfig.DEBUG_MODE:
 		dev_panel = preload("res://scripts/dev_panel.gd").new()
 		dev_panel.hud = self
@@ -343,6 +346,8 @@ func show_salvage(amount: int, point: Vector2) -> void:
 	floating.append({"label": label, "time": 0.0, "duration": 1.2})
 
 func _process(delta: float) -> void:
+	if is_instance_valid(grid_controls):
+		grid_controls.visible = fleet.regions.primary_station_visible() and (active_menu == "Build" or not selected.is_empty())
 	status_time -= delta
 	if status_time <= 0:
 		status_label.text = "Amber: salvage  ·  Violet: mine  ·  Inspect a module to upgrade  ·  Ships: fleet commands" if fleet.regions.primary_station_visible() else "Violet: mine  ·  Outposts/Regions: Scout / view region  ·  Station construction and salvage remain at Home"
@@ -943,3 +948,34 @@ func _selected_ship_gate() -> void:
 		if gate_panel.ship_picker.get_item_id(index) == selected_ship_id:
 			gate_panel.ship_picker.select(index)
 	gate_panel.refresh()
+
+func _setup_grid_controls() -> void:
+	grid_controls = HBoxContainer.new()
+	grid_controls.name = "GridViewControls"
+	grid_controls.add_theme_constant_override("separation", 6)
+	root.add_child(grid_controls)
+	for caption: String in ["Fit grid", "−", "+", "←", "→", "↑", "↓"]:
+		var button := Button.new()
+		button.text = caption
+		button.custom_minimum_size = Vector2(48, 44)
+		button.tooltip_text = "Change the view only; station positions stay fixed."
+		button.pressed.connect(_grid_action.bind(caption))
+		grid_controls.add_child(button)
+		grid_buttons[caption] = button
+	get_viewport().size_changed.connect(_layout_grid_controls)
+	_layout_grid_controls()
+	grid_controls.hide()
+
+func _layout_grid_controls() -> void:
+	grid_controls.position = Vector2(28, get_viewport().get_visible_rect().size.y - 122)
+
+func _grid_action(caption: String) -> void:
+	var camera: Camera2D = get_parent().ship_camera
+	match caption:
+		"Fit grid": camera.fit_grid()
+		"−": camera.zoom_view(1.0 / 1.25)
+		"+": camera.zoom_view(1.25)
+		"←": camera.pan_view(Vector2.LEFT)
+		"→": camera.pan_view(Vector2.RIGHT)
+		"↑": camera.pan_view(Vector2.UP)
+		"↓": camera.pan_view(Vector2.DOWN)

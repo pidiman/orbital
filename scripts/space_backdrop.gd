@@ -30,4 +30,4 @@ func _draw() -> void:
 
 func _process(_delta: float) -> void:
 	# Sky remains viewport-filling while the world camera pans.
-	position = -get_viewport().get_canvas_transform().origin
+	transform = get_viewport().get_canvas_transform().affine_inverse()

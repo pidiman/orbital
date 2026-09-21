@@ -5,16 +5,18 @@ signal module_selected(world_position: Vector2)
 var model: StationModel
 var selected: String = ""
 var inspected_position: Vector2 = Vector2.INF
-const GRID_RADIUS: int = 4
+var grid_radius: Vector2i = Geometry.grid_radius()
 var snap_enabled: bool = true
 var snap_spacing: float = Geometry.MODULE_SIZE
 var cell_size: float = 55.0
 var center: Vector2 = Vector2.ZERO
 var hover_cell: Vector2i = Vector2i(99, 99)
 var pulses: Array[Dictionary] = []
+var placement_cache: Array[Vector2i] = []
+var placement_cache_key: String = ""
 
 func _ready() -> void:
-	model.changed.connect(queue_redraw)
+	model.changed.connect(_invalidate_placement_cache)
 	model.module_built.connect(_on_built)
 	get_viewport().size_changed.connect(_layout)
 	_layout()
@@ -55,21 +57,20 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _draw() -> void:
 	var grid_color := Color(0.39, 0.57, 0.68, 0.10 if selected.is_empty() else 0.21)
-	var edge: float = (GRID_RADIUS + 0.5) * cell_size
-	for x in range(-4, 5):
-		for y in range(-4, 5):
-			var point := cell_position(Vector2i(x, y))
-			draw_circle(point, 1.2, grid_color)
+	var edge: Vector2 = (Vector2(grid_radius) + Vector2.ONE * 0.5) * cell_size
+	for x in range(-grid_radius.x, grid_radius.x + 1):
+		for y in range(-grid_radius.y, grid_radius.y + 1):
+			draw_circle(cell_position(Vector2i(x, y)), 1.2, grid_color)
 	if not selected.is_empty():
-		for i in range(10):
-			var offset: float = -edge + i * cell_size
-			draw_line(center + Vector2(offset, -edge), center + Vector2(offset, edge), grid_color, 1)
-			draw_line(center + Vector2(-edge, offset), center + Vector2(edge, offset), grid_color, 1)
-		for x in range(-4, 5):
-			for y in range(-4, 5):
-				var cell := Vector2i(x, y)
-				if model.placement_error(cell_to_world(cell) + snap_offset(), selected).is_empty():
-					draw_rect(Rect2(cell_position(cell) - Vector2.ONE * (cell_size / 2 - 3), Vector2.ONE * (cell_size - 6)), Color(0.3, 0.83, 0.73, 0.07))
+		for x in range(Geometry.grid_dimensions.x + 1):
+			var offset: float = -edge.x + x * cell_size
+			draw_line(center + Vector2(offset, -edge.y), center + Vector2(offset, edge.y), grid_color, 1)
+		for y in range(Geometry.grid_dimensions.y + 1):
+			var offset: float = -edge.y + y * cell_size
+			draw_line(center + Vector2(-edge.x, offset), center + Vector2(edge.x, offset), grid_color, 1)
+		_update_placement_cache()
+		for cell: Vector2i in placement_cache:
+			draw_rect(Rect2(cell_position(cell) - Vector2.ONE * (cell_size / 2 - 3), Vector2.ONE * (cell_size - 6)), Color(0.3, 0.83, 0.73, 0.07))
 	var positions: Array = model.modules.keys()
 	for index in range(positions.size()):
 		var world_position: Vector2 = positions[index]
@@ -86,7 +87,7 @@ func _draw() -> void:
 			draw_string(ThemeDB.fallback_font, point, "T%d" % model.tier_at(world_position), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("7ce8ce") if model.tier_at(world_position) > 1 else Color("a2b5c3"))
 	if model.modules.has(inspected_position):
 		draw_rect(screen_footprint(inspected_position, model.modules[inspected_position]), Color("88d9c6"), false, 1.5)
-	if not selected.is_empty() and absi(hover_cell.x) <= 4 and absi(hover_cell.y) <= 4:
+	if not selected.is_empty() and absi(hover_cell.x) <= grid_radius.x and absi(hover_cell.y) <= grid_radius.y:
 		var valid: bool = model.placement_error(placement_position(get_global_mouse_position()), selected).is_empty()
 		var color := Color("75e1c5") if valid else Color("ee8c86")
 		var rect := screen_footprint(placement_position(get_global_mouse_position()), selected)
@@ -129,3 +130,18 @@ func snap_offset() -> Vector2:
 func screen_footprint(origin: Vector2, kind: String) -> Rect2:
 	var rect: Rect2 = model.footprint_rect(origin, kind)
 	return Rect2(world_to_screen(rect.position), rect.size * cell_size / Geometry.MODULE_SIZE).grow(-2)
+
+func _invalidate_placement_cache() -> void:
+	placement_cache_key = ""
+	queue_redraw()
+
+func _update_placement_cache() -> void:
+	var key: String = selected + str(snap_spacing) + str(snap_enabled)
+	if key == placement_cache_key: return
+	placement_cache_key = key
+	placement_cache.clear()
+	for x in range(-grid_radius.x, grid_radius.x + 1):
+		for y in range(-grid_radius.y, grid_radius.y + 1):
+			var cell := Vector2i(x, y)
+			if model.placement_error(cell_to_world(cell) + snap_offset(), selected).is_empty():
+				placement_cache.append(cell)

@@ -45,7 +45,7 @@ static func run() -> Dictionary:
 	model.collect(100)
 	for point: Vector2 in model.footprint_points(gate, "teleport_gate"):
 		checks["occupied_" + str(point)] = model.placement_error(point, "solar").contains("overlap")
-	checks.bounds = model.placement_error(Vector2(232, 232), "teleport_gate").contains("entire footprint")
+	checks.bounds = model.placement_error(StationGeometry.build_extent(), "teleport_gate").contains("entire footprint")
 	checks.fractional_overlap = model.placement_error(gate + Vector2(0.25, 0.25), "storage").contains("overlap")
 	checks.insufficient_tech = fleet.research.research_error("teleportation").contains("already researched")
 	checks.unknown_region = not fleet.transport.jump(gate, trader, "venus").is_empty()

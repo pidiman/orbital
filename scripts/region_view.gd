@@ -22,7 +22,7 @@ func _draw() -> void:
 	if regions.primary_station_visible():
 		return
 	var area: Vector2 = get_viewport_rect().size
-	draw_set_transform(-get_canvas_transform().origin)
+	draw_set_transform_matrix(get_canvas_transform().affine_inverse())
 	var definition: Dictionary = regions.catalog[regions.current_region]
 	var planet: Dictionary = regions.planets[definition.planet]
 	draw_rect(Rect2(Vector2.ZERO, area), Color(planet.background))
