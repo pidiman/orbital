@@ -27,6 +27,9 @@ var station_view_button: Button
 var grid_controls: HBoxContainer
 var grid_buttons: Dictionary = {}
 var menu_buttons: Dictionary = {}
+var menu_panel: PanelContainer
+var settings_button: Button
+var footer_balance: Control
 var settings_panel: PanelContainer
 var settings_toggles: Dictionary = {}
 var managed_panels: Array[PanelContainer] = []
@@ -251,7 +254,7 @@ func _ready() -> void:
 	footer.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	footer.offset_left = 28
 	footer.offset_right = -28
-	footer.offset_top = -68
+	footer.offset_top = -84
 	footer.offset_bottom = -24
 	footer.add_theme_stylebox_override("panel", _style(Color("101c2a"), Color("2b3a4a")))
 	root.add_child(footer)
@@ -364,7 +367,8 @@ func show_salvage(amount: int, point: Vector2) -> void:
 
 func _process(delta: float) -> void:
 	if is_instance_valid(grid_controls):
-		grid_controls.visible = fleet.regions.primary_station_visible() and (active_menu == "Build" or not selected.is_empty())
+		grid_controls.visible = get_parent().preferences.values.show_grid_controls
+		footer_balance.visible = grid_controls.visible
 	status_time -= delta
 	if status_time <= 0:
 		status_label.text = "Amber: salvage  ·  Violet: mine  ·  Inspect a module to upgrade  ·  Ships: fleet commands" if fleet.regions.primary_station_visible() else "Violet: mine  ·  Outposts/Regions: Scout / view region  ·  Station construction and salvage remain at Home"
@@ -739,7 +743,7 @@ func _setup_menus() -> void:
 	root.add_child(menu_scroll)
 	menu_scroll.add_child(toolbar)
 	toolbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for caption: String in ["Build", "Ships", "Research", "Gate/Travel", "Outposts/Regions", "Trade/Contacts", "Settings"]:
+	for caption: String in ["Build", "Ships", "Research", "Gate/Travel", "Outposts/Regions", "Trade/Contacts", "Menu"]:
 		var button := Button.new()
 		button.text = caption
 		button.custom_minimum_size.y = 44
@@ -754,6 +758,7 @@ func _setup_menus() -> void:
 	research_button.queue_free()
 	research_button = menu_buttons["Research"]
 	_setup_settings()
+	_setup_menu()
 	_wrap_panel(panel, "Build / Ships")
 	_wrap_panel(research_panel, "Research")
 	_wrap_panel(gate_panel, "Gate / Travel")
@@ -793,7 +798,7 @@ func _wrap_panel(target: PanelContainer, title: String) -> void:
 	heading.add_child(close)
 	panel_closes[target.get_instance_id()] = close
 	var view: Node = region_navigation if target == region_navigation.panel else target
-	if view != panel and view != ship_context and view != settings_panel:
+	if view != panel and view != ship_context and view != settings_panel and view != menu_panel:
 		var old_close: Button = view.close_button
 		old_close.get_parent().hide()
 		view.close_button = close
@@ -841,10 +846,10 @@ func _layout_menus() -> void:
 	region_navigation.location_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	orbit_label.hide() # Replaced by the always-visible location indicator and Regions details.
 	for target: PanelContainer in managed_panels:
-		var width: float = minf(380 if target == panel or target == ship_context or target == settings_panel else 820, viewport_size.x - 56)
+		var width: float = minf(380 if target == panel or target == ship_context or target == settings_panel or target == menu_panel else 820, viewport_size.x - 56)
 		target.position = Vector2(viewport_size.x - width - 28, top)
-		var height: float = maxf(100, viewport_size.y - top - 84)
-		target.size = Vector2(width, minf(height, 360) if target == ship_context else height)
+		var height: float = maxf(100, viewport_size.y - top - 100)
+		target.size = Vector2(width, minf(height, 220) if target == menu_panel else (minf(height, 360) if target == ship_context else height))
 
 func close_panels() -> void:
 	if is_instance_valid(dev_panel): dev_panel.hide()
@@ -872,7 +877,8 @@ func open_menu(menu: String) -> void:
 		"Build", "Ships":
 			activate_panel(panel, menu)
 			tabs.current_tab = 0 if menu == "Build" else 1
-		"Settings": activate_panel(settings_panel, "Settings")
+		"Menu": activate_panel(menu_panel, "Menu")
+		"Settings": activate_panel(settings_panel, "Menu")
 		"Research": research_panel.open_panel()
 		"Gate/Travel": gate_panel.open_panel()
 		"Outposts/Regions": region_navigation.open_region(fleet.regions.current_region)
@@ -981,8 +987,20 @@ func _setup_grid_controls() -> void:
 	grid_controls = HBoxContainer.new()
 	grid_controls.name = "GridViewControls"
 	grid_controls.add_theme_constant_override("separation", 6)
-	root.add_child(grid_controls)
-	for caption: String in ["Fit grid", "−", "+", "←", "→", "↑", "↓"]:
+	var row := HBoxContainer.new()
+	footer.add_child(row)
+	status_label.reparent(row)
+	row.add_child(grid_controls)
+	row.move_child(grid_controls, 0)
+	grid_controls.custom_minimum_size.x = 210
+	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	footer_balance = Control.new()
+	footer_balance.custom_minimum_size.x = 210
+	footer_balance.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(footer_balance)
+	for caption: String in ["Fit grid", "−", "+"]:
 		var button := Button.new()
 		button.text = caption
 		button.custom_minimum_size = Vector2(48, 44)
@@ -992,10 +1010,11 @@ func _setup_grid_controls() -> void:
 		grid_buttons[caption] = button
 	get_viewport().size_changed.connect(_layout_grid_controls)
 	_layout_grid_controls()
-	grid_controls.hide()
+	grid_controls.visible = get_parent().preferences.values.show_grid_controls
+	footer_balance.visible = grid_controls.visible
 
 func _layout_grid_controls() -> void:
-	grid_controls.position = Vector2(28, get_viewport().get_visible_rect().size.y - 122)
+	grid_controls.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 func _grid_action(caption: String) -> void:
 	var camera: Camera2D = get_parent().ship_camera
@@ -1003,10 +1022,6 @@ func _grid_action(caption: String) -> void:
 		"Fit grid": camera.fit_grid()
 		"−": camera.zoom_view(1.0 / 1.25)
 		"+": camera.zoom_view(1.25)
-		"←": camera.pan_view(Vector2.LEFT)
-		"→": camera.pan_view(Vector2.RIGHT)
-		"↑": camera.pan_view(Vector2.UP)
-		"↓": camera.pan_view(Vector2.DOWN)
 
 func _setup_settings() -> void:
 	settings_panel = PanelContainer.new()
@@ -1041,3 +1056,19 @@ func pointer_over_ui(point: Vector2) -> bool:
 		if control.is_visible_in_tree() and control.get_global_rect().has_point(point): return true
 	var hovered := get_viewport().gui_get_hovered_control()
 	return is_instance_valid(hovered) and hovered != root and hovered.mouse_filter != Control.MOUSE_FILTER_IGNORE
+
+func _setup_menu() -> void:
+	menu_panel = PanelContainer.new()
+	menu_panel.name = "MainMenu"
+	root.add_child(menu_panel)
+	var body := VBoxContainer.new()
+	menu_panel.add_child(body)
+	var old_row := save_button.get_parent()
+	save_button.reparent(body)
+	load_button.reparent(body)
+	old_row.queue_free()
+	settings_button = Button.new()
+	settings_button.text = "Settings"
+	settings_button.pressed.connect(func() -> void: open_menu("Settings"))
+	body.add_child(settings_button)
+	_wrap_panel(menu_panel, "Menu")

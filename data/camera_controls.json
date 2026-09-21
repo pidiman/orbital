@@ -4,6 +4,18 @@
   "edge_width": 24.0,
   "bounds_margin": 240.0,
   "options": [
-    {"id": "edge_scrolling", "label": "Edge scrolling", "type": "bool", "default": false}
-  ]
+    {
+      "id": "edge_scrolling",
+      "label": "Edge scrolling",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "id": "show_grid_controls",
+      "label": "Show Fit grid & zoom controls",
+      "type": "bool",
+      "default": true
+    }
+  ],
+  "keyboard_zoom_rate": 1.5
 }

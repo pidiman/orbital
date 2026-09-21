@@ -75,9 +75,13 @@ func edge_direction(point: Vector2) -> Vector2:
 	return Vector2(float(point.x >= area.end.x - band) - float(point.x < band), float(point.y >= area.end.y - band) - float(point.y < band)).normalized()
 
 func _process(delta: float) -> void:
-	if not focused or pending or game.hud.has_open_panel(): return
+	if not focused or pending: return
 	var owner: Control = get_viewport().gui_get_focus_owner()
 	if owner is LineEdit or owner is TextEdit: return
+	var zoom_direction := float(Input.is_physical_key_pressed(KEY_BRACKETRIGHT)) - float(Input.is_physical_key_pressed(KEY_BRACKETLEFT))
+	if zoom_direction != 0.0:
+		game.ship_camera.zoom_view(exp(zoom_direction * float(game.preferences.definitions.keyboard_zoom_rate) * minf(delta, 0.05)))
+	if game.hud.has_open_panel(): return
 	var direction := Vector2(float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)), float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))
 	if direction == Vector2.ZERO: direction = edge_direction(pointer)
 	if direction != Vector2.ZERO:

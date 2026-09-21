@@ -147,7 +147,8 @@ func use(button: Control) -> void:
 				break
 	if not button.is_visible_in_tree():
 		var menu: String = ""
-		if game.hud.tool_buttons.values().has(button): menu = "Build"
+		if game.hud.menu_panel.is_ancestor_of(button): menu = "Menu"
+		elif game.hud.tool_buttons.values().has(button): menu = "Build"
 		elif game.hud.region_navigation.region_buttons.values().has(button): menu = "Outposts/Regions"
 		elif game.hud.panel.is_ancestor_of(button): menu = "Ships"
 		if not menu.is_empty():

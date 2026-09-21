@@ -69,7 +69,7 @@ func _ready() -> void:
 	game.preferences.path = "user://camera-test-preferences.cfg"
 	game.preferences.enabled = true
 	before = game.persistence.snapshot()
-	await use(hud.menu_buttons.Settings)
+	await use(hud.settings_button)
 	await use(hud.settings_toggles.edge_scrolling)
 	checks.toggle_on = game.preferences.values.edge_scrolling
 	checks.menu_blocks_edge = input.edge_direction(Vector2(1, 450)) == Vector2.ZERO
@@ -85,7 +85,7 @@ func _ready() -> void:
 	input._process(0.05)
 	checks.edge_moves = camera.position.x < origin.x
 	checks.ui_blocks_edge = input.edge_direction(Vector2(40, 30)) == Vector2.ZERO
-	await use(hud.menu_buttons.Settings)
+	await use(hud.settings_button)
 	await use(hud.settings_toggles.edge_scrolling)
 	hud.close_panels()
 	checks.toggle_off = input.edge_direction(Vector2(1, 450)) == Vector2.ZERO
@@ -99,7 +99,7 @@ func _ready() -> void:
 	checks.reset = camera.position == center and camera.zoom == Vector2.ONE
 	camera.fit_grid()
 	checks.fit = camera.zoom.x < 1.0
-	await use(hud.menu_buttons.Settings)
+	await use(hud.settings_button)
 	save_frame("camera_settings")
 	game.fleet._discover_region("venus")
 	game.fleet.regions.current_region = "venus"

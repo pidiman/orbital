@@ -13,13 +13,11 @@ func _ready() -> void:
 	await click(game.get_viewport().get_canvas_transform() * game.board.world_to_screen(Vector2(464, 0)))
 	checks.outer_cell_ui_build = game.model.modules.get(Vector2(464, 0)) == "solar"
 	checks.existing_positions_fixed = original.keys().all(func(p: Vector2) -> bool: return game.model.modules.get(p) == original[p])
-	checks.grid_controls_clear_footer = hud.grid_controls.get_global_rect().end.y < hud.footer.position.y
+	checks.grid_controls_inside_footer = hud.footer.get_global_rect().encloses(hud.grid_controls.get_global_rect())
 	var previous_zoom: Vector2 = game.ship_camera.zoom
 	await touch_at(hud.grid_buttons["+"].get_global_rect().get_center())
 	checks.touch_zoom = game.ship_camera.zoom.x > previous_zoom.x
-	var previous_position: Vector2 = game.ship_camera.position
-	await touch_at(hud.grid_buttons["→"].get_global_rect().get_center())
-	checks.touch_pan = game.ship_camera.position.x > previous_position.x
+	checks.no_arrow_controls = hud.grid_buttons.size() == 3
 	await use(hud.grid_buttons["Fit grid"])
 	save_frame("expanded_grid")
 	hud.close_panels()
