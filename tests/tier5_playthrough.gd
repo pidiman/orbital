@@ -16,7 +16,7 @@ func _ready() -> void:
 		hud.close_panels()
 		await click(game.get_viewport().get_canvas_transform() * game.board.world_to_screen(point))
 		var kind: String = game.model.modules[point]
-		checks[kind + " tiers listed"] = hud.upgrade_detail.text.contains("T1") and hud.upgrade_detail.text.contains("T5") and hud.upgrade_detail.text.contains("Materials")
+		checks[kind + " compact preview"] = hud.upgrade_detail.text.begins_with("Next:") and not hud.upgrade_detail.text.contains("T5") and hud.upgrade_detail.text.contains("Materials")
 		for tier in range(2, 6):
 			var upgrade: Dictionary = game.model.next_upgrade(point)
 			var funds: int = game.model.materials
@@ -24,7 +24,7 @@ func _ready() -> void:
 			await use(hud.upgrade_button)
 			checks["%s T%d UI upgrade" % [kind, tier]] = game.model.tier_at(point) == tier and game.model.materials == funds - int(upgrade.cost.materials) and hud.upgrade_title.text.contains("Tier %d" % tier)
 			if kind == "miner_dock": checks["dock T%d slots" % tier] = game.fleet.docking.usage[game.model.structure_id_at(point)].size() == int(game.model.definition_at(point).docking.capacity)
-		checks[kind + " max UI"] = hud.upgrade_button.disabled and hud.upgrade_detail.text.contains("T5 [CURRENT]")
+		checks[kind + " max UI"] = hud.upgrade_button.disabled and hud.upgrade_detail.text.contains("Maxed") and not hud.upgrade_detail.text.contains("Next:")
 		checks[kind + " footer clearance"] = hud.panel.get_global_rect().end.y < hud.footer.position.y
 		save_frame(kind + "_tier5")
 	# Insufficient Materials is visible as disabled button + clear tooltip.

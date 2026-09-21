@@ -79,3 +79,23 @@ Dedicated Miner/Scout/Trade/Material/Jump docks are now in Build. Dock inspectio
 shows occupied/total parking slots. Owned-ship tiles and context panels show
 Parked or Idle · no dock; homeless explanations use the existing bottom bar.
 Parked sprites remain selectable through the same map/tray selection path.
+
+
+## Compact inspection and persistent colony status
+
+Module inspection shows the current tier and resolved current stats, followed by
+`Next: <effect> for <cost>`. The upgrade action names the next tier. There is no
+T1–T5 breakdown or repeated NEXT heading. At maximum tier, only current stats
+and Maxed remain; upgrade and demolition behavior/costs are unchanged.
+
+The resource bar beneath the menu bar now has two rows: Save/Load plus resource
+indicators, then Miners (idle/total), Refineries (count/status), and colony
+level. The existing three Label instances render here with the same refresh
+values/signals; they no longer appear in module details or disappear in Ships.
+Both rows can wrap. The tray, region indicator and panels follow the resource
+bar's measured height, keeping their rectangles separate.
+
+`tests/hud_cleanup_playthrough.gd` verifies compact current/next/maxed details,
+unchanged model snapshots on inspection, live status updates, label ownership,
+native-touch navigation across all menus, and bar/tray/panel clearance at
+1280×860 and 960×720. No models, data definitions or save fields are modified.

@@ -45,10 +45,10 @@ Demolition refunds still follow the existing Materials-investment rules.
 
 ## UI and persistence
 
-Inspection lists T1–T5 with costs/effects, marks the current tier, and previews
-the next tier. The Upgrade button shows its cost and disables with a clear
+Inspection shows the current tier and its stats, followed by one compact
+`Next: <effect> for <cost>` preview. The Upgrade button names the next tier and disables with a clear
 insufficient-resource tooltip. The panel scrolls above the bottom message bar;
-T5 shows Maximum tier. Dock inspection uses upgraded occupancy/capacity.
+T5 shows Maxed with no next-tier preview. Dock inspection uses upgraded occupancy/capacity.
 
 Save version and schema remain unchanged. Tier values already persist in the
 v2 core compatibility projection and `extensions.world_locations` structure
@@ -64,6 +64,6 @@ T5, exact spending, improving stats, stable IDs, dock capacity filling, maximum
 and insufficient-funds rejection, old-definition snapshot migration, high-tier
 round-trips, T5 refinery conversion and data-only future currency costs.
 `tests/tier5_playthrough.gd` drives solar and Miner Dock upgrades through the real
-UI, checks previews, all tiers, capacity usage, footer clearance, insufficient
+UI, checks current/next previews, capacity usage, footer clearance, insufficient
 Materials and actual disk save/load. Existing regression tests retain their T2
 cost/effect assertions; only former T2-maximum expectations advance to T5.

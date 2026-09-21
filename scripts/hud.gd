@@ -73,6 +73,8 @@ var tool_buttons: Dictionary = {}
 var selected: String = ""
 var status_time: float = 0.0
 var floating: Array[Dictionary] = []
+var resource_bar: PanelContainer
+var resource_status: HFlowContainer
 var panel: PanelContainer
 var root: Control
 const INK := Color("dfebf2")
@@ -87,21 +89,33 @@ func _ready() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 	var header := PanelContainer.new()
+	resource_bar = header
+	header.name = "ResourceBar"
 	header.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	header.offset_left = 28
 	header.offset_top = 80
 	header.offset_right = -28
-	header.offset_bottom = 136
+	header.offset_bottom = 160
 	header.add_theme_stylebox_override("panel", _style(Color("111d2c"), Color("253647")))
 	root.add_child(header)
 	var header_margin := MarginContainer.new()
 	for side: String in ["left", "right"]:
 		header_margin.add_theme_constant_override("margin_" + side, 24)
 	header.add_child(header_margin)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	header_margin.add_child(row)
+	var header_rows := VBoxContainer.new()
+	header_rows.add_theme_constant_override("separation", 8)
+	header_margin.add_child(header_rows)
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 16)
+	row.add_theme_constant_override("v_separation", 6)
+	row.alignment = FlowContainer.ALIGNMENT_CENTER
+	header_rows.add_child(row)
+	resource_status = HFlowContainer.new()
+	resource_status.name = "ColonyStatus"
+	resource_status.alignment = FlowContainer.ALIGNMENT_CENTER
+	resource_status.add_theme_constant_override("h_separation", 24)
+	resource_status.add_theme_constant_override("v_separation", 4)
+	header_rows.add_child(resource_status)
 	var branding := VBoxContainer.new()
 	branding.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	branding.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -219,9 +233,9 @@ func _ready() -> void:
 	cancel.add_theme_stylebox_override("hover", _style(Color("20374a"), CYAN))
 	cancel.pressed.connect(func() -> void: choose(""); close_panels())
 	column.add_child(cancel)
-	fleet_label = _label(column, "", 12, Color("baa1f5"))
-	refinery_label = _label(column, "", 12, GOLD)
-	level_label = _label(column, "", 20, INK)
+	fleet_label = _label(resource_status, "", 12, Color("baa1f5"))
+	refinery_label = _label(resource_status, "", 12, GOLD)
+	level_label = _label(resource_status, "", 12, INK)
 	count_label = _label(column, "", 12, MUTED)
 	goal_bar = ProgressBar.new()
 	goal_bar.show_percentage = false
@@ -616,22 +630,15 @@ func _refresh_upgrade() -> void:
 		upgrade_stats.text += "\nParking: %d / %d ships" % [fleet.docking.usage.get(dock_id, {}).size(), int(definition.docking.capacity)]
 	if definition.has("conversion"):
 		upgrade_stats.text += "\n%d Minerals → %d Materials / %ds" % [definition.conversion.input, definition.conversion.output, definition.conversion.seconds]
-	var rows: PackedStringArray = []
-	var kind: String = model.modules[selected_position]
 	var current_tier: int = model.tier_at(selected_position)
-	rows.append("T1%s · Base · %s" % [" [CURRENT]" if current_tier == 1 else "", model.catalog[kind].effect])
-	var tiers: Array = model.catalog[kind].get("upgrades", [])
-	for index in range(tiers.size()):
-		rows.append("T%d%s · %s\n%s" % [index + 2, " [CURRENT]" if current_tier == index + 2 else "", model.upgrade_cost_text(tiers[index].cost), tiers[index].description])
-	upgrade_detail.text = "\n\n".join(rows)
 	var next: Dictionary = model.next_upgrade(selected_position)
 	if next.is_empty():
-		upgrade_detail.text += "\n\nMaximum tier reached."
+		upgrade_detail.text = "Maxed · Maximum tier reached."
 		upgrade_button.text = "Maximum tier"
 		upgrade_button.disabled = true
 		return
-	upgrade_detail.text += "\n\nNEXT T%d\n" % (current_tier + 1) + str(next.description)
-	upgrade_button.text = "Upgrade to T%d · %s" % [current_tier + 1, model.upgrade_cost_text(next.cost)]
+	upgrade_detail.text = "Next: %s for %s" % [next.description, model.upgrade_cost_text(next.cost)]
+	upgrade_button.text = "Upgrade to T%d" % (current_tier + 1)
 	var error: String = model.upgrade_error(selected_position)
 	upgrade_button.disabled = not error.is_empty()
 	upgrade_button.tooltip_text = error
@@ -748,6 +755,7 @@ func _setup_menus() -> void:
 	_wrap_panel(research_panel, "Research")
 	_wrap_panel(gate_panel, "Gate / Travel")
 	_install_secondary_panels()
+	resource_bar.resized.connect(_layout_menus)
 	get_viewport().size_changed.connect(_layout_menus)
 	close_panels()
 	_layout_menus()
@@ -819,13 +827,14 @@ func _layout_menus() -> void:
 	menu_scroll.size = Vector2(viewport_size.x - 258, 60)
 	toolbar.custom_minimum_size.y = 44
 	title_label.position = Vector2(42, 20)
-	var top: float = 290.0
+	var tray_top: float = resource_bar.position.y + resource_bar.size.y + 8.0
+	var top: float = tray_top + 146.0
 	if is_instance_valid(ship_tray):
-		ship_tray.position = Vector2(28, 144)
+		ship_tray.position = Vector2(28, tray_top)
 		ship_tray.size = Vector2(viewport_size.x - 56, 94)
-		station_view_button.position = Vector2(viewport_size.x - 172, 240)
+		station_view_button.position = Vector2(viewport_size.x - 172, tray_top + 96)
 		station_view_button.size = Vector2(144, 44)
-	region_navigation.location_label.position = Vector2(40, 252)
+	region_navigation.location_label.position = Vector2(40, tray_top + 108)
 	region_navigation.location_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	orbit_label.hide() # Replaced by the always-visible location indicator and Regions details.
 	for target: PanelContainer in managed_panels:
@@ -845,7 +854,7 @@ func activate_panel(target: PanelContainer, menu: String) -> void:
 	close_panels()
 	choose("")
 	active_menu = menu
-	for readout: Control in [refinery_label, level_label, count_label, goal_bar, goal_label]: readout.visible = menu != "Ships"
+	for readout: Control in [count_label, goal_bar, goal_label]: readout.visible = menu != "Ships"
 	if target == panel: target.get_node("MenuFrame").get_child(0).get_child(0).text = menu
 	if menu_buttons.has(menu): menu_buttons[menu].add_theme_stylebox_override("normal", _style(Color("25404b"), CYAN))
 	target.show()

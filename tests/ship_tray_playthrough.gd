@@ -128,6 +128,18 @@ func _ready() -> void:
 	game.model.materials = 0
 	game.model.changed.emit()
 	var piece: Dictionary = game.debris.pieces[0]
+	# Choose exposed debris: map-ship selection takes priority when a sprite
+	# crosses the salvage point, especially in this large moving fleet fixture.
+	for candidate: Dictionary in game.debris.pieces:
+		var clear: bool = true
+		for id: int in game.model.ships:
+			if game.fleet.transport.location(id) == game.fleet.regions.current_region and candidate.point.distance_to(game.ship_camera.ship_point(id)) < 70:
+				clear = false
+		for rock: Dictionary in game.asteroids.rocks.values():
+			if candidate.point.distance_to(rock.point) < 50: clear = false
+		if clear:
+			piece = candidate
+			break
 	game.ship_camera.ship_id = -1
 	game.ship_camera.position = piece.point
 	game.ship_camera.force_update_scroll()
