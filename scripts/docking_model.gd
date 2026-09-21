@@ -26,7 +26,7 @@ func compatible(id: int, dock_id: String, available: Dictionary) -> bool:
 	if not available.has(dock_id): return false
 	var ship: Dictionary = fleet.model.locations.ships[id]
 	var structure: Dictionary = fleet.model.locations.structures[dock_id]
-	return structure.region == ship.region and structure.owner == ship.owner and available[dock_id].ship_type == fleet.model.ship_catalog[ship.kind].get("dock_type", ship.kind)
+	return structure.region == ship.region and structure.owner == ship.owner and (available[dock_id].ship_type == "*" or available[dock_id].ship_type == fleet.model.ship_catalog[ship.kind].get("dock_type", ship.kind))
 
 func reconcile() -> void:
 	if suspended: return
@@ -72,7 +72,7 @@ func waiting_message() -> String:
 
 func homeless_message(id: int) -> String:
 	var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[id]]
-	return "%s #%d idle — no free %s dock. Ship can still take jobs." % [definition.name, id, definition.name.replace(" Ship", "")]
+	return "%s #%d idle — no free Space Dock slot. Ship can still take jobs." % [definition.name, id]
 
 func validate(data: Dictionary) -> String:
 	if not data.get("ships") is Dictionary or not data.get("usage") is Dictionary:

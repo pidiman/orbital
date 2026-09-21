@@ -433,16 +433,21 @@ func restore(document: Variant) -> String:
 	# Migrate retired structures only after validating the complete old graph.
 	# Same identity/position preserves connectivity, references and station layout.
 	var replaced_modules: int = 0
+	var replaced_docks: int = 0
 	var replacement_refund: int = 0
 	for structure: Dictionary in candidate.locations.structures.values():
 		var definition: Dictionary = candidate.catalog.get(structure.kind, {})
 		if not definition.has("migration_replacement"): continue
 		var replacement: String = definition.migration_replacement
-		candidate_fleet.cancel_unit(structure.position)
+		if definition.has("docking"):
+			structure.state["tier"] = int(definition.migration_tiers[str(int(structure.state.get("tier", 1)))])
+			replaced_docks += 1
+		else:
+			candidate_fleet.cancel_unit(structure.position)
+			replaced_modules += 1
 		replacement_refund += maxi(0, int(definition.cost) - int(candidate.catalog[replacement].cost))
 		structure.kind = replacement
-		replaced_modules += 1
-	if replaced_modules > 0:
+	if replaced_modules + replaced_docks > 0:
 		candidate.materials += replacement_refund
 		candidate.recalculate()
 		for field: String in STATION_FIELDS: station_data[field] = candidate.get(field)
@@ -471,7 +476,9 @@ func restore(document: Variant) -> String:
 	supply.rng.state = int(supply_data.rng_state)
 	migration_notice = "Legacy remote mining orders released; ore preserved. Send Miners through a gate and found a local outpost." if cancelled_remote > 0 else ""
 	if replaced_modules > 0:
-		migration_notice += " Converted %d legacy Mining Ship modules to Miner Docks in place; refunded %d Materials. Module mining jobs released; Ore preserved." % [replaced_modules, replacement_refund]
+		migration_notice += " Converted %d legacy Mining Ship modules to Space Docks in place; refunded %d Materials. Module mining jobs released; Ore preserved." % [replaced_modules, replacement_refund]
+	if replaced_docks > 0:
+		migration_notice += " Converted %d typed docks to Space Docks (old T1→T2, T2→T3, T3–T5→T4). Excess parked ships wait for a free slot and remain usable." % replaced_docks
 	autosave_blocked = false
 	preserved = migrated.duplicate(true)
 	dirty = false

@@ -160,7 +160,7 @@
       "yield": 18
     },
     "buildable": false,
-    "migration_replacement": "miner_dock"
+    "migration_replacement": "space_dock"
   },
   "refinery": {
     "name": "Refinery",
@@ -345,7 +345,16 @@
         },
         "description": "Parking capacity: 8 matching ships"
       }
-    ]
+    ],
+    "buildable": false,
+    "migration_replacement": "space_dock",
+    "migration_tiers": {
+      "1": 2,
+      "2": 3,
+      "3": 4,
+      "4": 4,
+      "5": 4
+    }
   },
   "scout_dock": {
     "name": "Scout Dock",
@@ -410,7 +419,16 @@
         },
         "description": "Parking capacity: 8 matching ships"
       }
-    ]
+    ],
+    "buildable": false,
+    "migration_replacement": "space_dock",
+    "migration_tiers": {
+      "1": 2,
+      "2": 3,
+      "3": 4,
+      "4": 4,
+      "5": 4
+    }
   },
   "trader_dock": {
     "name": "Trade Dock",
@@ -475,7 +493,16 @@
         },
         "description": "Parking capacity: 8 matching ships"
       }
-    ]
+    ],
+    "buildable": false,
+    "migration_replacement": "space_dock",
+    "migration_tiers": {
+      "1": 2,
+      "2": 3,
+      "3": 4,
+      "4": 4,
+      "5": 4
+    }
   },
   "material_ship_dock": {
     "name": "Material Dock",
@@ -540,7 +567,16 @@
         },
         "description": "Parking capacity: 8 matching ships"
       }
-    ]
+    ],
+    "buildable": false,
+    "migration_replacement": "space_dock",
+    "migration_tiers": {
+      "1": 2,
+      "2": 3,
+      "3": 4,
+      "4": 4,
+      "5": 4
+    }
   },
   "jump_ship_dock": {
     "name": "Jump Dock",
@@ -605,7 +641,16 @@
         },
         "description": "Parking capacity: 8 matching ships"
       }
-    ]
+    ],
+    "buildable": false,
+    "migration_replacement": "space_dock",
+    "migration_tiers": {
+      "1": 2,
+      "2": 3,
+      "3": 4,
+      "4": 4,
+      "5": 4
+    }
   },
   "xeno_miner_dock": {
     "name": "Xeno Dock",
@@ -669,6 +714,68 @@
           }
         },
         "description": "Parking capacity: 8 matching ships"
+      }
+    ],
+    "buildable": false,
+    "migration_replacement": "space_dock",
+    "migration_tiers": {
+      "1": 2,
+      "2": 3,
+      "3": 4,
+      "4": 4,
+      "5": 4
+    }
+  },
+  "space_dock": {
+    "name": "Space Dock",
+    "cost": 25,
+    "power_use": 1,
+    "power_output": 0,
+    "capacity": 0,
+    "color": "9bc9df",
+    "description": "Parking for any ship role in this region. Jobs never require a dock.",
+    "effect": "1 universal parking slot · 1 power",
+    "docking": {
+      "ship_type": "*",
+      "capacity": 1
+    },
+    "art": "ship_dock",
+    "upgrades": [
+      {
+        "cost": {
+          "materials": 30
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "*",
+            "capacity": 2
+          }
+        },
+        "description": "Parking capacity: 2 ships of any role"
+      },
+      {
+        "cost": {
+          "materials": 55
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "*",
+            "capacity": 3
+          }
+        },
+        "description": "Parking capacity: 3 ships of any role"
+      },
+      {
+        "cost": {
+          "materials": 90
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "*",
+            "capacity": 4
+          }
+        },
+        "description": "Parking capacity: 4 ships of any role"
       }
     ]
   }

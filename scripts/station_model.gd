@@ -83,7 +83,7 @@ func placement_error(world_position: Vector2, kind: String) -> String:
 	if not catalog.has(kind):
 		return "Choose a module first."
 	if not catalog[kind].get("buildable", true):
-		return "This legacy module is retired. Buy a Miner ship and build a Miner Dock instead."
+		return "This legacy module is retired. Use Space Dock for parking and ships for missions."
 	if not module_unlocked(kind):
 		return "Research this module's technology in a Research Lab first."
 	var points: Array[Vector2] = footprint_points(world_position, kind)

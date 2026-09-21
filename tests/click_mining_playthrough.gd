@@ -13,10 +13,10 @@ func _ready() -> void:
 	game = get_tree().root.get_node("Orbital")
 	game.get_node("ResourceClock").set_process(false)
 	var hud = game.hud
-	checks.build_catalog = not hud.tool_buttons.has("mining_ship") and hud.tool_buttons.has("miner_dock")
+	checks.build_catalog = not hud.tool_buttons.has("mining_ship") and hud.tool_buttons.has("space_dock")
 	game.model.materials = 1000
 	for i in range(1, 5): game.model.build(Vector2(i * 58, 0), "solar")
-	game.model.build(Vector2(0, 58), "miner_dock")
+	game.model.build(Vector2(0, 58), "space_dock")
 	await use(hud.ship_buttons.miner)
 	var miner: int = game.model.next_ship_id
 	checks.parks = game.fleet.docking.ships[miner].state == "parked"
