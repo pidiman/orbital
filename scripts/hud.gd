@@ -260,13 +260,15 @@ func _ready() -> void:
 	footer.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	footer.offset_left = 28
 	footer.offset_right = -28
-	footer.offset_top = -84
-	footer.offset_bottom = -24
-	footer.add_theme_stylebox_override("panel", _style(Color("101c2a"), Color("2b3a4a")))
+	footer.offset_top = -44
+	footer.offset_bottom = -14
+	footer.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	root.add_child(footer)
 	status_label = _label(footer, "", 14, INK)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	status_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_footer_text_style(status_label)
 	orbit_label = _label(root, "EARTH  /  408 KM\nA small beginning. An infinite horizon.", 13, Color("6894aa"))
 	orbit_label.position = Vector2(42, 0)
 	orbit_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
@@ -372,6 +374,7 @@ func show_salvage(amount: int, point: Vector2, resource: String = "materials") -
 	floating.append({"label": label, "time": 0.0, "duration": 1.2})
 
 func _process(delta: float) -> void:
+	status_label.tooltip_text = status_label.text
 	if is_instance_valid(zoom_label):
 		zoom_label.text = ("%.2f" % get_parent().ship_camera.zoom.x).trim_suffix("0") + "x"
 	if is_instance_valid(grid_controls):
@@ -1036,12 +1039,18 @@ func _setup_grid_controls() -> void:
 	for caption: String in ["Fit grid", "−", "+"]:
 		var button := Button.new()
 		button.text = caption
-		button.custom_minimum_size = Vector2(48, 44)
+		button.custom_minimum_size = Vector2(48, 30)
+		for state: String in ["normal", "hover", "pressed", "disabled", "focus"]:
+			button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+		button.add_theme_color_override("font_hover_color", CYAN)
+		button.add_theme_color_override("font_focus_color", CYAN)
+		_footer_text_style(button)
 		button.tooltip_text = "Change the view only; station positions stay fixed."
 		button.pressed.connect(_grid_action.bind(caption))
 		grid_controls.add_child(button)
 		grid_buttons[caption] = button
 	zoom_label = _label(grid_controls, "1.0x", 14, INK)
+	_footer_text_style(zoom_label)
 	zoom_label.custom_minimum_size.x = 50
 	zoom_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	zoom_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -1137,3 +1146,11 @@ func _setup_menu() -> void:
 	settings_button.pressed.connect(func() -> void: open_menu("Settings"))
 	body.add_child(settings_button)
 	_wrap_panel(menu_panel, "Menu")
+
+func _footer_text_style(control: Control) -> void:
+	control.add_theme_color_override("font_outline_color", Color(0.015, 0.025, 0.04, 0.95))
+	control.add_theme_constant_override("outline_size", 3)
+	if control is Label:
+		control.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+		control.add_theme_constant_override("shadow_offset_x", 1)
+		control.add_theme_constant_override("shadow_offset_y", 1)
