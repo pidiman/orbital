@@ -644,6 +644,9 @@ func inspect_module(world_position: Vector2) -> void:
 
 func _refresh_upgrade() -> void:
 	refinery_selector.hide()
+	upgrade_title.show()
+	if is_instance_valid(tabs) and tabs.current_tab == 2 and panel.has_node("MenuFrame"):
+		panel.get_node("MenuFrame").get_child(0).get_child(0).text = "Build"
 	if not fleet.regions.primary_station_visible():
 		upgrade_title.text = "Station at Earth"
 		upgrade_stats.text = "Jump Home to inspect or modify modules."
@@ -663,7 +666,9 @@ func _refresh_upgrade() -> void:
 		upgrade_button.disabled = true
 		return
 	var definition: Dictionary = model.definition_at(selected_position)
-	upgrade_title.text = "%s · Tier %d" % [definition.name, model.tier_at(selected_position)]
+	upgrade_title.hide() # The inspect header carries the module name and tier.
+	if tabs.current_tab == 2 and panel.has_node("MenuFrame"):
+		panel.get_node("MenuFrame").get_child(0).get_child(0).text = "%s · Tier %d" % [definition.name, model.tier_at(selected_position)]
 	upgrade_stats.text = "Generates %d Power · uses %d\nMaterial capacity bonus: %d" % [definition.power_output, definition.power_use, definition.capacity]
 	if definition.has("docking"):
 		var dock_id: String = model.structure_id_at(selected_position)
@@ -843,6 +848,7 @@ func _wrap_panel(target: PanelContainer, title: String) -> void:
 	frame.add_child(heading)
 	var label := _label(heading, title, 18, CYAN)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if target == panel: label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var close := Button.new()
 	close.text = "Close ×"
 	close.custom_minimum_size = Vector2(88, 44)
