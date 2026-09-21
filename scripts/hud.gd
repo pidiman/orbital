@@ -12,8 +12,6 @@ var gate_panel: PanelContainer
 var tech_label: Label
 var xenocrystal_label: Label
 var menu_scroll: ScrollContainer
-var more_button: Button
-var more_popup: PopupPanel
 var toolbar: GridContainer
 var title_label: Label
 var ship_tray: ScrollContainer
@@ -838,7 +836,7 @@ func _setup_menus() -> void:
 		label.mouse_filter = Control.MOUSE_FILTER_STOP
 	resource_bar.hide()
 	toolbar = GridContainer.new()
-	toolbar.columns = 4
+	toolbar.columns = 7
 	toolbar.add_theme_constant_override("h_separation", 3)
 	toolbar.add_theme_constant_override("v_separation", 8)
 	menu_scroll = ScrollContainer.new()
@@ -846,31 +844,17 @@ func _setup_menus() -> void:
 	root.add_child(menu_scroll)
 	menu_scroll.add_child(toolbar)
 	toolbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	more_popup = PopupPanel.new()
-	more_popup.name = "MoreMenus"
-	root.add_child(more_popup)
-	var overflow := VBoxContainer.new()
-	more_popup.add_child(overflow)
 	for caption: String in ["Build", "Ships", "Research", "Gate/Travel", "Outposts/Regions", "Trade/Contacts", "Menu"]:
 		var button := Button.new()
 		button.text = caption
-		button.custom_minimum_size.y = 28 if caption in ["Build", "Ships", "Research"] else 36
+		button.custom_minimum_size.y = 28
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.add_theme_font_size_override("font_size", 11)
 		button.add_theme_stylebox_override("normal", _style(Color("172738"), Color("304557")))
 		button.add_theme_stylebox_override("hover", _style(Color("25404b"), CYAN))
-		button.pressed.connect(func() -> void: more_popup.hide(); open_menu(caption))
-		if caption in ["Build", "Ships", "Research"]: toolbar.add_child(button)
-		else: overflow.add_child(button)
+		button.pressed.connect(func() -> void: open_menu(caption))
+		toolbar.add_child(button)
 		menu_buttons[caption] = button
-	more_button = Button.new()
-	more_button.text = "···"
-	more_button.tooltip_text = "Travel, regions, contacts and Menu"
-	more_button.custom_minimum_size = Vector2(32, 28)
-	more_button.add_theme_stylebox_override("normal", _style(Color("14232e"), Color("293d46"), 5))
-	more_button.pressed.connect(func() -> void:
-		more_popup.popup(Rect2i(Vector2i(more_button.global_position + Vector2(0, 32)), Vector2i(205, 160))))
-	toolbar.add_child(more_button)
 	research_button.get_parent().remove_child(research_button)
 	research_button.queue_free()
 	research_button = menu_buttons["Research"]
@@ -948,9 +932,9 @@ func _touch_targets(node: Node) -> void:
 func _layout_menus() -> void:
 	if not is_instance_valid(toolbar): return
 	var viewport_size := get_viewport().get_visible_rect().size
-	toolbar.columns = 4
+	toolbar.columns = 7
 	menu_scroll.position = Vector2(150, 8)
-	menu_scroll.size = Vector2(252, 28)
+	menu_scroll.size = Vector2(maxf(160, viewport_size.x - 510), 28)
 	toolbar.custom_minimum_size.y = 28
 	title_label.position = Vector2(22, 13)
 	if is_instance_valid(compact_resources):
@@ -976,7 +960,6 @@ func _layout_menus() -> void:
 		target.size = Vector2(width, minf(height, 220) if target == menu_panel else (minf(height, 360) if target == ship_context else height))
 
 func close_panels() -> void:
-	if is_instance_valid(more_popup): more_popup.hide()
 	if is_instance_valid(dev_panel): dev_panel.hide()
 	for target: PanelContainer in managed_panels:
 		if is_instance_valid(target): target.hide()
@@ -1231,7 +1214,7 @@ func _setup_settings() -> void:
 	_wrap_panel(settings_panel, "Settings")
 
 func has_open_panel() -> bool:
-	return (is_instance_valid(more_popup) and more_popup.visible) or managed_panels.any(func(item: PanelContainer) -> bool: return item.visible) or (is_instance_valid(dev_panel) and dev_panel.visible)
+	return managed_panels.any(func(item: PanelContainer) -> bool: return item.visible) or (is_instance_valid(dev_panel) and dev_panel.visible)
 
 func pointer_over_ui(point: Vector2) -> bool:
 	var viewport_size := get_viewport().get_visible_rect().size

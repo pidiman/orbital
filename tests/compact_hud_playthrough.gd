@@ -9,7 +9,7 @@ func _ready() -> void:
 	for i in range(1, 12): game.model.build(Vector2(i * 58, 0), "solar")
 	for kind: String in game.model.ship_catalog: game.model.buy_ship(kind)
 	await settle(3)
-	checks.three_primary = hud.toolbar.get_child_count() == 4 and not hud.menu_buttons["Gate/Travel"].is_visible_in_tree()
+	checks.all_inline = hud.toolbar.get_child_count() == 7 and hud.menu_buttons.values().all(func(button: Button) -> bool: return button.is_visible_in_tree() and button.get_parent() == hud.toolbar)
 	checks.seven_roles = hud.ship_tiles.size() == game.model.ship_catalog.size()
 	checks.compact_height = hud.ship_tray.get_global_rect().end.y <= 134
 	checks.resources_beside_menu = hud.compact_resources.position.x >= hud.menu_scroll.get_global_rect().end.x

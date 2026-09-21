@@ -138,9 +138,6 @@ func page(index: int) -> void:
 	if game.hud.active_menu != menu: await click(game.hud.menu_buttons[menu].get_global_rect().get_center())
 
 func use(button: Control) -> void:
-	if game.hud.menu_buttons.values().has(button) and not button.is_visible_in_tree():
-		await click(game.hud.more_button.get_global_rect().get_center())
-		await settle(2)
 	if game.hud.ship_context.is_ancestor_of(button) and not button.is_visible_in_tree():
 		for ship_id: int in game.hud.ship_entries:
 			if game.hud.ship_entries[ship_id].is_ancestor_of(button):
