@@ -9,6 +9,7 @@ const Research = preload("res://scripts/research_model.gd")
 const Transport = preload("res://scripts/gate_transport.gd")
 const Locations = preload("res://scripts/world_locations.gd")
 const LocationValidation = preload("res://scripts/location_save_validation.gd")
+const Hauling = preload("res://scripts/refinery_hauling.gd")
 const Docking = preload("res://scripts/docking_model.gd")
 const VERSION: int = 2
 const DEFAULT_PATH: String = "user://orbital-save.json"
@@ -36,6 +37,7 @@ func _init(station: StationModel, mining: Fleet, sector_supply: Supply) -> void:
 	model = station
 	fleet = mining
 	supply = sector_supply
+	fleet.hauling.changed.connect(request_autosave)
 	fleet.docking.changed.connect(request_autosave)
 	fleet.outposts.changed.connect(request_autosave)
 	fleet.research.changed.connect(request_autosave)
@@ -77,6 +79,8 @@ func snapshot() -> Dictionary:
 	if not document.extensions.has("outposts"):
 		document.extensions["outposts"] = {}
 	document.extensions.outposts["schema_version"] = 1
+	_merge_fields(document.extensions, "refinery_hauling", fleet.hauling, Hauling.FIELDS)
+	document.extensions.refinery_hauling["schema_version"] = 1
 	_merge_fields(document.extensions, "docking", fleet.docking, Docking.FIELDS)
 	document.extensions.docking["schema_version"] = 1
 	_merge_fields(document.extensions, "research", fleet.research, Research.FIELDS)
@@ -423,6 +427,11 @@ func restore(document: Variant) -> String:
 				candidate_fleet.erase_mining_assignment(unit)
 				cancelled_remote += 1
 		fleet_data.jobs = candidate_fleet.jobs
+	var hauling_data: Dictionary = _extension_fields(migrated.extensions, "refinery_hauling", candidate_fleet.hauling, Hauling.FIELDS)
+	if not decode_error.is_empty(): return decode_error
+	error = candidate_fleet.hauling.validate(hauling_data)
+	if not error.is_empty(): return error
+	_apply_fields(candidate_fleet.hauling, hauling_data, Hauling.FIELDS)
 	if migrated.extensions.has("docking"):
 		var docking_data: Dictionary = _extension_fields(migrated.extensions, "docking", candidate_fleet.docking, Docking.FIELDS)
 		if not decode_error.is_empty(): return decode_error
@@ -467,6 +476,7 @@ func restore(document: Variant) -> String:
 	for field: String in Locations.FIELDS:
 		model.locations.set(field, candidate.locations.get(field))
 	fleet.mining_assignments = candidate_fleet.mining_assignments
+	fleet.hauling.jobs = candidate_fleet.hauling.jobs
 	fleet.docking.ships = candidate_fleet.docking.ships
 	fleet.docking.usage = candidate_fleet.docking.usage
 	fleet.docking.suspended = false

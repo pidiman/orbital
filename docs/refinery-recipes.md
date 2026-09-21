@@ -12,7 +12,7 @@ Definitions live in `data/refinery_recipes.json`; `data/modules.json` declares t
 | 4 | 4 → 12 every 1s | 20 → 1 every 14s |
 | 5 | 6 → 18 every 1s | 20 → 1 every 12s |
 
-A batch pauses without spending inputs or losing progress if ingredients are insufficient or the full output won't fit. `output_capacity: "station"` checks the selected output resource against station capacity. Materials retains its existing cap. Because trade Tech was uncapped, this adds a **Refinery-only Tech production ceiling** equal to station capacity; it does not cap trade receipts, change storage rules elsewhere, or discard above-capacity stock. Spending Tech or raising capacity resumes production. Tech is credited through the existing trade-goods authority.
+A batch now pauses against its local output buffer rather than main storage. Recipe inputs, yields and tier durations above remain unchanged; see `docs/refinery-hauling.md` for the 30-unit buffer and assigned Hauler delivery rules. Recipe switches preserve already buffered goods. Tech main-storage capacity is enforced at delivery.
 
 Persistence stays v2: `extensions.world_locations.structures[stable_id].state.refinery_recipe` stores the selected ID. Progress uses the existing canonical `refinery_progress` and compatible legacy projection. Missing recipe fields mean the module's default; invalid IDs fail validation before changing live state. Demolishing a Refinery removes its state with the structure. No recipe is keyed by position in the saved extension.
 

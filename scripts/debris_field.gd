@@ -74,4 +74,4 @@ func _variant(source: Dictionary, id: int) -> String:
 	return variants[random.randi_range(0, variants.size() - 1)]
 
 func _visual_scale(piece: Dictionary) -> float:
-	return maxf(1.0, 0.6 / get_parent().ship_camera.zoom.x) if not piece.visual_variant.is_empty() else 1.0
+	return float(supply.floating_rules.types[piece.resource].get("visual_scale", 1.0)) * get_parent().board.cell_size / 58.0

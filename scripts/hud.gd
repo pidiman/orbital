@@ -22,6 +22,7 @@ var empty_tray: Label
 var context_title: Label
 var context_detail: Label
 var selected_ship_id: int = -1
+var hauling_assignment: int = -1
 var context_gate: Button
 var station_view_button: Button
 var zoom_label: Label
@@ -40,7 +41,7 @@ var panel_closes: Dictionary = {}
 var active_menu: String = ""
 var footer: PanelContainer
 var capability_buttons: Dictionary = {}
-const SHIP_ACTIONS: Dictionary = {"mining": "Assign asteroid", "survey": "Survey sector", "trade": "Trade with contact", "collection": "Deploy at Home", "founding": "Found outpost"}
+const SHIP_ACTIONS: Dictionary = {"hauling": "Assign refinery", "mining": "Assign asteroid", "survey": "Survey sector", "trade": "Trade with contact", "collection": "Deploy at Home", "founding": "Found outpost"}
 const SectorMap = preload("res://scripts/sector_map.gd")
 var sector_map: PanelContainer
 var map_button: Button
@@ -325,6 +326,7 @@ func _style(fill: Color, border: Color, radius: int = 8) -> StyleBoxFlat:
 	return style
 
 func choose(kind: String) -> void:
+	hauling_assignment = -1
 	if not kind.is_empty() and not fleet.regions.primary_station_visible():
 		message("Jump Home to construct station modules.", true)
 		return
@@ -387,8 +389,9 @@ func _process(delta: float) -> void:
 		status_label.text = "Labeled pickups: salvage  ·  Violet asteroids: mine  ·  Inspect a module to upgrade  ·  Ships: fleet commands" if fleet.regions.primary_station_visible() else "Labeled pickups: salvage  ·  Violet: mine  ·  Outposts/Regions: Scout / view region  ·  Station construction remains at Home"
 		if fleet.collection != null and not fleet.collection.waiting_message().is_empty():
 			status_label.text = fleet.collection.waiting_message()
-		if not fleet.docking.waiting_message().is_empty() and fleet.collection.waiting_message().is_empty():
+		if not fleet.docking.waiting_message().is_empty() and fleet.collection.waiting_message().is_empty() and fleet.hauling.waiting_message().is_empty():
 			status_label.text = fleet.docking.waiting_message()
+		if not fleet.hauling.waiting_message().is_empty(): status_label.text = fleet.hauling.waiting_message()
 		status_label.add_theme_color_override("font_color", MUTED)
 	for item: Dictionary in floating:
 		item.time += delta
@@ -415,7 +418,7 @@ func show_minerals(amount: int, point: Vector2) -> void:
 	floating.append({"label": label, "time": 0.0, "duration": 2.0})
 
 func show_refining(amount: int) -> void:
-	message("Refinery output: +%d Materials from Minerals." % amount)
+	message("Refinery buffered: +%d Materials. Assign a Hauler to deliver." % amount)
 
 func _catalog_button(parent: Node, definition: Dictionary) -> Button:
 	var button := Button.new()
@@ -543,6 +546,9 @@ func _refresh_ships() -> void:
 			elif status.is_empty() and fleet.transport.location(ship_id) != fleet.regions.HOME:
 				button.text += " · " + str(fleet.regions.catalog[fleet.transport.location(ship_id)].name)
 			button.disabled = fleet.unit_busy(ship_id) or not work_error.is_empty()
+			if capability == "hauling" and fleet.hauling.jobs.has(ship_id):
+				button.text = "Stop hauling"
+				button.disabled = false
 			if capability != "founding": button.tooltip_text = work_error
 		sell_buttons[ship_id].text = "Decommission · +%d M" % model.ship_refund(ship_id)
 
@@ -556,9 +562,17 @@ func _command_ship(ship_id: int, capability: String = "") -> void:
 			if definition.has(action):
 				capability = action
 				break
+	if capability == "hauling" and fleet.hauling.jobs.has(ship_id):
+		fleet.hauling.stop(ship_id)
+		message("Hauler will stop after delivering its cargo." if fleet.hauling.jobs.has(ship_id) else "Hauling stopped.")
+		return
 	if not definition.has(capability) or fleet.unit_busy(ship_id):
 		return
 	match capability:
+		"hauling":
+			close_panels()
+			hauling_assignment = ship_id
+			message("Click a Home Refinery to assign hauling. ESC cancels selection.", false, 8.0)
 		"founding":
 			var error: String = fleet.outposts.found(ship_id)
 			message("Outpost founded. Local Minerals stay here; hauling is not available yet." if error.is_empty() else error, not error.is_empty(), 8.0)
@@ -617,6 +631,11 @@ func _build_upgrade_page() -> void:
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 func inspect_module(world_position: Vector2) -> void:
+	if hauling_assignment >= 0:
+		var error: String = fleet.hauling.assign(hauling_assignment, world_position)
+		message("Hauler assigned; repeats trips from this Refinery." if error.is_empty() else error, not error.is_empty())
+		if error.is_empty(): hauling_assignment = -1
+		return
 	choose("")
 	selected_position = world_position
 	activate_panel(panel, "Build")
@@ -652,6 +671,13 @@ func _refresh_upgrade() -> void:
 	if definition.has("conversion"):
 		var recipe: Dictionary = model.refinery_recipe(selected_position)
 		upgrade_stats.text += "\n%d %s → %d %s / %ds\n%s" % [recipe.input, recipe.input_resource.capitalize(), recipe.output, recipe.output_resource.capitalize(), recipe.seconds, model.refinery_status(selected_position)]
+		var buffer: Dictionary = model.refinery_buffer(selected_position)
+		var capacity: int = int(definition.output_buffer_capacity)
+		upgrade_stats.text += "\nBuffer: %d / %d · %s" % [capacity - model.refinery_buffer_space(selected_position), capacity, model.upgrade_cost_text(buffer) if not buffer.is_empty() else "empty"]
+		var assigned: int = 0
+		for job: Dictionary in fleet.hauling.jobs.values():
+			if job.refinery_id == model.structure_id_at(selected_position): assigned += 1
+		upgrade_stats.text += "\nHaulers assigned: %d" % assigned
 		refinery_selector.clear()
 		for recipe_id: String in definition.recipes:
 			refinery_selector.add_item(model.refinery_recipes[recipe_id].name)
@@ -916,6 +942,7 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("ui_cancel"):
+		hauling_assignment = -1
 		if has_open_panel():
 			close_panels()
 		else:
@@ -979,6 +1006,7 @@ func _refresh_tray() -> void:
 			tray_rows.add_child(tile)
 			ship_tiles[id] = tile
 		var status: String = "Working" if fleet.unit_busy(id) else ("Parked" if fleet.docking.status(id) == "parked" else "Idle · no dock")
+		if fleet.hauling.jobs.has(id): status = str(fleet.hauling.jobs[id].status)
 		if fleet.collection.jobs.has(id): status = str(fleet.collection.jobs[id].status)
 		if fleet.transport.jobs.has(id): status = "In transit"
 		var tile = ship_tiles[id]
@@ -992,6 +1020,7 @@ func _refresh_tray() -> void:
 			if fleet.transport.jobs.has(id): context_detail.text += " → " + str(fleet.regions.catalog[fleet.transport.jobs[id].destination].name)
 
 func deselect_ship() -> void:
+	hauling_assignment = -1
 	selected_ship_id = -1
 	get_parent().asteroids.selected_ship = -1
 	# Release visual following at the current camera position; jobs are untouched.
@@ -999,6 +1028,7 @@ func deselect_ship() -> void:
 	_refresh_ships()
 
 func select_ship(id: int) -> void:
+	hauling_assignment = -1
 	if not model.ships.has(id): return
 	var region: String = fleet.transport.location(id)
 	var different_region: bool = region != fleet.regions.current_region

@@ -27,6 +27,15 @@ static func validate_graph(data: Dictionary, model: StationModel, region_data: D
 		if positions[record.station_id].has(record.position):
 			return "Duplicate structure position within a station."
 		positions[record.station_id][record.position] = id
+		if record.state.has("output_buffer"):
+			if not model.catalog.get(record.kind, {}).has("conversion") or not record.state.output_buffer is Dictionary: return "Invalid refinery buffer."
+			var allowed_outputs: Array = []
+			for recipe: Dictionary in model.refinery_recipes.values(): allowed_outputs.append(recipe.output_resource)
+			var total: int = 0
+			for resource: Variant in record.state.output_buffer:
+				if not resource is String or not resource in allowed_outputs or not integer(record.state.output_buffer[resource]): return "Invalid buffered resource."
+				total += int(record.state.output_buffer[resource])
+			if total > int(model.definition_for(record.kind, int(record.state.get("tier", 1))).get("output_buffer_capacity", 30)): return "Refinery buffer exceeds capacity."
 		if record.state.has("refinery_recipe"):
 			var recipe: Variant = record.state.refinery_recipe
 			if not recipe is String or not model.refinery_recipes.has(recipe) or not model.catalog.get(record.kind, {}).get("recipes", []).has(recipe):

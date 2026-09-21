@@ -235,7 +235,8 @@
       "minerals_materials",
       "materials_tech"
     ],
-    "default_recipe": "minerals_materials"
+    "default_recipe": "minerals_materials",
+    "output_buffer_capacity": 30
   },
   "space_depot": {
     "name": "Space Depot",

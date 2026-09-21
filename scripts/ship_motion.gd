@@ -85,6 +85,7 @@ func mission_key(unit: Variant) -> String:
 	var fleet: RefCounted = game.fleet
 	if mining_jobs.has(unit): return "mining:" + str(mining_jobs[unit].target)
 	if fleet.transport.jobs.has(unit): return "gate:" + str(fleet.transport.jobs[unit].destination)
+	if fleet.hauling.jobs.has(unit): return "hauling:" + str(fleet.hauling.jobs[unit].refinery_id)
 	if fleet.collection.jobs.has(unit): return "collection"
 	if fleet.diplomacy.jobs.has(unit): return "trade:" + str(fleet.diplomacy.jobs[unit].id)
 	if fleet.survey_jobs.has(unit): return "survey:" + str(fleet.survey_jobs[unit].sector_id)
@@ -99,6 +100,11 @@ func target_for(unit: Variant) -> Vector2:
 	var origin: Vector2 = origins.get(unit, game.asteroids.home_position(unit))
 	if fleet.transport.jobs.has(unit):
 		return game.board.world_to_screen(fleet.transport.jobs[unit].gate)
+	if fleet.hauling.jobs.has(unit):
+		var job: Dictionary = fleet.hauling.jobs[unit]
+		var target: Vector2 = Vector2.ZERO
+		if job.phase == "pickup" and fleet.model.locations.structures.has(job.refinery_id): target = fleet.model.locations.structures[job.refinery_id].position
+		return game.board.world_to_screen(target) + Vector2(0, 30)
 	if fleet.collection.jobs.has(unit):
 		return game.get_node("MaterialShips").target_position(unit)
 	if mining_jobs.has(unit):

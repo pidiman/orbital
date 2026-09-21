@@ -138,6 +138,22 @@ func module_count_with(capability: String) -> int:
 			count += 1
 	return count
 
+func refinery_buffer(world_position: Vector2) -> Dictionary:
+	var state: Dictionary = structure_state(world_position)
+	if not state.has("output_buffer"): state["output_buffer"] = {}
+	return state.output_buffer
+
+func refinery_buffer_space(world_position: Vector2) -> int:
+	var used: int = 0
+	for amount: int in refinery_buffer(world_position).values(): used += amount
+	return int(definition_at(world_position).get("output_buffer_capacity", 30)) - used
+
+# Recovery on demolition/decommission preserves already produced goods, like trade cargo.
+func recover_goods(resource: String, amount: int) -> void:
+	if resource == "materials": materials += amount
+	elif resource == "minerals": minerals += amount
+	elif research != null: research.trade.receive_goods(resource, amount)
+
 func refinery_recipe_id(world_position: Vector2) -> String:
 	var definition: Dictionary = definition_at(world_position)
 	return str(structure_state(world_position).get("refinery_recipe", definition.get("default_recipe", "minerals_materials")))
@@ -161,10 +177,8 @@ func set_refinery_recipe(world_position: Vector2, recipe_id: String) -> String:
 
 func refinery_pause_reason(world_position: Vector2) -> String:
 	var recipe: Dictionary = refinery_recipe(world_position)
+	if refinery_buffer_space(world_position) < int(recipe.output): return "buffer full · paused"
 	if upgrade_resource_amount(recipe.input_resource) < int(recipe.input): return "waiting for " + recipe.input_resource
-	var output_stock: int = upgrade_resource_amount(recipe.output_resource)
-	if output_stock < 0: return "output inventory unavailable"
-	if recipe.get("output_capacity", "") == "station" and capacity - output_stock < int(recipe.output): return "storage full · paused"
 	return ""
 
 func refinery_status(world_position: Vector2) -> String:
@@ -185,11 +199,9 @@ func _refine() -> void:
 				"minerals": minerals -= int(recipe.input)
 				"materials": materials -= int(recipe.input)
 				_: research.trade.inventory[recipe.input_resource] -= int(recipe.input)
-			if recipe.output_resource == "materials":
-				materials += int(recipe.output)
-				produced += int(recipe.output)
-			elif recipe.output_resource == "minerals": add_minerals(int(recipe.output))
-			else: research.trade.receive_goods(recipe.output_resource, int(recipe.output))
+			var buffer: Dictionary = refinery_buffer(world_position)
+			buffer[recipe.output_resource] = int(buffer.get(recipe.output_resource, 0)) + int(recipe.output)
+			if recipe.output_resource == "materials": produced += int(recipe.output)
 			progress = 0
 		structure_state(world_position)["refinery_progress"] = progress
 	if produced > 0:
@@ -314,6 +326,8 @@ func demolish_module(world_position: Vector2) -> String:
 	if not error.is_empty():
 		return error
 	var refund: int = module_refund(world_position)
+	for resource: String in structure_state(world_position).get("output_buffer", {}):
+		recover_goods(resource, int(structure_state(world_position).output_buffer[resource]))
 	locations.structures.erase(structure_id_at(world_position))
 	recalculate()
 	# Keep existing stock and the full refund, even after removing Storage.

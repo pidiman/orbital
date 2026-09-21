@@ -189,10 +189,10 @@ func ship_position(unit: Variant) -> Vector2:
 
 func _marker_scale(target: int) -> float:
 	var definition: Dictionary = supply.floating_rules.types.get(fleet.target_resource(target), {})
-	return maxf(1.0, 0.8 / get_parent().ship_camera.zoom.x) if definition.get("visual", "") == "crystal" else 1.0
+	return float(definition.get("visual_scale", 1.0)) * board.cell_size / 58.0 if definition.get("visual", "") == "crystal" else 1.0
 
 func _draw_crystal(target: int, point: Vector2, tint: Color, definition: Dictionary) -> void:
-	# Readable even at Fit grid: presentation scale only, matching the hit area.
+	# Constant world scale: camera zoom affects crystals exactly like modules.
 	var scale_factor: float = _marker_scale(target)
 	draw_set_transform(point, 0.0, Vector2.ONE * scale_factor)
 	draw_circle(Vector2.ZERO, 32, Color(tint, 0.12))

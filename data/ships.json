@@ -87,5 +87,19 @@
     },
     "art": "mining_ship",
     "dock_type": "xeno_miner"
+  },
+  "hauler": {
+    "name": "Hauler",
+    "cost": 50,
+    "power_use": 2,
+    "color": "eebd76",
+    "description": "Assigned refinery deliveries, up to 5 finished goods per trip.",
+    "effect": "Haul refinery output · 2 power",
+    "hauling": {
+      "batch_size": 5,
+      "travel_seconds": 3,
+      "region": "home"
+    },
+    "art": "trader"
   }
 }

@@ -50,7 +50,7 @@ func _ready() -> void:
 	save_frame("five_amber_variants")
 	game.ship_camera.zoom_view(0.3)
 	await settle(2)
-	checks.zoomed_out_readable = is_equal_approx(game.debris._visual_scale(game.debris.pieces[0]) * game.ship_camera.zoom.x, 0.6)
+	checks.world_scaled = is_equal_approx(game.debris._visual_scale(game.debris.pieces[0]), game.board.cell_size / 58.0)
 	save_frame("debris_zoomed_out")
 	game.ship_camera.reset_view()
 	var first: Dictionary = game.debris.pieces[0]

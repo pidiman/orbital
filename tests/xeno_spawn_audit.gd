@@ -46,7 +46,7 @@ func _ready() -> void:
 						game.ship_camera.zoom_view(0.2)
 						await settle(2)
 						save_frame("xeno_zoomed_out")
-						checks.readable_scale = is_equal_approx(game.asteroids._marker_scale(target) * game.ship_camera.zoom.x, 0.8)
+						checks.world_scale = is_equal_approx(game.asteroids._marker_scale(target), 0.75 * game.board.cell_size / 58.0)
 						checks.mining_only = stock.salvage(id, Callable(), -1, region) == 0
 						game.ship_camera.reset_view()
 	report("generated_over_20_minutes", counts)

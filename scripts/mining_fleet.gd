@@ -18,6 +18,7 @@ var transport: Transport
 const Outposts = preload("res://scripts/outpost_model.gd")
 var outposts: Outposts
 var docking: RefCounted
+var hauling: RefCounted
 var collection: RefCounted
 var model: StationModel
 var asteroids: Dictionary = {}
@@ -57,6 +58,7 @@ func _init(station: StationModel) -> void:
 	model.ship_removed.connect(cancel_unit)
 	sectors = JSON.parse_string(FileAccess.get_file_as_string("res://data/sectors.json"))
 	diplomacy.enrich_sectors(sectors)
+	hauling = preload("res://scripts/refinery_hauling.gd").new(self)
 	docking = preload("res://scripts/docking_model.gd").new(self)
 
 func register_asteroid(asteroid_id: int, amount: int) -> void:
@@ -225,6 +227,7 @@ func revealed_count() -> int:
 	return count
 
 func tick() -> void:
+	hauling.tick()
 	transport.tick()
 	diplomacy.tick()
 	_tick_regions()
@@ -260,6 +263,9 @@ func tick() -> void:
 	changed.emit()
 
 func cancel_unit(unit: Variant) -> void:
+	if unit is Vector2 and hauling != null:
+		for id: int in hauling.jobs.keys():
+			if not model.locations.structures.has(hauling.jobs[id].refinery_id) and hauling.jobs[id].phase == "pickup": hauling.cancel(id)
 	if jobs.has(unit):
 		var target: int = jobs[unit].target
 		if asteroids.has(target):
@@ -270,6 +276,7 @@ func cancel_unit(unit: Variant) -> void:
 		regions.survey_jobs.erase(unit)
 		transport.cancel(unit)
 		diplomacy.cancel(unit)
+		hauling.cancel(unit)
 		if collection != null:
 			collection.cancel(unit)
 	changed.emit()
@@ -280,7 +287,7 @@ static func discovery_position(asteroid_id: int) -> Vector2:
 	return slots[posmod(-asteroid_id - 1000, slots.size())]
 
 func unit_busy(unit: Variant) -> bool:
-	return transport.jobs.has(unit) or (collection != null and collection.jobs.has(unit)) or jobs.has(unit) or survey_jobs.has(unit) or diplomacy.jobs.has(unit) or regions.survey_jobs.has(unit)
+	return (hauling != null and hauling.jobs.has(unit)) or transport.jobs.has(unit) or (collection != null and collection.jobs.has(unit)) or jobs.has(unit) or survey_jobs.has(unit) or diplomacy.jobs.has(unit) or regions.survey_jobs.has(unit)
 
 func trade_error(ship_id: int, contact_id: String, offer_id: String) -> String:
 	if not transport.work_error(ship_id).is_empty():

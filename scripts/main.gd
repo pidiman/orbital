@@ -107,6 +107,7 @@ func _ready() -> void:
 	camera_input.name = "CameraInput"
 	camera_input.game = self
 	add_child(camera_input)
+	fleet.hauling.notice.connect(hud.message)
 	supply.collection.notice.connect(hud.message)
 	hud.tool_selected.connect(_select_tool)
 	hud.ship_assignment_requested.connect(func(ship_id: int) -> void: asteroids.selected_ship = ship_id)
@@ -170,6 +171,7 @@ func _save_failure(message: String) -> void:
 		hud.message(message, true, 8.0)
 
 func _restore_presentation() -> void:
+	hud.hauling_assignment = -1
 	board.selected = ""
 	board.inspected_position = Vector2.INF
 	board.pulses.clear()

@@ -15,7 +15,8 @@
         "pipes_cables",
         "broken_dish",
         "crushed_canister"
-      ]
+      ],
+      "visual_scale": 1.0
     },
     "minerals": {
       "weight": 14.8,
@@ -31,7 +32,8 @@
       "requires_mining": true,
       "lifetime_seconds": 180.0,
       "visual": "crystal",
-      "label": "Xenocrystals"
+      "label": "Xenocrystals",
+      "visual_scale": 0.75
     }
   }
 }
