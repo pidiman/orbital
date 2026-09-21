@@ -66,6 +66,9 @@ func _ready() -> void:
 	await settle(2)
 	checks.demolish_message = hud.status_label.text.contains("no free Miner dock")
 	await use(hud.menu_buttons.Build) # Close inspection before opening the catalog.
+	# Isolate placement from randomly spawned debris over catalog test cells.
+	game.supply.debris.clear()
+	game.debris._sync_view()
 	# All five catalog docks are normal build modules with the same controls.
 	var x: int = 0
 	for kind: String in game.model.ship_catalog:

@@ -16,6 +16,9 @@ func _draw() -> void:
 			draw_circle(point + Vector2(13, 0), 4, Color("eebd76"))
 
 func ship_position(ship_id: int) -> Vector2:
+	return get_parent().ship_motion.position_for(ship_id)
+
+func target_position(ship_id: int) -> Vector2:
 	var area: Vector2 = get_viewport_rect().size
 	var job: Dictionary = supply.collection.jobs[ship_id]
 	var point := Vector2(job.position.x * (area.x - 380), 145 + job.position.y * (area.y - 255))

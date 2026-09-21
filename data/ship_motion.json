@@ -1,0 +1,21 @@
+{
+  "speed": 260.0,
+  "max_frame_delta": 0.05,
+  "ship_speeds": {},
+  "return_fraction": 0.25,
+  "mission_markers": {
+    "trade": [
+      0.78,
+      0.5
+    ],
+    "survey": [
+      0.65,
+      0.25
+    ],
+    "regional_survey": [
+      0.2,
+      0.35
+    ]
+  },
+  "follow_rate": 14.0
+}

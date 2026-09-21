@@ -5,6 +5,7 @@ var ship_id: int = -1
 var focus_region: String = ""
 
 func _ready() -> void:
+	process_priority = 20
 	position = get_viewport_rect().size * 0.5
 	get_viewport().size_changed.connect(reset_view)
 
@@ -32,11 +33,7 @@ func _update_focus() -> void:
 	force_update_scroll()
 
 func ship_point(id: int) -> Vector2:
-	if game.fleet.transport.jobs.has(id):
-		return game.board.world_to_screen(game.fleet.transport.jobs[id].gate)
-	if game.fleet.collection.jobs.has(id):
-		return game.get_node("MaterialShips").ship_position(id)
-	return game.asteroids.ship_position(id)
+	return game.ship_motion.position_for(id)
 
 func pan_view(direction: Vector2) -> void:
 	ship_id = -1

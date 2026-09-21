@@ -22,6 +22,7 @@ var mineral_count: int = 0
 var model: StationModel
 var board: Node2D
 var debris: Node2D
+var ship_motion: Node
 var hud: CanvasLayer
 var ship_camera: Camera2D
 var module_count: int = 1
@@ -77,6 +78,10 @@ func _ready() -> void:
 	clock.model = model
 	clock.supply = supply
 	add_child(clock)
+	ship_motion = preload("res://scripts/ship_motion.gd").new()
+	ship_motion.name = "ShipMotion"
+	ship_motion.game = self
+	add_child(ship_motion)
 	ship_camera = preload("res://scripts/ship_focus.gd").new()
 	ship_camera.name = "ShipCamera"
 	ship_camera.game = self
@@ -159,6 +164,8 @@ func _restore_presentation() -> void:
 	asteroids.selected_ship = -1
 	asteroids.rocks.clear()
 	asteroids._sync_view()
+	ship_motion.reset()
+	ship_motion.advance_visual(0.0)
 	debris._sync_view()
 	hud.reset_after_load()
 	_update_region_view()

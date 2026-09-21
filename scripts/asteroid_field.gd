@@ -13,7 +13,6 @@ var next_id: int:
 	get: return supply.next_home_id
 var asteroid_count: int = 0
 var selected_ship: int = -1
-var parking_points: Dictionary = {}
 var font: Font = ThemeDB.fallback_font
 const ORE := Color("baa1f5")
 
@@ -25,18 +24,8 @@ func _ready() -> void:
 			selected_ship = -1)
 	_sync_view()
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	_sync_view()
-	for id: int in parking_points.keys():
-		if not fleet.model.ships.has(id): parking_points.erase(id)
-	for id: int in fleet.model.ships:
-		if fleet.docking.status(id) == "parked":
-			var target: Vector2 = dock_point(id)
-			parking_points[id] = Vector2(parking_points.get(id, home_position(id))).move_toward(target, 400.0 * delta)
-		elif fleet.collection != null and fleet.collection.jobs.has(id):
-			parking_points[id] = get_parent().get_node("MaterialShips").ship_position(id)
-		else:
-			parking_points[id] = ship_position(id)
 	queue_redraw()
 
 func _sync_view() -> void:
@@ -85,7 +74,7 @@ func _draw() -> void:
 		if fleet.transport.location(ship_id) != fleet.regions.current_region:
 			continue
 		if fleet.transport.jobs.has(ship_id):
-			var point: Vector2 = board.world_to_screen(fleet.transport.jobs[ship_id].gate)
+			var point: Vector2 = ship_position(ship_id)
 			var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
 			ModuleArt.draw_module(self, point, definition.get("art", "scout"), 0.55, 0.5)
 			draw_string(font, point + Vector2(-30, 40), "In transit", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ORE)
@@ -110,7 +99,7 @@ func _draw() -> void:
 		var job: Dictionary = fleet.jobs[unit]
 		if not rocks.has(job.target):
 			continue
-		var start: Vector2 = home_position(unit)
+		var start: Vector2 = get_parent().ship_motion.origins.get(unit, home_position(unit))
 		var target: Vector2 = rocks[job.target].point
 		draw_dashed_line(start, target, Color(0.72, 0.62, 0.96, 0.4), 1.5, 7.0)
 		var progress: float = 1.0 - float(job.remaining) / float(job.duration)
@@ -118,6 +107,13 @@ func _draw() -> void:
 		ModuleArt.draw_module(self, ship_point, "mining_ship", 0.55)
 		draw_arc(target, 34.0, -PI / 2, -PI / 2 + TAU * maxf(0.01, progress), 48, ORE, 3.0, true)
 		draw_string(font, target + Vector2(-21, 51), "%ds" % job.remaining, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ORE)
+	# Legacy module-owned miners also finish their cosmetic return after the
+	# model removes the job; hide the extra sprite once it reaches its module.
+	for unit: Variant in get_parent().ship_motion.points:
+		if unit is Vector2 and not fleet.jobs.has(unit) and fleet.regions.primary_station_visible():
+			var point: Vector2 = ship_position(unit)
+			if point.distance_to(home_position(unit)) > 1.0:
+				ModuleArt.draw_module(self, point, "mining_ship", 0.55)
 	for asteroid_id: int in rocks:
 		if not fleet.asteroids.has(asteroid_id) or fleet.asteroid_region(asteroid_id) != fleet.regions.current_region:
 			continue
@@ -166,12 +162,4 @@ func dock_point(id: int) -> Vector2:
 	return point + Vector2((float(reservation.slot) - (capacity - 1) * 0.5) * 40.0, 38.0)
 
 func ship_position(unit: Variant) -> Vector2:
-	if unit is int and fleet.docking.status(unit) == "parked":
-		return parking_points.get(unit, dock_point(unit))
-	var start: Vector2 = home_position(unit)
-	if not fleet.jobs.has(unit): return start
-	var job: Dictionary = fleet.jobs[unit]
-	if not rocks.has(job.target): return start
-	var progress: float = 1.0 - float(job.remaining) / float(job.duration)
-	var flight: float = clampf(progress * 4.0, 0.0, 1.0) if progress < 0.75 else clampf((1.0 - progress) * 4.0, 0.0, 1.0)
-	return start.lerp(rocks[job.target].point + Vector2(0, 30), flight)
+	return get_parent().ship_motion.position_for(unit)

@@ -73,3 +73,7 @@ Reservations persist without repacking valid occupied slots.
   parking, mouse/native touch selection, bottom messages, occupancy inspection,
   dispatch, all five dock catalog entries, demolition and actual save/load.
 - Existing 341-check model suite and owned-ship tray playthrough remain passing.
+
+Parking movement now uses the shared view-only `ShipMotion` controller and
+`data/ship_motion.json` speed settings; the earlier parking-specific 400 px/s
+animation has been replaced. Reservation/parking model rules are unchanged.
