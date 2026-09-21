@@ -135,7 +135,9 @@ func _ready() -> void:
 	save_button.text = "Save"
 	save_button.custom_minimum_size = Vector2(62, 44)
 	save_button.tooltip_text = "Save latest checkpoint. Autosaves also run after actions and every 10 seconds."
-	save_button.pressed.connect(func() -> void: save_requested.emit())
+	save_button.pressed.connect(func() -> void:
+		save_requested.emit()
+		close_panels())
 	persistence.add_child(save_button)
 	load_button = Button.new()
 	load_button.text = "Load"
@@ -890,7 +892,10 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("ui_cancel"):
-		close_panels()
+		if has_open_panel():
+			close_panels()
+		else:
+			deselect_ship()
 		choose("")
 		get_viewport().set_input_as_handled()
 
@@ -961,6 +966,13 @@ func _refresh_tray() -> void:
 			context_title.text = "%s #%d" % [definition.name, id]
 			context_detail.text = "%s · %s" % [fleet.regions.catalog[fleet.transport.location(id)].name, status]
 			if fleet.transport.jobs.has(id): context_detail.text += " → " + str(fleet.regions.catalog[fleet.transport.jobs[id].destination].name)
+
+func deselect_ship() -> void:
+	selected_ship_id = -1
+	get_parent().asteroids.selected_ship = -1
+	# Release visual following at the current camera position; jobs are untouched.
+	get_parent().ship_camera.ship_id = -1
+	_refresh_ships()
 
 func select_ship(id: int) -> void:
 	if not model.ships.has(id): return
