@@ -216,6 +216,7 @@ func _ready() -> void:
 	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	for kind: String in model.catalog:
 		var definition: Dictionary = model.catalog[kind]
+		if not definition.get("buildable", true): continue
 		var button: Button = _catalog_button(module_page, definition)
 		button.name = kind.capitalize() + "Button"
 		button.pressed.connect(func() -> void: choose(kind))

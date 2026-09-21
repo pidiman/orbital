@@ -158,7 +158,9 @@
     "mining": {
       "seconds": 8,
       "yield": 18
-    }
+    },
+    "buildable": false,
+    "migration_replacement": "miner_dock"
   },
   "refinery": {
     "name": "Refinery",

@@ -430,6 +430,24 @@ func restore(document: Variant) -> String:
 		if not error.is_empty(): return error
 	else:
 		candidate_fleet.docking.reconcile()
+	# Migrate retired structures only after validating the complete old graph.
+	# Same identity/position preserves connectivity, references and station layout.
+	var replaced_modules: int = 0
+	var replacement_refund: int = 0
+	for structure: Dictionary in candidate.locations.structures.values():
+		var definition: Dictionary = candidate.catalog.get(structure.kind, {})
+		if not definition.has("migration_replacement"): continue
+		var replacement: String = definition.migration_replacement
+		candidate_fleet.cancel_unit(structure.position)
+		replacement_refund += maxi(0, int(definition.cost) - int(candidate.catalog[replacement].cost))
+		structure.kind = replacement
+		replaced_modules += 1
+	if replaced_modules > 0:
+		candidate.materials += replacement_refund
+		candidate.recalculate()
+		for field: String in STATION_FIELDS: station_data[field] = candidate.get(field)
+		fleet_data.jobs = candidate_fleet.jobs
+		candidate_fleet.docking.reconcile()
 	fleet.docking.suspended = true
 	# Commit only after the whole graph has passed validation. Existing model references survive.
 	_apply_fields(fleet.research, research_data, Research.FIELDS)
@@ -452,6 +470,8 @@ func restore(document: Variant) -> String:
 	supply.rng.seed = int(supply_data.rng_seed)
 	supply.rng.state = int(supply_data.rng_state)
 	migration_notice = "Legacy remote mining orders released; ore preserved. Send Miners through a gate and found a local outpost." if cancelled_remote > 0 else ""
+	if replaced_modules > 0:
+		migration_notice += " Converted %d legacy Mining Ship modules to Miner Docks in place; refunded %d Materials. Module mining jobs released; Ore preserved." % [replaced_modules, replacement_refund]
 	autosave_blocked = false
 	preserved = migrated.duplicate(true)
 	dirty = false

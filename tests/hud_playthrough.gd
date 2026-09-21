@@ -58,7 +58,7 @@ func _ready() -> void:
 	var ship: int = game.model.next_ship_id
 	await use(hud.sell_buttons[ship])
 	checks.decommission_reachable = not game.model.ships.has(ship)
-	checks.all_module_actions = hud.tool_buttons.size() == game.model.catalog.size()
+	checks.all_module_actions = hud.tool_buttons.size() == game.model.catalog.values().filter(func(definition: Dictionary) -> bool: return definition.get("buildable", true)).size()
 	checks.all_ship_roles = hud.ship_buttons.size() == game.model.ship_catalog.size()
 	# Smaller landscape layout: menus stay bounded above the footer.
 	hud.close_panels()
