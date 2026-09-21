@@ -1,5 +1,7 @@
 extends Node2D
 const SaveStore = preload("res://scripts/save_store.gd")
+var save_library: RefCounted
+var save_dialogs: CanvasLayer
 var session_pause: CanvasLayer
 var persistence: SaveStore
 var save_path: String = SaveStore.DEFAULT_PATH
@@ -48,11 +50,16 @@ func _ready() -> void:
 	# Disposable playtests must never read or overwrite the player's checkpoint.
 	persistence.path = save_path
 	persistence.enabled = verification_persistence or (not OS.get_cmdline_args().has("--summer-verify") and not get_tree().root.has_node("SummerProbe"))
+	save_library = preload("res://scripts/save_library.gd").new(persistence, "user://saves" if not verification_persistence else save_path.get_base_dir().path_join("slots"), save_path)
 	var resume_error: String = ""
 	var resumed: bool = false
 	if persistence.enabled and FileAccess.file_exists(persistence.path):
 		resume_error = persistence.load_game()
 		resumed = resume_error.is_empty()
+	if persistence.path == SaveStore.DEFAULT_PATH:
+		if resumed: save_library.current_name = "Legacy save"
+		persistence.path = save_library.slot_path("Legacy save" if resumed else "Autosave")
+	save_library.mark_clean()
 	process_priority = 1000
 	get_tree().auto_accept_quit = false
 	background = Backdrop.new()
@@ -131,6 +138,11 @@ func _ready() -> void:
 	session_pause.game = self
 	session_pause.name = "SessionPause"
 	add_child(session_pause)
+	save_dialogs = preload("res://scripts/save_dialogs.gd").new()
+	save_dialogs.game = self
+	save_dialogs.library = save_library
+	add_child(save_dialogs)
+	hud.new_game_requested.connect(save_dialogs.show_new)
 	_update_region_view()
 	_sync_readouts()
 	if resumed:
@@ -165,18 +177,18 @@ func _process(delta: float) -> void:
 	persistence.advance(delta)
 
 func _manual_save() -> void:
-	var error: String = persistence.save_game()
-	hud.message("Colony saved to user://orbital-save.json" if error.is_empty() else error, not error.is_empty())
+	save_dialogs.show_save()
 
 func _manual_load() -> void:
-	var error: String = persistence.load_game()
-	hud.message((persistence.migration_notice if not persistence.migration_notice.is_empty() else "Latest checkpoint restored.") if error.is_empty() else error, not error.is_empty(), 12.0)
+	save_dialogs.show_load()
 
 func _save_failure(message: String) -> void:
 	if is_instance_valid(hud):
 		hud.message(message, true, 8.0)
 
 func _restore_presentation() -> void:
+	# Replace the old scoped outpost model before any HUD/view refresh can use it.
+	_update_region_view()
 	hud.hauling_assignment = -1
 	board.selected = ""
 	board.inspected_position = Vector2.INF
@@ -188,7 +200,6 @@ func _restore_presentation() -> void:
 	ship_motion.advance_visual(0.0)
 	debris._sync_view()
 	hud.reset_after_load()
-	_update_region_view()
 	_sync_readouts()
 
 func _notification(what: int) -> void:

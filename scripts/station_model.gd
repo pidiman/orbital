@@ -66,15 +66,19 @@ func _init() -> void:
 	recalculate()
 
 func recalculate() -> void:
-	capacity = 100 if station_id.is_empty() else int(locations.outpost_catalog[locations.stations[station_id].kind].base_capacity)
-	power_output = 3 if station_id.is_empty() else int(locations.outpost_catalog[locations.stations[station_id].kind].base_power)
+	var is_home: bool = station_id.is_empty() or station_id == locations.primary_station()
+	var station: Dictionary = locations.stations.get(station_id, {})
+	var outpost: Dictionary = {} if is_home else locations.outpost_catalog.get(str(station.get("kind", "")), {})
+	# Home never uses the outpost catalog; stale/unknown scopes have safe defaults.
+	capacity = int(outpost.get("base_capacity", 100))
+	power_output = int(outpost.get("base_power", 3))
 	power_use = 0
 	for world_position: Vector2 in modules:
 		var definition: Dictionary = definition_at(world_position)
 		capacity += int(definition.capacity)
 		power_output += int(definition.power_output)
 		power_use += int(definition.power_use)
-	if station_id.is_empty():
+	if is_home:
 		for kind: String in ships.values():
 			power_use += int(ship_catalog[kind].power_use)
 	level = 1 + int((modules.size() - 1) / 4.0)

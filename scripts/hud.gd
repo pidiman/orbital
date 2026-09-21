@@ -45,6 +45,7 @@ var footer: PanelContainer
 var capability_buttons: Dictionary = {}
 const SHIP_ACTIONS: Dictionary = {"hauling": "Assign refinery", "mining": "Assign asteroid", "survey": "Explore regions", "trade": "Trade with contact", "collection": "Deploy at Home", "founding": "Found outpost"}
 const Fleet = preload("res://scripts/mining_fleet.gd")
+signal new_game_requested
 signal save_requested
 signal load_requested
 var save_button: Button
@@ -922,7 +923,7 @@ func _layout_menus() -> void:
 		var width: float = minf(380 if target == panel or target == ship_context or target == settings_panel or target == menu_panel else 820, viewport_size.x - 56)
 		target.position = Vector2(viewport_size.x - width - 28, top)
 		var height: float = maxf(100, viewport_size.y - top - 100)
-		target.size = Vector2(width, minf(height, 220) if target == menu_panel else (minf(height, 360) if target == ship_context else height))
+		target.size = Vector2(width, minf(height, 280) if target == menu_panel else (minf(height, 360) if target == ship_context else height))
 
 func close_panels() -> void:
 	if is_instance_valid(dev_panel): dev_panel.hide()
@@ -1213,6 +1214,13 @@ func _setup_menu() -> void:
 		load_button.add_theme_stylebox_override(style, save_button.get_theme_stylebox(style))
 	settings_button.pressed.connect(func() -> void: open_menu("Settings"))
 	body.add_child(settings_button)
+	var new_button := Button.new()
+	new_button.text = "New game"
+	new_button.custom_minimum_size.y = 44
+	for style: String in ["normal", "hover", "pressed", "focus"]:
+		new_button.add_theme_stylebox_override(style, save_button.get_theme_stylebox(style))
+	new_button.pressed.connect(func() -> void: new_game_requested.emit())
+	body.add_child(new_button)
 	_wrap_panel(menu_panel, "Menu")
 
 func _footer_text_style(control: Control) -> void:

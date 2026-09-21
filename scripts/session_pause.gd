@@ -1,5 +1,6 @@
 extends CanvasLayer
 # Session-only engine pause. Gameplay and its HUD remain pausable.
+var modal_active: bool = false
 var game: Node2D
 var button: Button
 var shade: ColorRect
@@ -48,6 +49,7 @@ func set_paused(value: bool) -> void:
 	get_tree().paused = value
 	shade.visible = value
 	indicator.visible = value
+	indicator.text = "PAUSED" if modal_active else "PAUSED · Space to resume"
 	button.text = "▶" if value else "Ⅱ"
 	button.tooltip_text = "Resume · Space" if value else "Pause · Space"
 	pressed_close = null
@@ -58,6 +60,7 @@ func _dismiss_popups(node: Node) -> void:
 	for child: Node in node.get_children(): _dismiss_popups(child)
 
 func _input(event: InputEvent) -> void:
+	if modal_active: return
 	if event is InputEventKey and event.keycode == KEY_SPACE:
 		if event.pressed and not event.echo: toggle()
 		get_viewport().set_input_as_handled()
