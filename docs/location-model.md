@@ -43,3 +43,10 @@ A save without the new extension gets deterministic structure IDs and Home owner
 Existing model/economy, mining, research, collection, trade, recovery, exploration and persistence tests remain in use. Rendered research/trade/gate, collection and multi-region probes verify the player flows. The 24,000-trade soak still retains 256 recent records and produces a roughly 125 KiB save, below the unchanged 8 MiB loader cap.
 
 Latest verification: core economy passed; mining 29/29; combined ships/upgrades/exploration/recovery/trade/persistence/location suite 285/285 (including 62 location checks); research 42/42; collection 19/19. Rendered probes: research/trade/gates 31/31, collection 11/11, regions 27/27, all finished without probe errors. Editor diagnostics reported zero script/runtime errors and two unclassified console warnings (Control focus warning shown); no gameplay warning was introduced by the model refactor.
+
+## Typed parking
+
+`fleet.docking` now reserves local, owner-matched slots by stable structure ID.
+Its assignments and usage persist in `extensions.docking` schema 1. Parking does
+not change physical regions, ownership, work eligibility or delivery routing.
+See [docking.md](docking.md) for configuration, migration and parking rules.

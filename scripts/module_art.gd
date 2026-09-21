@@ -9,7 +9,15 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 	cyan.a = opacity
 	gold.a = opacity
 	canvas.draw_set_transform(center, 0.0, Vector2.ONE * scale_factor)
-	if kind == "teleport_gate":
+	if kind == "ship_dock":
+		canvas.draw_rect(Rect2(-26, -22, 52, 44), Color(0.08, 0.16, 0.24, opacity))
+		canvas.draw_line(Vector2(-26, 22), Vector2(-26, -22), ink, 3)
+		canvas.draw_line(Vector2(-26, -22), Vector2(26, -22), ink, 3)
+		canvas.draw_line(Vector2(26, -22), Vector2(26, 22), ink, 3)
+		for x in [-13, 13]:
+			canvas.draw_line(Vector2(x, -10), Vector2(x, 16), cyan, 2)
+			canvas.draw_circle(Vector2(x, 20), 3, gold)
+	elif kind == "teleport_gate":
 		var violet := Color(0.73, 0.65, 0.96, opacity)
 		canvas.draw_rect(Rect2(-27, -27, 54, 54), Color(0.08, 0.13, 0.22, opacity))
 		canvas.draw_rect(Rect2(-27, -27, 54, 54), violet, false, 1)

@@ -13,6 +13,7 @@ var next_id: int:
 	get: return supply.next_home_id
 var asteroid_count: int = 0
 var selected_ship: int = -1
+var parking_points: Dictionary = {}
 var font: Font = ThemeDB.fallback_font
 const ORE := Color("baa1f5")
 
@@ -24,8 +25,18 @@ func _ready() -> void:
 			selected_ship = -1)
 	_sync_view()
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_sync_view()
+	for id: int in parking_points.keys():
+		if not fleet.model.ships.has(id): parking_points.erase(id)
+	for id: int in fleet.model.ships:
+		if fleet.docking.status(id) == "parked":
+			var target: Vector2 = dock_point(id)
+			parking_points[id] = Vector2(parking_points.get(id, home_position(id))).move_toward(target, 400.0 * delta)
+		elif fleet.collection != null and fleet.collection.jobs.has(id):
+			parking_points[id] = get_parent().get_node("MaterialShips").ship_position(id)
+		else:
+			parking_points[id] = ship_position(id)
 	queue_redraw()
 
 func _sync_view() -> void:
@@ -83,7 +94,7 @@ func _draw() -> void:
 			continue
 		var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
 		if not fleet.jobs.has(ship_id):
-			var point: Vector2 = home_position(ship_id)
+			var point: Vector2 = ship_position(ship_id)
 			ModuleArt.draw_module(self, point, definition.get("art", "scout"), 0.55)
 			var text: String = "%s #%d" % [definition.name, ship_id]
 			if fleet.regions.survey_jobs.has(ship_id):
@@ -147,7 +158,16 @@ func _add_discovery_marker(asteroid_id: int) -> void:
 func home_asteroid_count() -> int:
 	return supply.home_asteroids.size()
 
+func dock_point(id: int) -> Vector2:
+	var reservation: Dictionary = fleet.docking.ships[id]
+	var structure: Dictionary = fleet.model.locations.structures[reservation.dock_id]
+	var point: Vector2 = board.world_to_screen(structure.position) if structure.region == fleet.regions.HOME else RegionView.project(structure.position, get_viewport_rect().size)
+	var capacity: int = int(fleet.model.catalog[structure.kind].docking.capacity)
+	return point + Vector2((float(reservation.slot) - (capacity - 1) * 0.5) * 40.0, 38.0)
+
 func ship_position(unit: Variant) -> Vector2:
+	if unit is int and fleet.docking.status(unit) == "parked":
+		return parking_points.get(unit, dock_point(unit))
 	var start: Vector2 = home_position(unit)
 	if not fleet.jobs.has(unit): return start
 	var job: Dictionary = fleet.jobs[unit]

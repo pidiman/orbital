@@ -154,5 +154,80 @@
       "seconds": 3
     },
     "art": "teleport_gate"
+  },
+  "miner_dock": {
+    "name": "Miner Dock",
+    "cost": 25,
+    "power_use": 1,
+    "power_output": 0,
+    "capacity": 0,
+    "color": "b9a6f5",
+    "description": "Parking for up to 2 Miner ships in this region. Jobs never require a dock.",
+    "effect": "2 parking slots · 1 power",
+    "docking": {
+      "ship_type": "miner",
+      "capacity": 2
+    },
+    "art": "ship_dock"
+  },
+  "scout_dock": {
+    "name": "Scout Dock",
+    "cost": 25,
+    "power_use": 1,
+    "power_output": 0,
+    "capacity": 0,
+    "color": "8bcdf1",
+    "description": "Parking for up to 2 Scout ships in this region. Jobs never require a dock.",
+    "effect": "2 parking slots · 1 power",
+    "docking": {
+      "ship_type": "scout",
+      "capacity": 2
+    },
+    "art": "ship_dock"
+  },
+  "trader_dock": {
+    "name": "Trade Dock",
+    "cost": 25,
+    "power_use": 1,
+    "power_output": 0,
+    "capacity": 0,
+    "color": "eebd76",
+    "description": "Parking for up to 2 Trade ships in this region. Jobs never require a dock.",
+    "effect": "2 parking slots · 1 power",
+    "docking": {
+      "ship_type": "trader",
+      "capacity": 2
+    },
+    "art": "ship_dock"
+  },
+  "material_ship_dock": {
+    "name": "Material Dock",
+    "cost": 25,
+    "power_use": 1,
+    "power_output": 0,
+    "capacity": 0,
+    "color": "eebd76",
+    "description": "Parking for up to 2 Material ships in this region. Jobs never require a dock.",
+    "effect": "2 parking slots · 1 power",
+    "docking": {
+      "ship_type": "material_ship",
+      "capacity": 2
+    },
+    "art": "ship_dock"
+  },
+  "jump_ship_dock": {
+    "name": "Jump Dock",
+    "cost": 25,
+    "power_use": 1,
+    "power_output": 0,
+    "capacity": 0,
+    "color": "6ce0d5",
+    "description": "Parking for up to 2 Jump ships in this region. Jobs never require a dock.",
+    "effect": "2 parking slots · 1 power",
+    "docking": {
+      "ship_type": "jump_ship",
+      "capacity": 2
+    },
+    "art": "ship_dock"
   }
 }

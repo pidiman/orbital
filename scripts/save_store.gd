@@ -9,6 +9,7 @@ const Research = preload("res://scripts/research_model.gd")
 const Transport = preload("res://scripts/gate_transport.gd")
 const Locations = preload("res://scripts/world_locations.gd")
 const LocationValidation = preload("res://scripts/location_save_validation.gd")
+const Docking = preload("res://scripts/docking_model.gd")
 const VERSION: int = 2
 const DEFAULT_PATH: String = "user://orbital-save.json"
 const STATION_FIELDS: Array[String] = ["modules", "module_tiers", "ships", "next_ship_id", "materials", "minerals", "capacity", "power_output", "power_use", "level", "ticks", "tick_elapsed", "refinery_progress", "total_refined"]
@@ -35,6 +36,7 @@ func _init(station: StationModel, mining: Fleet, sector_supply: Supply) -> void:
 	model = station
 	fleet = mining
 	supply = sector_supply
+	fleet.docking.changed.connect(request_autosave)
 	fleet.outposts.changed.connect(request_autosave)
 	fleet.research.changed.connect(request_autosave)
 	fleet.transport.changed.connect(request_autosave)
@@ -65,6 +67,7 @@ func advance(delta: float) -> void:
 		save_game()
 
 func snapshot() -> Dictionary:
+	fleet.docking.reconcile()
 	var document: Dictionary = preserved.duplicate(true)
 	document["format"] = "orbital.save"
 	document["version"] = maxi(VERSION, int(document.get("version", VERSION)))
@@ -74,6 +77,8 @@ func snapshot() -> Dictionary:
 	if not document.extensions.has("outposts"):
 		document.extensions["outposts"] = {}
 	document.extensions.outposts["schema_version"] = 1
+	_merge_fields(document.extensions, "docking", fleet.docking, Docking.FIELDS)
+	document.extensions.docking["schema_version"] = 1
 	_merge_fields(document.extensions, "research", fleet.research, Research.FIELDS)
 	document.extensions.research["schema_version"] = 1
 	_merge_fields(document.extensions, "gate_transport", fleet.transport, Transport.FIELDS)
@@ -390,6 +395,14 @@ func restore(document: Variant) -> String:
 				candidate_fleet.erase_mining_assignment(unit)
 				cancelled_remote += 1
 		fleet_data.jobs = candidate_fleet.jobs
+	if migrated.extensions.has("docking"):
+		var docking_data: Dictionary = _extension_fields(migrated.extensions, "docking", candidate_fleet.docking, Docking.FIELDS)
+		if not decode_error.is_empty(): return decode_error
+		error = candidate_fleet.docking.validate(docking_data)
+		if not error.is_empty(): return error
+	else:
+		candidate_fleet.docking.reconcile()
+	fleet.docking.suspended = true
 	# Commit only after the whole graph has passed validation. Existing model references survive.
 	_apply_fields(fleet.research, research_data, Research.FIELDS)
 	_apply_fields(fleet.transport, transport_data, Transport.FIELDS)
@@ -401,6 +414,9 @@ func restore(document: Variant) -> String:
 	for field: String in Locations.FIELDS:
 		model.locations.set(field, candidate.locations.get(field))
 	fleet.mining_assignments = candidate_fleet.mining_assignments
+	fleet.docking.ships = candidate_fleet.docking.ships
+	fleet.docking.usage = candidate_fleet.docking.usage
+	fleet.docking.suspended = false
 	for field: String in Trade.FIELDS:
 		fleet.diplomacy.set(field, candidate_fleet.diplomacy.get(field))
 	supply.rng.seed = int(supply_data.rng_seed)

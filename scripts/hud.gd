@@ -265,6 +265,7 @@ func _ready() -> void:
 	root.add_child(gate_panel)
 	_setup_menus()
 	_setup_ship_tray()
+	fleet.docking.changed.connect(_refresh_ships)
 	_setup_grid_controls()
 	if DevConfig.DEBUG_MODE:
 		dev_panel = preload("res://scripts/dev_panel.gd").new()
@@ -353,6 +354,8 @@ func _process(delta: float) -> void:
 		status_label.text = "Amber: salvage  ·  Violet: mine  ·  Inspect a module to upgrade  ·  Ships: fleet commands" if fleet.regions.primary_station_visible() else "Violet: mine  ·  Outposts/Regions: Scout / view region  ·  Station construction and salvage remain at Home"
 		if fleet.collection != null and not fleet.collection.waiting_message().is_empty():
 			status_label.text = fleet.collection.waiting_message()
+		if not fleet.docking.waiting_message().is_empty() and fleet.collection.waiting_message().is_empty():
+			status_label.text = fleet.docking.waiting_message()
 		status_label.add_theme_color_override("font_color", MUTED)
 	for item: Dictionary in floating:
 		item.time += delta
@@ -444,7 +447,7 @@ func _buy_ship(kind: String) -> void:
 		message(error, true)
 		return
 	choose("")
-	message("%s #%d ready. Select its tile for commands." % [model.ship_catalog[kind].name, model.next_ship_id])
+	message(fleet.docking.homeless_message(model.next_ship_id) if fleet.docking.status(model.next_ship_id) == "homeless" else "%s #%d ready. Select its tile for commands." % [model.ship_catalog[kind].name, model.next_ship_id])
 
 func _refresh_ships() -> void:
 	for removed_id: int in ship_entries.keys():
@@ -608,6 +611,9 @@ func _refresh_upgrade() -> void:
 	var definition: Dictionary = model.definition_at(selected_position)
 	upgrade_title.text = "%s · Tier %d" % [definition.name, model.tier_at(selected_position)]
 	upgrade_stats.text = "Generates %d Power · uses %d\nMaterial capacity bonus: %d" % [definition.power_output, definition.power_use, definition.capacity]
+	if definition.has("docking"):
+		var dock_id: String = model.structure_id_at(selected_position)
+		upgrade_stats.text += "\nParking: %d / %d ships" % [fleet.docking.usage.get(dock_id, {}).size(), int(definition.docking.capacity)]
 	if definition.has("conversion"):
 		upgrade_stats.text += "\n%d Minerals → %d Materials / %ds" % [definition.conversion.input, definition.conversion.output, definition.conversion.seconds]
 	var next: Dictionary = model.next_upgrade(selected_position)
@@ -915,7 +921,7 @@ func _refresh_tray() -> void:
 			tile.pressed.connect(func() -> void: select_ship(id))
 			tray_rows.add_child(tile)
 			ship_tiles[id] = tile
-		var status: String = "Working" if fleet.unit_busy(id) else "Idle"
+		var status: String = "Working" if fleet.unit_busy(id) else ("Parked" if fleet.docking.status(id) == "parked" else "Idle · no dock")
 		if fleet.collection.jobs.has(id): status = str(fleet.collection.jobs[id].status)
 		if fleet.transport.jobs.has(id): status = "In transit"
 		var tile = ship_tiles[id]

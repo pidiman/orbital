@@ -17,6 +17,7 @@ var research: Research
 var transport: Transport
 const Outposts = preload("res://scripts/outpost_model.gd")
 var outposts: Outposts
+var docking: RefCounted
 var collection: RefCounted
 var model: StationModel
 var asteroids: Dictionary = {}
@@ -53,6 +54,7 @@ func _init(station: StationModel) -> void:
 	model.ship_removed.connect(cancel_unit)
 	sectors = JSON.parse_string(FileAccess.get_file_as_string("res://data/sectors.json"))
 	diplomacy.enrich_sectors(sectors)
+	docking = preload("res://scripts/docking_model.gd").new(self)
 
 func register_asteroid(asteroid_id: int, amount: int) -> void:
 	if not asteroids.has(asteroid_id) and amount > 0:

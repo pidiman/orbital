@@ -74,3 +74,8 @@ points, native touch, remote selection, command visibility, footer clearance,
 outer-cell construction, mining, outer-depot collection, and save/load. Existing
 tray and HUD playthroughs also pass. Runtime probes report no script errors;
 existing static-call, local-variable and Control-focus warnings remain.
+
+Dedicated Miner/Scout/Trade/Material/Jump docks are now in Build. Dock inspection
+shows occupied/total parking slots. Owned-ship tiles and context panels show
+Parked or Idle · no dock; homeless explanations use the existing bottom bar.
+Parked sprites remain selectable through the same map/tray selection path.

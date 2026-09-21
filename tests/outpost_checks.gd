@@ -138,6 +138,7 @@ static func run() -> Dictionary:
 	old.fleet.asteroids[old_target].claimed = true
 	var legacy: Dictionary = old.snapshot()
 	legacy.extensions.erase("outposts")
+	legacy.extensions.erase("docking")
 	checks.old_graph_migration = loaded.restore(legacy).is_empty() and loaded.fleet.jobs.is_empty() and not loaded.fleet.asteroids[old_target].claimed and loaded.model.locations.stations.size() == 1 and loaded.model.minerals == old.model.minerals and loaded.fleet.asteroids[old_target].minerals == old.fleet.asteroids[old_target].minerals
 	checks.migration_notice = loaded.migration_notice.contains("ore preserved")
 	legacy.extensions.erase("world_locations")

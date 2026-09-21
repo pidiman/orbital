@@ -5,13 +5,14 @@
     "power_use": 2,
     "color": "b9a6f5",
     "description": "Assign an asteroid; repeats until depleted.",
-    "effect": "18 minerals / 8s \u00b7 2 power",
+    "effect": "18 minerals / 8s · 2 power",
     "mining": {
       "seconds": 8,
       "yield": 18,
       "repeat": true
     },
-    "art": "mining_ship"
+    "art": "mining_ship",
+    "dock_type": "miner"
   },
   "scout": {
     "name": "Scout",
@@ -19,12 +20,13 @@
     "power_use": 1,
     "color": "8bcdf1",
     "description": "Travel to nearby sectors and reveal discoveries.",
-    "effect": "Sector travel \u00b7 1 power",
+    "effect": "Sector travel · 1 power",
     "survey": {
       "seconds": 5,
       "travel_speed": 1.0
     },
-    "art": "scout"
+    "art": "scout",
+    "dock_type": "scout"
   },
   "trader": {
     "name": "Trade Ship",
@@ -32,11 +34,12 @@
     "power_use": 2,
     "color": "eebd76",
     "description": "Carry cargo to alien contacts; earn goods and standing.",
-    "effect": "Contact trade \u00b7 2 power",
+    "effect": "Contact trade · 2 power",
     "trade": {
       "seconds": 7
     },
-    "art": "trader"
+    "art": "trader",
+    "dock_type": "trader"
   },
   "material_ship": {
     "name": "Material Ship",
@@ -44,13 +47,14 @@
     "power_use": 1,
     "color": "eebd76",
     "description": "Collects one Material per trip. Requires Space Depot.",
-    "effect": "Home collection \u00b7 1 power",
+    "effect": "Home collection · 1 power",
     "collection": {
       "speed": 0.22,
       "cargo_capacity": 1,
       "region": "home"
     },
-    "art": "trader"
+    "art": "trader",
+    "dock_type": "material_ship"
   },
   "jump_ship": {
     "name": "Jump Ship",
@@ -58,10 +62,11 @@
     "power_use": 2,
     "color": "6ce0d5",
     "description": "Travel through a Teleport Gate, then found a local mining outpost.",
-    "effect": "Found outpost \u00b7 2 power",
+    "effect": "Found outpost · 2 power",
     "founding": {
       "outpost": "mining_outpost"
     },
-    "art": "scout"
+    "art": "scout",
+    "dock_type": "jump_ship"
   }
 }
