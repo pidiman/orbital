@@ -25,3 +25,11 @@ Save, Load and Settings in Menu share the same filled/bordered normal and hover 
 Verification: floating model tests (20,000 spawns, type amounts, receipt, migration and deterministic continuation), 28 grid checks, live click/depot/Menu checks, plus collection, persistence, ownership, outpost and ship-tray regressions.
 
 Spawn visibility fix: the old weight 0.2, shared cap of 12 and 60-second expiry made Xeno practically absent: 7 of 10 audited seeds produced none in 20 simulated minutes. The RNG, type registration and rendering were working. Weight 2 and a 180-second Xeno lifetime produced nodes in all ten audit seeds while remaining the rarest, smallest resource. This does not guarantee a spawn deadline. Existing saved lifetimes remain intact. Floating-clock subtraction now clamps tiny negative floating-point residues to zero so ordinary simulation snapshots pass existing save validation; no save schema changes.
+
+## Materials debris art
+
+Materials now select uniformly among five amber/rust 2D vector variants: riveted hull fragment, broken gridded solar panel, pipes/cables, cracked antenna dish, and dented hatch canister. `data/material_debris.json` defines palette and polygon/line/circle primitives; `types.materials.visual_variants` in `data/floating_resources.json` lists eligible stable IDs. Add an entry to both data files to extend the set without code changes. Cyan Xeno rendering is unchanged.
+
+At spawn, a visual RNG copies the existing region seed and post-spawn RNG state; its draw never advances the gameplay stream. The optional `visual_variant` string is stored on the piece inside the existing v2 `extensions.floating_resources` pool. Old saves without it derive a stable fallback from region seed and piece ID. Missing art IDs also fall back gracefully. No quantities, timing, resource probabilities, movement, collection authority or save version changes. Materials art keeps a minimum screen scale when zoomed out, with matching pointer hit area.
+
+`tests/debris_variants_playthrough.gd` checks all five randomly generated variants, 500 paired spawns with/without visual assignment (identical gameplay outputs and RNG state), v2 round-trip, legacy fallback, click-salvage quantities, and rendered galleries at normal/low zoom.

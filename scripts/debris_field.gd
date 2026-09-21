@@ -3,6 +3,7 @@ signal salvaged(amount: int, point: Vector2, resource: String)
 signal full_storage
 const Supply = preload("res://scripts/sector_supply.gd")
 var supply: Supply
+var art = preload("res://scripts/debris_art.gd").new()
 # Projected snapshots only; authority lives in SectorSupply.
 var pieces: Array[Dictionary] = []
 var debris_count: int = 0
@@ -22,13 +23,13 @@ func _sync_view() -> void:
 		var source: Dictionary = available[debris_id]
 		if supply.mining_target(supply.fleet.regions.current_region, debris_id) != -1: continue
 		var point := Vector2(source.position.x * (area.x - 380.0), 145.0 + source.position.y * (area.y - 255.0))
-		pieces.append({"resource": source.get("resource", "materials"), "amount": source.amount, "id": debris_id, "point": point, "angle": fmod(debris_id * 2.399, TAU) + supply.elapsed * 0.2})
+		pieces.append({"visual_variant": _variant(source, debris_id), "resource": source.get("resource", "materials"), "amount": source.amount, "id": debris_id, "point": point, "angle": fmod(debris_id * 2.399, TAU) + supply.elapsed * 0.2})
 	debris_count = pieces.size()
 
 func handle_click(point: Vector2) -> bool:
 	for i in range(pieces.size() - 1, -1, -1):
 		var piece: Dictionary = pieces[i]
-		if (get_canvas_transform().affine_inverse() * point).distance_to(piece.point) <= 27:
+		if (get_canvas_transform().affine_inverse() * point).distance_to(piece.point) <= 27 * _visual_scale(piece):
 			if supply.floating_rules.types[piece.resource].get("requires_mining", false):
 				get_parent().hud.message("A Xeno Miner is required to extract this node.")
 				return true
@@ -50,11 +51,27 @@ func _draw() -> void:
 		draw_circle(piece.point, 25, Color(0.94, 0.72, 0.40, 0.07 if not hovered else 0.18))
 		draw_arc(piece.point, 23, -0.3, 1.0, 14, Color("b28a53"), 1, true)
 		draw_arc(piece.point, 23, 2.8, 4.1, 14, Color("b28a53"), 1, true)
-		draw_set_transform(piece.point, piece.angle)
-		var polygon := PackedVector2Array([Vector2(-10, -5), Vector2(-2, -11), Vector2(10, -5), Vector2(8, 8), Vector2(-5, 10)])
-		draw_colored_polygon(polygon, Color("8f795a"))
-		polygon.append(polygon[0])
-		draw_polyline(polygon, tint, 1.5, true)
-		draw_line(Vector2(-3, -5), Vector2(4, 3), Color("c9aa78"), 2)
+		draw_set_transform(piece.point, piece.angle, Vector2.ONE * _visual_scale(piece))
+		if not piece.visual_variant.is_empty():
+			art.draw_variant(self, piece.visual_variant)
+		else:
+			var polygon := PackedVector2Array([Vector2(-10, -5), Vector2(-2, -11), Vector2(10, -5), Vector2(8, 8), Vector2(-5, 10)])
+			draw_colored_polygon(polygon, Color("8f795a"))
+			polygon.append(polygon[0])
+			draw_polyline(polygon, tint, 1.5, true)
+			draw_line(Vector2(-3, -5), Vector2(4, 3), Color("c9aa78"), 2)
 		draw_set_transform(Vector2.ZERO)
 		draw_string(ThemeDB.fallback_font, piece.point + Vector2(-30, 39), "%s · %d" % [str(piece.resource).capitalize(), piece.amount], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, tint)
+
+func _variant(source: Dictionary, id: int) -> String:
+	var variants: Array = supply.floating_rules.types[source.get("resource", "materials")].get("visual_variants", [])
+	if variants.is_empty(): return ""
+	var saved: String = source.get("visual_variant", "")
+	if art.definitions.variants.has(saved): return saved
+	# Old saves lack this optional field: derive a stable look without changing state.
+	var random := RandomNumberGenerator.new()
+	random.seed = int(supply.fleet.regions.records[supply.fleet.regions.current_region].seed) ^ id
+	return variants[random.randi_range(0, variants.size() - 1)]
+
+func _visual_scale(piece: Dictionary) -> float:
+	return maxf(1.0, 0.6 / get_parent().ship_camera.zoom.x) if not piece.visual_variant.is_empty() else 1.0

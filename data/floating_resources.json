@@ -8,7 +8,14 @@
       "weight": 85.0,
       "amount_min": 8,
       "amount_max": 14,
-      "color": "eebd76"
+      "color": "eebd76",
+      "visual_variants": [
+        "hull_fragment",
+        "solar_panel",
+        "pipes_cables",
+        "broken_dish",
+        "crushed_canister"
+      ]
     },
     "minerals": {
       "weight": 14.8,

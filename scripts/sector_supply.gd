@@ -104,6 +104,13 @@ func _spawn_debris(_initial: bool = false, region_id: String = "home") -> void:
 		center = Vector2(0.7, 0.5)
 	next_debris_id += 1
 	floating[region_id].pieces[next_debris_id] = {"position": center + Vector2(random.randf_range(-extent.x, extent.x), random.randf_range(-extent.y, extent.y)), "velocity": Vector2.ZERO, "resource": resource, "amount": random.randi_range(int(definition.amount_min), int(definition.amount_max)), "remaining": float(definition.get("lifetime_seconds", floating_rules.lifetime_seconds))}
+	var variants: Array = definition.get("visual_variants", [])
+	if not variants.is_empty():
+		# Fork the per-region seeded stream: visual rolls never shift economy draws.
+		var visual_random := RandomNumberGenerator.new()
+		visual_random.seed = int(record.seed)
+		visual_random.state = random.state
+		floating[region_id].pieces[next_debris_id]["visual_variant"] = variants[visual_random.randi_range(0, variants.size() - 1)]
 	record.rng_state = str(random.state)
 	sync_mining_nodes()
 
@@ -179,6 +186,7 @@ func validate_floating(data: Dictionary, records: Dictionary, allocator: int) ->
 			ids[id] = true
 			if not piece is Dictionary or not floating_rules.types.has(piece.get("resource", "")): return "Invalid floating-resource type."
 			if not piece.get("position") is Vector2 or not piece.position.is_finite() or not piece.get("velocity") is Vector2 or not piece.velocity.is_finite(): return "Invalid floating-resource position."
+			if piece.has("visual_variant") and not piece.visual_variant is String: return "Invalid floating visual variant."
 			var amount: Variant = piece.get("amount")
 			var remaining: Variant = piece.get("remaining")
 			if not (amount is int or amount is float) or not is_finite(amount) or amount < 1 or amount != floor(amount) or amount > 9007199254740991: return "Invalid floating-resource amount."
