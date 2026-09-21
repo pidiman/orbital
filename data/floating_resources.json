@@ -20,9 +20,11 @@
       "weight": 2.0,
       "amount_min": 1,
       "amount_max": 1,
-      "color": "72dbcb",
+      "color": "67f5e1",
       "requires_mining": true,
-      "lifetime_seconds": 180.0
+      "lifetime_seconds": 180.0,
+      "visual": "crystal",
+      "label": "Xenocrystals"
     }
   }
 }

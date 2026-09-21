@@ -30,3 +30,11 @@ Pinch uses Godot `InputEventMagnifyGesture.factor`; spreading fingers zooms in. 
 Tune `data/camera_controls.json`: `pinch_sensitivity` = 1.0 (exponent on native magnification), `scroll_zoom_sensitivity` = 0.08 (log zoom per vertical gesture unit), `wheel_zoom_sensitivity` = 0.12 (log zoom per notch, about 12.75% in). Lower values reduce sensitivity; zero disables that input. No gameplay save or preference schema changes.
 
 Gestures use unhandled input so UI scrolling takes priority, plus the existing HUD hit test blocks panels, tray, bars and buttons. Zoom is ignored during a pending left-click/drag and while unfocused. `tests/gesture_zoom_playthrough.gd` injects all three native Godot event types through the viewport and checks cursor anchoring, directions, limits, UI blocking, live labels and unchanged model snapshots. Physical MacBook trackpad feel is not measured by these automated tests.
+
+## Xenocrystal client tuning
+
+Menu → Settings → **Xenocrystals (tuning)** contains integer amount (1–10) and lifetime in seconds (30–600) inputs. Committing an edit immediately overrides the existing floating spawn definition: amount sets both min/max; lifetime sets the per-type lifetime. It affects new nodes only. Existing nodes, extraction timers, spawn weights and gameplay save format remain unchanged.
+
+Values use the same `user://orbital-client.cfg`, section `supply_tuning`, keys `xeno_amount` and `xeno_lifetime`. Missing keys fall back to `data/floating_resources.json` (currently amount 1, lifetime 180). Only explicit overrides are saved; camera settings preserve this section and vice versa. Preferences load before the first initial spawn. UI descriptors, ranges, grouping and target fields are declared in `data/camera_controls.json` under `tuning_options` for extension.
+
+`tests/xeno_tuning_playthrough.gd` checks editable controls, live spawn parameters and new nodes, unchanged existing nodes/save snapshots/rarity, file reload, absent-key defaults and layout clearance.

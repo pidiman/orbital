@@ -51,7 +51,7 @@ func _sync_view() -> void:
 
 func handle_click(point: Vector2) -> bool:
 	for asteroid_id: int in rocks:
-		if (get_canvas_transform().affine_inverse() * point).distance_to(rocks[asteroid_id].point) <= 34.0:
+		if (get_canvas_transform().affine_inverse() * point).distance_to(rocks[asteroid_id].point) <= 34.0 * _marker_scale(asteroid_id):
 			var assignment_ship: int = selected_ship
 			if assignment_ship == -1:
 				var highlighted: int = get_parent().hud.selected_ship_id
@@ -138,6 +138,10 @@ func _draw() -> void:
 		var resource: String = fleet.target_resource(asteroid_id)
 		var tint: Color = Color(supply.floating_rules.types[resource].color) if resource != "minerals" else ORE
 		var point: Vector2 = rock.point
+		var definition: Dictionary = supply.floating_rules.types.get(resource, {})
+		if definition.get("visual", "") == "crystal":
+			_draw_crystal(asteroid_id, point, tint, definition)
+			continue
 		var hovered: bool = get_global_mouse_position().distance_to(point) <= 34.0
 		draw_circle(point, 34, Color(0.57, 0.39, 0.86, 0.17 if hovered else 0.07))
 		draw_set_transform(point, rock.angle)
@@ -182,3 +186,26 @@ func dock_point(id: int) -> Vector2:
 
 func ship_position(unit: Variant) -> Vector2:
 	return get_parent().ship_motion.position_for(unit)
+
+func _marker_scale(target: int) -> float:
+	var definition: Dictionary = supply.floating_rules.types.get(fleet.target_resource(target), {})
+	return maxf(1.0, 0.8 / get_parent().ship_camera.zoom.x) if definition.get("visual", "") == "crystal" else 1.0
+
+func _draw_crystal(target: int, point: Vector2, tint: Color, definition: Dictionary) -> void:
+	# Readable even at Fit grid: presentation scale only, matching the hit area.
+	var scale_factor: float = _marker_scale(target)
+	draw_set_transform(point, 0.0, Vector2.ONE * scale_factor)
+	draw_circle(Vector2.ZERO, 32, Color(tint, 0.12))
+	for shard: Dictionary in [{"offset": Vector2(-16, 5), "scale": 0.65}, {"offset": Vector2(16, 9), "scale": 0.55}, {"offset": Vector2.ZERO, "scale": 1.0}]:
+		var shape := PackedVector2Array()
+		for vertex: Vector2 in [Vector2(0, -29), Vector2(12, -9), Vector2(9, 16), Vector2(0, 27), Vector2(-11, 11), Vector2(-12, -9)]:
+			shape.append(shard.offset + vertex * shard.scale)
+		draw_colored_polygon(shape, tint.darkened(0.65))
+		shape.append(shape[0])
+		draw_polyline(shape, tint, 2.0, true)
+		draw_line(shard.offset + Vector2(0, -29) * shard.scale, shard.offset + Vector2(0, 27) * shard.scale, tint.lightened(0.55), 1.5, true)
+	var label: String = "%s · %d" % [definition.get("label", fleet.target_resource(target).capitalize()), fleet.asteroids[target].minerals]
+	var width: float = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	draw_rect(Rect2(-width * 0.5 - 4, 34, width + 8, 22), Color(0.02, 0.06, 0.09, 0.9))
+	draw_string(font, Vector2(-width * 0.5, 50), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, tint)
+	draw_set_transform(Vector2.ZERO)

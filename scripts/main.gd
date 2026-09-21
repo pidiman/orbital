@@ -36,14 +36,17 @@ func _ready() -> void:
 	model = StationModel.new()
 	fleet = Fleet.new(model)
 	model.ticked.connect(fleet.tick)
-	supply = Supply.new(model, fleet)
+	preferences = preload("res://scripts/client_preferences.gd").new()
+	preferences.enabled = not OS.get_cmdline_args().has("--summer-verify") and not get_tree().root.has_node("SummerProbe")
+	preferences.load_preferences()
+	var floating_configuration: Dictionary = preferences.floating_defaults.duplicate(true)
+	preferences.apply_tuning(floating_configuration)
+	supply = Supply.new(model, fleet, -1, {}, floating_configuration)
+	preferences.tuning_changed.connect(func() -> void: preferences.apply_tuning(supply.floating_rules))
 	persistence = SaveStore.new(model, fleet, supply)
 	# Disposable playtests must never read or overwrite the player's checkpoint.
 	persistence.path = save_path
 	persistence.enabled = verification_persistence or (not OS.get_cmdline_args().has("--summer-verify") and not get_tree().root.has_node("SummerProbe"))
-	preferences = preload("res://scripts/client_preferences.gd").new()
-	preferences.enabled = not OS.get_cmdline_args().has("--summer-verify") and not get_tree().root.has_node("SummerProbe")
-	preferences.load_preferences()
 	var resume_error: String = ""
 	var resumed: bool = false
 	if persistence.enabled and FileAccess.file_exists(persistence.path):

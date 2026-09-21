@@ -20,7 +20,8 @@ var debris_elapsed: float = 0.0
 var asteroid_elapsed: float = 0.0
 var rng := RandomNumberGenerator.new()
 
-func _init(station: StationModel, mining_fleet: MiningFleet, seed_value: int = -1, configuration: Dictionary = {}) -> void:
+func _init(station: StationModel, mining_fleet: MiningFleet, seed_value: int = -1, configuration: Dictionary = {}, floating_configuration: Dictionary = {}) -> void:
+	if not floating_configuration.is_empty(): floating_rules = floating_configuration.duplicate(true)
 	model = station
 	fleet = mining_fleet
 	collection = Collection.new(station, mining_fleet, self)

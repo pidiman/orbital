@@ -33,6 +33,7 @@ var settings_button: Button
 var footer_balance: Control
 var settings_panel: PanelContainer
 var settings_toggles: Dictionary = {}
+var settings_numbers: Dictionary = {}
 var managed_panels: Array[PanelContainer] = []
 var panel_closes: Dictionary = {}
 var active_menu: String = ""
@@ -1062,6 +1063,27 @@ func _setup_settings() -> void:
 				message("Could not save local settings."))
 		body.add_child(toggle)
 		settings_toggles[option.id] = toggle
+	var tuning_section: String = ""
+	for option: Dictionary in get_parent().preferences.definitions.get("tuning_options", []):
+		if option.section != tuning_section:
+			tuning_section = option.section
+			_label(body, tuning_section, 18, INK)
+		var row := HBoxContainer.new()
+		body.add_child(row)
+		var caption: Label = _label(row, option.label, 14, MUTED)
+		caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var number := SpinBox.new()
+		number.min_value = option.min
+		number.max_value = option.max
+		number.step = option.step
+		number.value = get_parent().preferences.tuning_value(option)
+		number.custom_minimum_size = Vector2(115, 44)
+		number.value_changed.connect(func(value: float) -> void:
+			if get_parent().preferences.set_tuning(option, value) != OK:
+				message("Could not save local tuning settings."))
+		row.add_child(number)
+		settings_numbers[option.id] = number
+	_label(body, "Applies to newly spawned nodes.", 14, MUTED)
 	_label(body, "Drag the field or use W/A/S/D to pan.", 14, MUTED)
 	_wrap_panel(settings_panel, "Settings")
 
