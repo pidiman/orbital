@@ -57,8 +57,8 @@ func _ready() -> void:
 	game.model.materials = 59
 	game.model.changed.emit()
 	await use(game.hud.capability_buttons[jump].founding)
-	checks.insufficient_message = game.hud.status_label.text.contains("60 Home Materials") and game.model.locations.stations.size() == 1
-	game.model.materials = 100
+	checks.insufficient_message = game.hud.status_label.text.contains("360 Home Materials") and game.model.locations.stations.size() == 1
+	game.model.materials = 400
 	game.model.changed.emit()
 	await use(game.hud.capability_buttons[jump].founding)
 	var outpost_id: String = game.model.locations.outpost_at("venus", "player")
@@ -95,7 +95,7 @@ func _ready() -> void:
 		await get_tree().physics_frame
 	game.get_node("ResourceClock").set_process(false)
 	checks.local_credit = game.model.locations.stations[outpost_id].inventory.minerals == 18 and game.model.minerals == home_ore
-	checks.local_readout = game.hud.orbit_label.text.contains("18 local Minerals") and game.hud.minerals_label.text == str(home_ore)
+	checks.local_readout = game.hud.orbit_label.text.contains("18 local Minerals") and game.hud.minerals_label.text == "18"
 	checks.deposit_message = game.hud.status_label.text.contains("Home storage unchanged")
 	await use(game.hud.region_navigation.region_buttons.home)
 	checks.home_station_still_home = game.board.visible and game.model.locations.station_region("station:home") == "home"

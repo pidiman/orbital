@@ -34,7 +34,7 @@ A save without the new extension gets deterministic structure IDs and Home owner
 
 - **`legacy_remote_home` is now disabled for new orders.** Remote mining requires a physically local Miner and an outpost; delivery uses `local_outpost`. Pre-outpost saves release legacy cross-region orders without consuming their remaining ore and show a migration notice.
 - Regional Scout surveys still select their route origin from the viewed region (`viewed_region_legacy`); the ship's physical Home location stays distinct.
-- Gate arrivals can found outposts through the `founding` capability or mine locally through `mining` after an outpost exists. Return travel, full remote module construction and material hauling are not implemented. Other work remains Home-only.
+- Gate arrivals can found outposts through the `founding` capability or mine locally through `mining` after an outpost exists. Outposts now support local Solar, Storage, Space Dock and Teleport Gate construction through a station-scoped adapter, including gate departures and return travel. Full remote module construction and material hauling remain unavailable; see `docs/outpost-bases.md`. Other work remains Home-only.
 
 ## Original refactor verification (historical)
 

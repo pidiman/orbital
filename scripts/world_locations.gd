@@ -103,20 +103,26 @@ func finish_transit(ship_id: int) -> void:
 	ships[ship_id].region = ships[ship_id].transit.destination
 	ships[ship_id].transit = {}
 
-func legacy_modules() -> Dictionary:
+func legacy_modules(station_id: String = "") -> Dictionary:
+	if station_id.is_empty(): station_id = primary_station()
 	var result: Dictionary = {}
 	for record: Dictionary in structures.values():
-		if record.station_id == primary_station():
+		if record.station_id == station_id:
 			result[record.position] = record.kind
 	return result
 
-func import_modules(values: Dictionary) -> void:
+func import_modules(values: Dictionary, station_id: String = "") -> void:
 	# Only used by old-save adapters. New saves overwrite this deterministic
 	# migration with their canonical identities before any signals are emitted.
-	structures.clear()
-	next_structure_id = 0
+	if station_id.is_empty():
+		structures.clear()
+		next_structure_id = 0
+		station_id = primary_station()
+	else:
+		for id: String in structures.keys():
+			if structures[id].station_id == station_id: structures.erase(id)
 	for point: Vector2 in values:
-		add_structure(primary_station(), values[point], point)
+		add_structure(station_id, values[point], point)
 
 func legacy_ships() -> Dictionary:
 	var result: Dictionary = {}
@@ -129,19 +135,21 @@ func import_ships(values: Dictionary) -> void:
 	for id: int in values:
 		add_ship(id, values[id], primary_station())
 
-func position_state(field: String) -> Dictionary:
+func position_state(field: String, station_id: String = "") -> Dictionary:
+	if station_id.is_empty(): station_id = primary_station()
 	var result: Dictionary = {}
 	for record: Dictionary in structures.values():
-		if record.station_id == primary_station() and record.state.has(field):
+		if record.station_id == station_id and record.state.has(field):
 			result[record.position] = record.state[field]
 	return result
 
-func import_position_state(field: String, values: Dictionary) -> void:
+func import_position_state(field: String, values: Dictionary, station_id: String = "") -> void:
+	if station_id.is_empty(): station_id = primary_station()
 	for record: Dictionary in structures.values():
-		if record.station_id == primary_station():
+		if record.station_id == station_id:
 			record.state.erase(field)
 	for point: Vector2 in values:
-		var id: String = structure_at(primary_station(), point)
+		var id: String = structure_at(station_id, point)
 		if not id.is_empty():
 			structures[id].state[field] = values[point]
 

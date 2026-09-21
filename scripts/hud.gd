@@ -1,5 +1,7 @@
 extends CanvasLayer
 const DevConfig = preload("res://scripts/dev_config.gd")
+var build_model: StationModel:
+	get: return get_parent().board.model
 var dev_panel: PanelContainer
 const RegionNavigation = preload("res://scripts/region_navigation.gd")
 var region_navigation: Control
@@ -329,7 +331,7 @@ func _style(fill: Color, border: Color, radius: int = 8) -> StyleBoxFlat:
 
 func choose(kind: String) -> void:
 	hauling_assignment = -1
-	if not kind.is_empty() and not fleet.regions.primary_station_visible():
+	if not kind.is_empty() and not get_parent().board.visible:
 		message("Jump Home to construct station modules.", true)
 		return
 	if not kind.is_empty(): close_panels()
@@ -340,22 +342,23 @@ func choose(kind: String) -> void:
 	message("Click labeled floating resources to collect; violet asteroids dispatch a Miner." if kind.is_empty() else "%s selected. Click a green cell beside the station." % model.catalog[kind].name)
 
 func refresh() -> void:
+	build_model.recalculate()
 	var home: bool = fleet.regions.primary_station_visible()
 	for kind: String in tool_buttons:
-		tool_buttons[kind].visible = model.module_unlocked(kind)
-		tool_buttons[kind].disabled = not home
+		tool_buttons[kind].visible = model.module_unlocked(kind) and (home or (not build_model.station_id.is_empty() and model.locations.outpost_catalog[model.locations.stations[build_model.station_id].kind].buildable_modules.has(kind)))
+		tool_buttons[kind].disabled = not get_parent().board.visible
 	orbit_label.text = "EARTH  /  408 KM\nA small beginning. An infinite horizon." if home else "%s / EXPLORATION\n%s" % [str(fleet.regions.catalog[fleet.regions.current_region].name).to_upper(), fleet.outposts.short_summary(fleet.regions.current_region)]
 	tech_label.text = "%s" % fleet.diplomacy.inventory.get("tech", 0)
-	xenocrystal_label.text = "%s" % fleet.diplomacy.inventory.get("xenocrystal", 0)
-	minerals_label.text = "%d" % model.minerals
+	xenocrystal_label.text = "%s" % (fleet.diplomacy.inventory.get("xenocrystal", 0) if build_model.station_id.is_empty() else model.locations.stations[build_model.station_id].inventory.get("xenocrystal", 0))
+	minerals_label.text = "%d" % build_model.minerals
 	fleet_label.text = "Miners %d idle / %d" % [fleet.idle_count(), fleet.mining_units().size()]
 	var refinery_count: int = model.module_count_with("conversion")
 	refinery_label.text = "Refineries %d · %s" % [refinery_count, _refinery_status()]
-	materials_label.text = "%d" % model.materials
-	materials_label.tooltip_text = "Materials: %d / %d capacity" % [model.materials, model.capacity]
-	power_label.text = "%+d" % model.power_balance()
-	power_label.tooltip_text = "Power: %d generated / %d used" % [model.power_output, model.power_use]
-	power_detail.text = "%d generated  /  %d used" % [model.power_output, model.power_use]
+	materials_label.text = "%d" % build_model.materials
+	materials_label.tooltip_text = "Materials: %d / %d capacity" % [build_model.materials, build_model.capacity]
+	power_label.text = "%+d" % build_model.power_balance()
+	power_label.tooltip_text = "Power: %d generated / %d used" % [build_model.power_output, build_model.power_use]
+	power_detail.text = "%d generated  /  %d used" % [build_model.power_output, build_model.power_use]
 	level_label.text = "Lv %02d · %s" % [model.level, "Outpost" if model.level == 1 else ("Settlement" if model.level == 2 else "Colony")]
 	count_label.text = ("" if home else "HOME / ") + "%02d modules connected" % model.modules.size()
 	goal_bar.max_value = 9
@@ -390,7 +393,7 @@ func _process(delta: float) -> void:
 		footer_balance.visible = grid_controls.visible
 	status_time -= delta
 	if status_time <= 0:
-		status_label.text = "Labeled pickups: salvage  ·  Violet asteroids: mine  ·  Inspect a module to upgrade  ·  Ships: fleet commands" if fleet.regions.primary_station_visible() else "Labeled pickups: salvage  ·  Violet: mine  ·  Outposts/Regions: Scout / view region  ·  Station construction remains at Home"
+		status_label.text = "Labeled pickups: salvage  ·  Violet asteroids: mine  ·  Inspect a module to upgrade  ·  Ships: fleet commands" if fleet.regions.primary_station_visible() else "Labeled pickups: salvage  ·  Violet: mine  ·  Outposts/Regions: Scout / view region  ·  Outpost construction uses local storage"
 		if fleet.collection != null and not fleet.collection.waiting_message().is_empty():
 			status_label.text = fleet.collection.waiting_message()
 		if not fleet.docking.waiting_message().is_empty() and fleet.collection.waiting_message().is_empty() and fleet.hauling.waiting_message().is_empty():
@@ -579,7 +582,7 @@ func _command_ship(ship_id: int, capability: String = "") -> void:
 			message("Click a Home Refinery to assign hauling. ESC cancels selection.", false, 8.0)
 		"founding":
 			var error: String = fleet.outposts.found(ship_id)
-			message("Outpost founded. Local Minerals stay here; hauling is not available yet." if error.is_empty() else error, not error.is_empty(), 8.0)
+			message("Outpost founded with starter Materials. Build locally; hauling to Home is not available yet." if error.is_empty() else error, not error.is_empty(), 8.0)
 		"collection":
 			var error: String = fleet.collection.deploy(ship_id)
 			message("Material Ship deployed at Earth." if error.is_empty() else error, not error.is_empty())
@@ -653,47 +656,47 @@ func inspect_module(world_position: Vector2) -> void:
 	_refresh_upgrade()
 
 func _refresh_upgrade() -> void:
-	var is_refinery: bool = fleet.regions.primary_station_visible() and model.modules.has(selected_position) and model.definition_at(selected_position).has("conversion")
+	var is_refinery: bool = get_parent().board.visible and build_model.modules.has(selected_position) and build_model.definition_at(selected_position).has("conversion")
 	refinery_selector.visible = is_refinery
 	refinery_run_button.visible = is_refinery
 	upgrade_title.show()
 	if is_instance_valid(tabs) and tabs.current_tab == 2 and panel.has_node("MenuFrame"):
 		panel.get_node("MenuFrame").get_child(0).get_child(0).text = "Build"
-	if not fleet.regions.primary_station_visible():
+	if not get_parent().board.visible:
 		upgrade_title.text = "Station at Earth"
 		upgrade_stats.text = "Jump Home to inspect or modify modules."
 		upgrade_detail.text = "This region is exploration-only."
 		upgrade_button.disabled = true
 		demolish_button.disabled = true
 		return
-	var demolition_error: String = model.demolition_error(selected_position)
+	var demolition_error: String = build_model.demolition_error(selected_position)
 	demolish_button.disabled = not demolition_error.is_empty()
-	demolish_button.text = "Demolish · +%d M" % model.module_refund(selected_position)
+	demolish_button.text = "Demolish · +%d M" % build_model.module_refund(selected_position)
 	demolish_button.tooltip_text = demolition_error if not demolition_error.is_empty() else "Frees position and power; cancels dock missions. Remaining modules stay operational. Stock and refund are retained above capacity."
-	if not model.modules.has(selected_position):
+	if not build_model.modules.has(selected_position):
 		upgrade_title.text = "Select a module"
 		upgrade_stats.text = "Use Inspect, then click a station module."
 		upgrade_detail.text = "Habitat · Solar · Storage · Refinery"
 		upgrade_button.text = "Select a module to upgrade"
 		upgrade_button.disabled = true
 		return
-	var definition: Dictionary = model.definition_at(selected_position)
+	var definition: Dictionary = build_model.definition_at(selected_position)
 	upgrade_title.hide() # The inspect header carries the module name and tier.
 	if tabs.current_tab == 2 and panel.has_node("MenuFrame"):
-		panel.get_node("MenuFrame").get_child(0).get_child(0).text = "%s · Tier %d" % [definition.name, model.tier_at(selected_position)]
+		panel.get_node("MenuFrame").get_child(0).get_child(0).text = "%s · Tier %d" % [definition.name, build_model.tier_at(selected_position)]
 	upgrade_stats.text = "Generates %d Power · uses %d\nMaterial capacity bonus: %d" % [definition.power_output, definition.power_use, definition.capacity]
 	if definition.has("docking"):
-		var dock_id: String = model.structure_id_at(selected_position)
+		var dock_id: String = build_model.structure_id_at(selected_position)
 		upgrade_stats.text += "\nParking: %d / %d ships" % [fleet.docking.usage.get(dock_id, {}).size(), int(definition.docking.capacity)]
 	if definition.has("conversion"):
-		var recipe: Dictionary = model.refinery_recipe(selected_position)
-		upgrade_stats.text += "\n%d %s → %d %s / %ds\n%s" % [recipe.input, recipe.input_resource.capitalize(), recipe.output, recipe.output_resource.capitalize(), recipe.seconds, model.refinery_status(selected_position)]
-		var buffer: Dictionary = model.refinery_buffer(selected_position)
+		var recipe: Dictionary = build_model.refinery_recipe(selected_position)
+		upgrade_stats.text += "\n%d %s → %d %s / %ds\n%s" % [recipe.input, recipe.input_resource.capitalize(), recipe.output, recipe.output_resource.capitalize(), recipe.seconds, build_model.refinery_status(selected_position)]
+		var buffer: Dictionary = build_model.refinery_buffer(selected_position)
 		var capacity: int = int(definition.output_buffer_capacity)
-		upgrade_stats.text += "\nBuffer: %d / %d · %s" % [capacity - model.refinery_buffer_space(selected_position), capacity, model.upgrade_cost_text(buffer) if not buffer.is_empty() else "empty"]
+		upgrade_stats.text += "\nBuffer: %d / %d · %s" % [capacity - build_model.refinery_buffer_space(selected_position), capacity, build_model.upgrade_cost_text(buffer) if not buffer.is_empty() else "empty"]
 		var assigned: int = 0
 		for job: Dictionary in fleet.hauling.jobs.values():
-			if job.refinery_id == model.structure_id_at(selected_position): assigned += 1
+			if job.refinery_id == build_model.structure_id_at(selected_position): assigned += 1
 		upgrade_stats.text += "\nHaulers assigned: %d" % assigned
 		# Preserve an open popup across model/fleet refreshes; rebuild only if its choices change.
 		var recipe_ids: Array = definition.recipes
@@ -702,35 +705,35 @@ func _refresh_upgrade() -> void:
 		if displayed_ids != recipe_ids:
 			refinery_selector.clear()
 			for recipe_id: String in recipe_ids:
-				refinery_selector.add_item(model.refinery_recipes[recipe_id].name)
+				refinery_selector.add_item(build_model.refinery_recipes[recipe_id].name)
 				refinery_selector.set_item_metadata(refinery_selector.item_count - 1, recipe_id)
-		refinery_selector.select(recipe_ids.find(model.refinery_recipe_id(selected_position)))
-		refinery_run_button.text = "Stop production" if model.refinery_running(selected_position) else "Run production · Stopped"
+		refinery_selector.select(recipe_ids.find(build_model.refinery_recipe_id(selected_position)))
+		refinery_run_button.text = "Stop production" if build_model.refinery_running(selected_position) else "Run production · Stopped"
 
-	var current_tier: int = model.tier_at(selected_position)
-	var next: Dictionary = model.next_upgrade(selected_position)
+	var current_tier: int = build_model.tier_at(selected_position)
+	var next: Dictionary = build_model.next_upgrade(selected_position)
 	if next.is_empty():
 		upgrade_detail.text = "Maxed · Maximum tier reached."
 		upgrade_button.text = "Maximum tier"
 		upgrade_button.disabled = true
 		return
-	upgrade_detail.text = "Next: %s for %s" % [next.description, model.upgrade_cost_text(next.cost)]
+	upgrade_detail.text = "Next: %s for %s" % [next.description, build_model.upgrade_cost_text(next.cost)]
 	if definition.has("conversion"):
-		var next_recipe: Dictionary = model.refinery_recipe(selected_position, current_tier + 1)
-		upgrade_detail.text = "Next: %d %s → %d %s / %ds for %s" % [next_recipe.input, next_recipe.input_resource.capitalize(), next_recipe.output, next_recipe.output_resource.capitalize(), next_recipe.seconds, model.upgrade_cost_text(next.cost)]
+		var next_recipe: Dictionary = build_model.refinery_recipe(selected_position, current_tier + 1)
+		upgrade_detail.text = "Next: %d %s → %d %s / %ds for %s" % [next_recipe.input, next_recipe.input_resource.capitalize(), next_recipe.output, next_recipe.output_resource.capitalize(), next_recipe.seconds, build_model.upgrade_cost_text(next.cost)]
 	upgrade_button.text = "Upgrade to T%d" % (current_tier + 1)
-	var error: String = model.upgrade_error(selected_position)
+	var error: String = build_model.upgrade_error(selected_position)
 	upgrade_button.disabled = not error.is_empty()
 	upgrade_button.tooltip_text = error
 	if not error.is_empty(): upgrade_detail.text += "\n\n" + error
 
 func _upgrade_selected() -> void:
-	var error: String = model.upgrade_module(selected_position)
-	message("Module upgraded to Tier %d." % model.tier_at(selected_position) if error.is_empty() else error, not error.is_empty())
+	var error: String = build_model.upgrade_module(selected_position)
+	message("Module upgraded to Tier %d." % build_model.tier_at(selected_position) if error.is_empty() else error, not error.is_empty())
 
 func _demolish_selected() -> void:
-	var refund: int = model.module_refund(selected_position)
-	var error: String = model.demolish_module(selected_position)
+	var refund: int = build_model.module_refund(selected_position)
+	var error: String = build_model.demolish_module(selected_position)
 	message("Module decommissioned. +%d Materials; position freed." % refund if error.is_empty() else error, not error.is_empty())
 
 func _sell_ship(ship_id: int) -> void:

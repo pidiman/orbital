@@ -394,6 +394,12 @@ func restore(document: Variant) -> String:
 		for station: Dictionary in location_data.stations.values():
 			if station.has("inventory") and station.inventory is Dictionary and not station.inventory.has("xenocrystal"):
 				station.inventory["xenocrystal"] = 0
+		for station: Dictionary in location_data.stations.values():
+			if station.has("inventory") and station.inventory is Dictionary and not station.inventory.has("materials"):
+				station.inventory["materials"] = 0
+				# Old outposts had only a marker and mining inventory; no built grid to move.
+				if location_data.structures.has(station.get("structure_id", "")):
+					location_data.structures[station.structure_id].position = Vector2.ZERO
 		error = candidate_fleet.outposts.validate(location_data, region_data, int(station_data.next_ship_id))
 		if not error.is_empty():
 			return error
@@ -798,9 +804,9 @@ func _validate_research_transport(research_data: Dictionary, transport_data: Dic
 		var job: Variant = transport_data.jobs[ship_id]
 		if not ship_id is int or not station.ships.has(ship_id) or not _valid_job(job) or not _valid_vector(job.get("gate")):
 			return "Invalid gate transit."
-		if job.get("origin") != Regions.HOME or transport_data.locations.get(ship_id, Regions.HOME) != Regions.HOME:
-			return "Gate departure must be at Home."
-		if not job.get("destination") is String or not region_data.records.has(job.destination) or not region_data.records[job.destination].discovered or not candidate.regions.adjacent(Regions.HOME, job.destination):
+		if not job.get("origin") is String or not region_data.records.has(job.origin) or transport_data.locations.get(ship_id, Regions.HOME) != job.origin:
+			return "Gate departure must match the ship region."
+		if not job.get("destination") is String or not region_data.records.has(job.destination) or not region_data.records[job.destination].discovered or not candidate.regions.adjacent(job.origin, job.destination):
 			return "Invalid gate route."
 		if not job.get("cost") is Dictionary:
 			return "Invalid gate cost escrow."

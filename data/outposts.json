@@ -7,13 +7,25 @@
     },
     "storage": {
       "minerals": 0,
-      "xenocrystal": 0
+      "xenocrystal": 0,
+      "materials": 0
     },
     "position": [
-      400,
-      110
+      0,
+      0
     ],
     "art": "storage",
-    "color": "6ce0d5"
+    "color": "6ce0d5",
+    "starter_transfer": {
+      "materials": 300
+    },
+    "buildable_modules": [
+      "solar",
+      "storage",
+      "space_dock",
+      "teleport_gate"
+    ],
+    "base_capacity": 300,
+    "base_power": 0
   }
 }

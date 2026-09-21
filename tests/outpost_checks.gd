@@ -36,14 +36,14 @@ static func run() -> Dictionary:
 	checks.location = model.locations.ship_region(jump) == "venus" and fleet.regions.viewed_region == "home"
 	model.materials = 59
 	before = store.snapshot()
-	checks.cost_rejection_atomic = fleet.outposts.found(jump).contains("60 Home Materials") and store.snapshot() == before
-	model.materials = 100
+	checks.cost_rejection_atomic = fleet.outposts.found(jump).contains("360 Home Materials") and store.snapshot() == before
+	model.materials = 400
 	checks.found = fleet.outposts.found(jump).is_empty() and model.materials == 40
 	var outpost_id: String = model.locations.outpost_at("venus", "player")
 	checks.own_identity = outpost_id != "station:home" and not outpost_id.is_empty()
 	if outpost_id.is_empty(): return checks
 	var station: Dictionary = model.locations.stations[outpost_id]
-	checks.local_inventory = station.inventory == {"minerals": 0, "xenocrystal": 0} and station.region == "venus" and station.owner == "player"
+	checks.local_inventory = station.inventory == {"minerals": 0, "xenocrystal": 0, "materials": 300} and station.region == "venus" and station.owner == "player"
 	checks.structure_identity = model.locations.structures[station.structure_id].station_id == outpost_id and model.locations.structures[station.structure_id].region == "venus"
 	checks.founding_state = station.founding.state == "established" and station.founding.ship_id == jump and station.founding.paid.materials == 60 and model.locations.ships[jump].founding.station_id == outpost_id
 	checks.hull_survives = model.ships.has(jump) and model.locations.ships[jump].station_id == "station:home"
@@ -79,7 +79,7 @@ static func run() -> Dictionary:
 	checks.repeat_local_only = model.locations.stations[outpost_id].inventory.minerals == 36 and model.minerals == home_ore
 	fleet.cancel_unit(miner)
 	checks.cancel_stays_local = model.locations.ship_region(miner) == "venus" and not fleet.asteroids[target].claimed
-	checks.no_remote_building = fleet.regions.jump("venus").is_empty() and not model.build(Vector2(58, 58), "solar").is_empty()
+	checks.primary_adapter_rejects_remote_building = fleet.regions.jump("venus").is_empty() and not model.build(Vector2(58, 58), "solar").is_empty()
 	checks.no_material_hauling = store.supply.collection.depots_in("venus").is_empty()
 	fleet.regions.jump("home")
 	model.materials = 100
@@ -104,7 +104,7 @@ static func run() -> Dictionary:
 	bad.extensions.erase("outposts")
 	checks.missing_extension_rejected = not loaded.restore(bad).is_empty() and loaded.snapshot() == before
 	# A second region gets a distinct owner and never shares Venus inventory.
-	model.materials = 300
+	model.materials = 600
 	model.buy_ship("jump_ship")
 	var second_jump: int = model.next_ship_id
 	fleet.diplomacy.inventory.xenocrystal = 2
@@ -146,7 +146,7 @@ static func run() -> Dictionary:
 	before = loaded.snapshot()
 	checks.migration_resave = loaded.restore(before).is_empty() and loaded.snapshot() == before and loaded.migration_notice.is_empty()
 	var hybrid: Store = Setup.make_store()
-	hybrid.model.materials = 100
+	hybrid.model.materials = 500
 	hybrid.model.build(Vector2(58, 0), "solar")
 	hybrid.model.ship_catalog["hybrid"] = hybrid.model.ship_catalog.miner.duplicate(true)
 	hybrid.model.ship_catalog.hybrid["founding"] = {"outpost": "mining_outpost"}

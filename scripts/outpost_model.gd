@@ -18,8 +18,8 @@ func definition_for(ship_id: int) -> Dictionary:
 func cost_text(ship_id: int) -> String:
 	var definition: Dictionary = definition_for(ship_id)
 	var parts: Array[String] = []
-	for resource: String in definition.get("cost", {}):
-		parts.append("%d Home %s" % [definition.cost[resource], resource.capitalize()])
+	for resource: String in founding_cost(definition):
+		parts.append("%d Home %s" % [founding_cost(definition)[resource], resource.capitalize()])
 	return " + ".join(parts)
 
 func founding_error(ship_id: int) -> String:
@@ -36,10 +36,10 @@ func founding_error(ship_id: int) -> String:
 		return "This region is not unlocked for outpost founding."
 	if not world.outpost_at(region, world.ships[ship_id].owner).is_empty():
 		return "You already have an outpost in this region."
-	for resource: String in definition.cost:
+	for resource: String in founding_cost(definition):
 		var available: int = fleet.model.materials if resource == "materials" else int(fleet.diplomacy.inventory.get(resource, 0))
-		if available < int(definition.cost[resource]):
-			return "Founding requires " + cost_text(ship_id) + "."
+		if available < int(founding_cost(definition)[resource]):
+			return "Founding + starter transfer requires " + cost_text(ship_id) + "."
 	return ""
 
 func found(ship_id: int) -> String:
@@ -52,15 +52,15 @@ func found(ship_id: int) -> String:
 	var definition: Dictionary = catalog[kind]
 	var station_id: String = "station:outpost:%d" % (world.next_structure_id + 1)
 	# Instant transaction: one cost, one outpost, no pending UI-owned founding state.
-	for resource: String in definition.cost:
+	for resource: String in founding_cost(definition):
 		if resource == "materials":
-			fleet.model.materials -= int(definition.cost[resource])
+			fleet.model.materials -= int(founding_cost(definition)[resource])
 		else:
-			fleet.diplomacy.inventory[resource] -= int(definition.cost[resource])
+			fleet.diplomacy.inventory[resource] -= int(founding_cost(definition)[resource])
 	var inventory: Dictionary = {}
 	for resource: String in definition.storage:
-		inventory[resource] = int(definition.storage[resource])
-	world.stations[station_id] = {"id": station_id, "owner": ship.owner, "region": ship.region, "kind": kind, "inventory": inventory, "founding": {"state": "established", "ship_id": ship_id, "paid": definition.cost.duplicate(true)}}
+		inventory[resource] = int(definition.storage[resource]) + int(definition.get("starter_transfer", {}).get(resource, 0))
+	world.stations[station_id] = {"id": station_id, "owner": ship.owner, "region": ship.region, "kind": kind, "inventory": inventory, "grid": {"columns": StationGeometry.grid_dimensions.x, "rows": StationGeometry.grid_dimensions.y}, "founding": {"state": "established", "ship_id": ship_id, "paid": definition.cost.duplicate(true), "starter_transfer": definition.get("starter_transfer", {}).duplicate(true)}}
 	var point := Vector2(definition.position[0], definition.position[1])
 	var structure_id: String = world.add_structure(station_id, kind, point)
 	world.stations[station_id]["structure_id"] = structure_id
@@ -76,7 +76,8 @@ func summary(region_id: String) -> String:
 	if id.is_empty():
 		return "No outpost. Send a Jump Ship through a gate, then use Found outpost in Ships."
 	var station: Dictionary = world.stations[id]
-	return "%s · Local Minerals: %d · Xenocrystals: %d · Hauling to Home is not available yet." % [catalog[station.kind].name, station.inventory.minerals, station.inventory.get("xenocrystal", 0)]
+	var local: StationModel = fleet.model.scoped_station(id)
+	return "%s · Local Materials %d/%d · Minerals %d · Xenocrystals %d · Power %+d (%d generated / %d used). No Home hauling." % [catalog[station.kind].name, local.materials, local.capacity, local.minerals, station.inventory.get("xenocrystal", 0), local.power_balance(), local.power_output, local.power_use]
 
 func validate(world: Dictionary, regions: Dictionary, next_ship_id: int) -> String:
 	var seen: Dictionary = {}
@@ -97,20 +98,48 @@ func validate(world: Dictionary, regions: Dictionary, next_ship_id: int) -> Stri
 		for resource: String in catalog[station.kind].storage:
 			if not quantity(station.inventory.get(resource)):
 				return "Invalid local resource quantity."
+		if station.has("grid"):
+			if not station.grid is Dictionary: return "Invalid outpost grid."
+			for axis: String in ["columns", "rows"]:
+				if not quantity(station.grid.get(axis)) or station.grid[axis] < 9 or station.grid[axis] > 257 or int(station.grid[axis]) % 2 != 1: return "Invalid outpost grid dimensions."
 		var founding: Variant = station.get("founding")
 		if not founding is Dictionary or founding.get("state") != "established" or not quantity(founding.get("ship_id")) or founding.ship_id < 1 or founding.ship_id > next_ship_id or not founding.get("paid") is Dictionary:
 			return "Invalid founding state."
 		for resource: Variant in founding.paid:
 			if not resource is String or (resource != "materials" and not fleet.diplomacy.goods_catalog.has(resource)) or not quantity(founding.paid[resource]):
 				return "Invalid founding cost record."
+		if founding.has("starter_transfer"):
+			if not founding.starter_transfer is Dictionary: return "Invalid starter transfer record."
+			for resource: Variant in founding.starter_transfer:
+				if not resource is String or not catalog[station.kind].storage.has(resource) or not quantity(founding.starter_transfer[resource]): return "Invalid starter transfer quantity."
+		var power: int = int(catalog[station.kind].base_power)
+		for module: Dictionary in world.structures.values():
+			if module.station_id != id: continue
+			var definition: Dictionary = fleet.model.definition_for(module.kind, int(module.state.get("tier", 1)))
+			power += int(definition.power_output) - int(definition.power_use)
+		if power < 0: return "Outpost has insufficient local power."
 		# The founding hull may have been decommissioned; its historical ID remains.
 		if world.ships.has(int(founding.ship_id)):
 			var ship: Dictionary = world.ships[int(founding.ship_id)]
-			if ship.get("founding") != {"state": "established", "station_id": id} or ship.region != station.region or ship.owner != station.owner or not fleet.model.ship_catalog[ship.kind].has("founding"):
+			if ship.get("founding") != {"state": "established", "station_id": id} or ship.owner != station.owner or not fleet.model.ship_catalog[ship.kind].has("founding"):
 				return "Founding ship disagrees with outpost."
 	for structure: Dictionary in world.structures.values():
-		if structure.station_id != fleet.model.locations.primary_station() and world.stations[structure.station_id].structure_id != structure.id:
-			return "Remote module construction is not supported."
+		if structure.station_id == fleet.model.locations.primary_station(): continue
+		var station: Dictionary = world.stations[structure.station_id]
+		if station.structure_id == structure.id: continue
+		if not catalog[station.kind].buildable_modules.has(structure.kind): return "Unsupported outpost module."
+		var tier: int = int(structure.state.get("tier", 1))
+		if tier < 1 or tier > fleet.model.catalog[structure.kind].get("upgrades", []).size() + 1: return "Invalid outpost module tier."
+		if not fleet.model.module_unlocked(structure.kind): return "Outpost module technology is locked."
+		for cell: Vector2 in fleet.model.footprint_points(structure.position, structure.kind):
+			var grid: Dictionary = station.get("grid", {"columns": StationGeometry.grid_dimensions.x, "rows": StationGeometry.grid_dimensions.y})
+			var extent := Vector2((int(grid.columns) - 1) / 2.0, (int(grid.rows) - 1) / 2.0) * StationGeometry.MODULE_SIZE
+			if not cell.is_finite() or absf(cell.x) > extent.x or absf(cell.y) > extent.y: return "Outpost module outside grid."
+			for other: Dictionary in world.structures.values():
+				if other.id == structure.id or other.station_id != structure.station_id: continue
+				for occupied: Vector2 in fleet.model.footprint_points(other.position, other.kind):
+					if StationGeometry.overlaps(cell, occupied): return "Overlapping outpost modules."
+
 	for ship: Dictionary in world.ships.values():
 		if ship.has("founding"):
 			var founding: Variant = ship.founding
@@ -125,3 +154,9 @@ func short_summary(region_id: String) -> String:
 	var world: RefCounted = fleet.model.locations
 	var id: String = world.outpost_at(region_id, world.rules.primary_station.owner)
 	return "No outpost · Found one with a Jump Ship." if id.is_empty() else "Outpost · %d local Minerals · No Home hauling" % world.stations[id].inventory.minerals
+
+func founding_cost(definition: Dictionary) -> Dictionary:
+	var result: Dictionary = definition.get("cost", {}).duplicate(true)
+	for resource: String in definition.get("starter_transfer", {}):
+		result[resource] = int(result.get(resource, 0)) + int(definition.starter_transfer[resource])
+	return result

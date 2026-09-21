@@ -180,7 +180,7 @@ func home_asteroid_count() -> int:
 func dock_point(id: int) -> Vector2:
 	var reservation: Dictionary = fleet.docking.ships[id]
 	var structure: Dictionary = fleet.model.locations.structures[reservation.dock_id]
-	var point: Vector2 = board.world_to_screen(structure.position) if structure.region == fleet.regions.HOME else RegionView.project(structure.position, get_viewport_rect().size)
+	var point: Vector2 = board.world_to_screen(structure.position)
 	var capacity: int = int(fleet.model.structure_definition(reservation.dock_id).docking.capacity)
 	return point + Vector2((float(reservation.slot) - (capacity - 1) * 0.5) * 40.0, 38.0)
 

@@ -44,7 +44,7 @@ func _on_built(world_position: Vector2, _kind: String) -> void:
 	pulses.append({"position": world_position, "time": 0.0})
 
 func handle_click(point: Vector2) -> bool:
-	if model.region_context != null and not model.region_context.primary_station_visible(): return false
+	if not visible: return false
 	var world_point: Vector2 = get_canvas_transform().affine_inverse() * point
 	if not selected.is_empty():
 		requested_build.emit(placement_position(world_point))
@@ -62,10 +62,10 @@ func _draw() -> void:
 		for y in range(-grid_radius.y, grid_radius.y + 1):
 			draw_circle(cell_position(Vector2i(x, y)), 1.2, grid_color)
 	if not selected.is_empty():
-		for x in range(Geometry.grid_dimensions.x + 1):
+		for x in range(model.build_grid_dimensions().x + 1):
 			var offset: float = -edge.x + x * cell_size
 			draw_line(center + Vector2(offset, -edge.y), center + Vector2(offset, edge.y), grid_color, 1)
-		for y in range(Geometry.grid_dimensions.y + 1):
+		for y in range(model.build_grid_dimensions().y + 1):
 			var offset: float = -edge.y + y * cell_size
 			draw_line(center + Vector2(-edge.x, offset), center + Vector2(edge.x, offset), grid_color, 1)
 		_update_placement_cache()
@@ -136,7 +136,7 @@ func _invalidate_placement_cache() -> void:
 	queue_redraw()
 
 func _update_placement_cache() -> void:
-	var key: String = selected + str(snap_spacing) + str(snap_enabled)
+	var key: String = model.station_id + str(model.modules) + str(model.materials) + selected + str(snap_spacing) + str(snap_enabled)
 	if key == placement_cache_key: return
 	placement_cache_key = key
 	placement_cache.clear()

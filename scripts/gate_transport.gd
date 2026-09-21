@@ -33,37 +33,45 @@ func work_error(ship_id: int) -> String:
 		return "Ship is stationed in %s. This operation away from Home is future scope." % fleet.regions.catalog[location(ship_id)].name
 	return ""
 
-func jump_error(gate: Vector2, ship_id: int, destination: String) -> String:
-	if not gates.has(gate):
-		return "Build a Teleport Gate at Earth first."
-	if not fleet.model.ships.has(ship_id):
-		return "Select an owned ship."
-	if not work_error(ship_id).is_empty():
-		return work_error(ship_id)
-	if fleet.unit_busy(ship_id):
-		return "Ship is busy. Choose an idle Home ship."
-	if not fleet.regions.is_discovered(destination):
-		return "Survey the destination region first."
-	var origin: String = fleet.model.locations.structures[fleet.model.structure_id_at(gate)].region
-	if destination == origin or not fleet.regions.adjacent(origin, destination):
-		return "No direct gate route from Home to this region."
-	var capability: Dictionary = fleet.model.definition_at(gate).teleport
-	for good: String in capability.cost:
-		if int(fleet.diplomacy.inventory.get(good, 0)) < int(capability.cost[good]):
-			return "Gate jump requires %d %s." % [capability.cost[good], fleet.diplomacy.goods_catalog[good].name]
+func gate_id(gate: Variant) -> String:
+	return str(gate) if gate is String else fleet.model.locations.structure_at(fleet.model.locations.primary_station(), gate)
+
+func all_gates() -> Array[String]:
+	var result: Array[String] = []
+	for id: String in fleet.model.locations.structures:
+		if fleet.model.structure_definition(id).has("teleport"): result.append(id)
+	return result
+
+func jump_error(gate: Variant, ship_id: int, destination: String) -> String:
+	var id: String = gate_id(gate)
+	if not all_gates().has(id): return "Build a Teleport Gate in the departure region first."
+	if not fleet.model.ships.has(ship_id): return "Select an owned ship."
+	var structure: Dictionary = fleet.model.locations.structures[id]
+	if location(ship_id) != structure.region: return "Ship must be in the departure gate's region."
+	if fleet.unit_busy(ship_id): return "Ship is busy. Choose an idle ship."
+	if not fleet.regions.is_discovered(destination): return "Survey the destination region first."
+	if destination == structure.region or not fleet.regions.adjacent(structure.region, destination): return "No direct gate route from this region."
+	var base: StationModel = fleet.model.scoped_station(structure.station_id)
+	if base.power_balance() < 0: return "Departure station needs more Solar power."
+	var inventory: Dictionary = fleet.diplomacy.inventory if structure.station_id == fleet.model.locations.primary_station() else fleet.model.locations.stations[structure.station_id].inventory
+	for good: String in fleet.model.structure_definition(id).teleport.cost:
+		var amount: int = int(fleet.model.structure_definition(id).teleport.cost[good])
+		if int(inventory.get(good, 0)) < amount: return "Departure storage needs %d %s for this jump." % [amount, fleet.diplomacy.goods_catalog[good].name]
 	return ""
 
-func jump(gate: Vector2, ship_id: int, destination: String) -> String:
+func jump(gate: Variant, ship_id: int, destination: String) -> String:
 	var error: String = jump_error(gate, ship_id, destination)
-	if not error.is_empty():
-		return error
-	var capability: Dictionary = fleet.model.definition_at(gate).teleport
-	for good: String in capability.cost:
-		fleet.diplomacy.inventory[good] -= int(capability.cost[good])
+	if not error.is_empty(): return error
+	var id: String = gate_id(gate)
+	var structure: Dictionary = fleet.model.locations.structures[id]
+	var capability: Dictionary = fleet.model.structure_definition(id).teleport
+	var inventory: Dictionary = fleet.diplomacy.inventory if structure.station_id == fleet.model.locations.primary_station() else fleet.model.locations.stations[structure.station_id].inventory
+	for good: String in capability.cost: inventory[good] -= int(capability.cost[good])
 	var duration: int = maxi(1, int(capability.seconds))
 	fleet.model.locations.begin_transit(ship_id, destination)
-	jobs[ship_id] = {"gate_id": fleet.model.structure_id_at(gate), "gate": gate, "origin": location(ship_id), "destination": destination, "remaining": duration, "duration": duration, "cost": capability.cost.duplicate(true)}
-	gates[gate].jumps += 1
+	jobs[ship_id] = {"gate_id": id, "gate": structure.position, "origin": location(ship_id), "destination": destination, "remaining": duration, "duration": duration, "cost": capability.cost.duplicate(true)}
+	if not structure.state.has("teleport"): structure.state["teleport"] = {"jumps": 0}
+	structure.state.teleport.jumps += 1
 	changed.emit()
 	fleet.diplomacy.changed.emit()
 	return ""
@@ -81,7 +89,10 @@ func tick() -> void:
 func cancel(ship_id: int) -> void:
 	if jobs.has(ship_id):
 		for good: String in jobs[ship_id].cost:
-			fleet.diplomacy.inventory[good] += int(jobs[ship_id].cost[good])
+			var origin: String = jobs[ship_id].origin
+			var station: String = fleet.model.locations.outpost_at(origin, fleet.model.locations.rules.primary_station.owner)
+			var inventory: Dictionary = fleet.diplomacy.inventory if station.is_empty() else fleet.model.locations.stations[station].inventory
+			inventory[good] = int(inventory.get(good, 0)) + int(jobs[ship_id].cost[good])
 		if fleet.model.locations.ships.has(ship_id):
 			fleet.model.locations.ships[ship_id].region = jobs[ship_id].origin
 			fleet.model.locations.ships[ship_id].transit = {}

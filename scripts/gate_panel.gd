@@ -30,7 +30,7 @@ func _ready() -> void:
 	close_button = _button(heading, "Close")
 	close_button.pressed.connect(hide)
 	inventory_label = hud._label(column, "", 15, hud.GOLD)
-	hud._label(column, "TELEPORT GATE · outbound from Earth", 16, hud.CYAN)
+	hud._label(column, "TELEPORT GATE · local departure", 16, hud.CYAN)
 	hud._label(column, "Departure gate", 12, hud.MUTED)
 	gate_picker = _picker(column)
 	hud._label(column, "Ship to transport", 12, hud.MUTED)
@@ -49,7 +49,7 @@ func _ready() -> void:
 	locations_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	column.add_child(locations_scroll)
 	locations_label = hud._label(locations_scroll, "", 13, hud.INK)
-	var note: Label = hud._label(column, "Jump Ships can found outposts. Local Miners deposit there. Return hauling and module construction are future scope.", 12, hud.MUTED)
+	var note: Label = hud._label(column, "Jump Ships can found outposts. Local Miners deposit there. Outposts support Solar, Storage, Space Dock and Gates. Return hauling is future scope.", 12, hud.MUTED)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	fleet.changed.connect(refresh)
 	fleet.model.changed.connect(refresh)
@@ -71,8 +71,8 @@ func _picker(parent: Node) -> OptionButton:
 	picker.item_selected.connect(func(_index: int) -> void: refresh())
 	return picker
 
-func selected_gate() -> Vector2:
-	return gate_picker.get_item_metadata(gate_picker.selected) if gate_picker.selected >= 0 else Vector2.INF
+func selected_gate() -> Variant:
+	return gate_picker.get_item_metadata(gate_picker.selected) if gate_picker.selected >= 0 else ""
 
 func selected_ship() -> int:
 	return ship_picker.get_item_id(ship_picker.selected) if ship_picker.selected >= 0 else -1
@@ -88,18 +88,19 @@ func open_panel() -> void:
 func refresh() -> void:
 	if not is_instance_valid(jump_button):
 		return
-	inventory_label.text = "Xenocrystals available: %d" % fleet.diplomacy.inventory.get("xenocrystal", 0)
-	var signature: String = str(fleet.transport.gates.keys()) + str(fleet.model.ships) + str(fleet.regions.records.keys())
+	inventory_label.text = "Home Xenocrystals: %d · Outpost departures use local Xenocrystals." % fleet.diplomacy.inventory.get("xenocrystal", 0)
+	var signature: String = str(fleet.transport.all_gates()) + str(fleet.model.ships) + str(fleet.regions.records.keys())
 	if signature != picker_signature:
 		picker_signature = signature
-		var gate: Vector2 = selected_gate()
+		var gate: Variant = selected_gate()
 		var ship: int = selected_ship()
 		var destination: String = selected_destination()
 		gate_picker.clear()
 		ship_picker.clear()
 		destination_picker.clear()
-		for point: Vector2 in fleet.transport.gates:
-			gate_picker.add_item("Gate at %s" % point)
+		for point: String in fleet.transport.all_gates():
+			var structure: Dictionary = fleet.model.locations.structures[point]
+			gate_picker.add_item("%s · Gate at %s" % [fleet.regions.catalog[structure.region].name, structure.position])
 			gate_picker.set_item_metadata(gate_picker.item_count - 1, point)
 			if point == gate:
 				gate_picker.select(gate_picker.item_count - 1)
@@ -107,9 +108,10 @@ func refresh() -> void:
 			ship_picker.add_item("%s #%d" % [fleet.model.ship_catalog[fleet.model.ships[ship_id]].name, ship_id], ship_id)
 			if ship_id == ship:
 				ship_picker.select(ship_picker.item_count - 1)
-		for region_id: String in fleet.regions.catalog:
-			if region_id == fleet.regions.HOME:
-				continue
+		var destinations: Array = fleet.regions.catalog.keys()
+		destinations.erase(fleet.regions.HOME)
+		destinations.append(fleet.regions.HOME)
+		for region_id: String in destinations:
 			destination_picker.add_item(fleet.regions.catalog[region_id].name)
 			destination_picker.set_item_metadata(destination_picker.item_count - 1, region_id)
 			if region_id == destination:
@@ -118,8 +120,8 @@ func refresh() -> void:
 		var id: String = str(destination_picker.get_item_metadata(index))
 		destination_picker.set_item_text(index, "%s · %s" % [fleet.regions.catalog[id].name, "Discovered" if fleet.regions.is_discovered(id) else "Unknown"])
 	var costs: Array[String] = []
-	if fleet.transport.gates.has(selected_gate()):
-		var capability: Dictionary = fleet.model.definition_at(selected_gate()).teleport
+	if fleet.transport.all_gates().has(fleet.transport.gate_id(selected_gate())):
+		var capability: Dictionary = fleet.model.structure_definition(fleet.transport.gate_id(selected_gate())).teleport
 		for good: String in capability.cost:
 			costs.append("%d %s" % [capability.cost[good], fleet.diplomacy.goods_catalog[good].name])
 	jump_button.text = "Transport ship" + (" · " + " + ".join(costs) if not costs.is_empty() else "")

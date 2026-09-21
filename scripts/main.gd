@@ -125,6 +125,7 @@ func _ready() -> void:
 	hud.save_requested.connect(_manual_save)
 	hud.load_requested.connect(_manual_load)
 	fleet.regions.location_changed.connect(_update_region_view)
+	fleet.outposts.changed.connect(_update_region_view)
 	fleet.regions.discovered.connect(_region_discovered)
 	session_pause = preload("res://scripts/session_pause.gd").new()
 	session_pause.game = self
@@ -139,7 +140,7 @@ func _ready() -> void:
 
 func _build(world_position: Vector2) -> void:
 	var previous_level: int = model.level
-	var error: String = model.build(world_position, board.selected)
+	var error: String = board.model.build(world_position, board.selected)
 	if not error.is_empty():
 		hud.message(error, true)
 	elif previous_level == model.level:
@@ -208,8 +209,12 @@ func _update_region_view() -> void:
 	background.visible = home
 	region_view.visible = not home
 	region_view.queue_redraw()
-	board.visible = home
-	board.set_process_unhandled_input(home)
+	var outpost: String = model.locations.outpost_at(fleet.regions.current_region, model.locations.rules.primary_station.owner)
+	board.model = model if outpost.is_empty() else model.scoped_station(outpost)
+	board.grid_radius = (board.model.build_grid_dimensions() - Vector2i.ONE) / 2
+	board.placement_cache_key = ""
+	board.visible = home or not outpost.is_empty()
+	board.set_process_unhandled_input(board.visible)
 	debris.visible = true
 	debris.set_process_unhandled_input(true)
 	board.selected = ""

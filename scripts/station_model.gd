@@ -1,6 +1,7 @@
 class_name StationModel
 extends RefCounted
 const Locations = preload("res://scripts/world_locations.gd")
+var station_id: String = ""
 var locations: Locations
 const Geometry = preload("res://scripts/station_geometry.gd")
 
@@ -14,7 +15,7 @@ signal refined(amount: int)
 signal module_built(world_position: Vector2, kind: String)
 signal level_reached(level: int)
 
-# This model always owns the primary station at Earth; region structures are separate.
+# Default instance owns Home. Scoped adapters share canonical locations and target one outpost.
 var research: RefCounted
 var region_context: RefCounted
 var decommission_rules: Dictionary = {}
@@ -25,20 +26,30 @@ var ships: Dictionary:
 	set(value): locations.import_ships(value)
 var next_ship_id: int = 0
 var module_tiers: Dictionary:
-	get: return locations.position_state("tier")
-	set(value): locations.import_position_state("tier", value)
+	get: return locations.position_state("tier", station_id)
+	set(value): locations.import_position_state("tier", value, station_id)
 # Primary-station position view, in continuous world units (58 per module).
 # Never round here: grid snapping belongs exclusively to the board input adapter.
 var modules: Dictionary:
-	get: return locations.legacy_modules()
-	set(value): locations.import_modules(value)
-var minerals: int = 0
+	get: return locations.legacy_modules(station_id)
+	set(value): locations.import_modules(value, station_id)
+var home_minerals: int = 0
+var minerals: int:
+	get: return home_minerals if station_id.is_empty() else int(locations.stations[station_id].inventory.get("minerals", 0))
+	set(value):
+		if station_id.is_empty(): home_minerals = value
+		else: locations.stations[station_id].inventory["minerals"] = value
 var refinery_progress: Dictionary:
-	get: return locations.position_state("refinery_progress")
-	set(value): locations.import_position_state("refinery_progress", value)
+	get: return locations.position_state("refinery_progress", station_id)
+	set(value): locations.import_position_state("refinery_progress", value, station_id)
 var total_refined: int = 0
 var refinery_recipes: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/refinery_recipes.json"))
-var materials: int = 40
+var home_materials: int = 40
+var materials: int:
+	get: return home_materials if station_id.is_empty() else int(locations.stations[station_id].inventory.get("materials", 0))
+	set(value):
+		if station_id.is_empty(): home_materials = value
+		else: locations.stations[station_id].inventory["materials"] = value
 var capacity: int = 100
 var power_output: int = 3
 var power_use: int = 2
@@ -55,16 +66,17 @@ func _init() -> void:
 	recalculate()
 
 func recalculate() -> void:
-	capacity = 100
-	power_output = 3
+	capacity = 100 if station_id.is_empty() else int(locations.outpost_catalog[locations.stations[station_id].kind].base_capacity)
+	power_output = 3 if station_id.is_empty() else int(locations.outpost_catalog[locations.stations[station_id].kind].base_power)
 	power_use = 0
 	for world_position: Vector2 in modules:
 		var definition: Dictionary = definition_at(world_position)
 		capacity += int(definition.capacity)
 		power_output += int(definition.power_output)
 		power_use += int(definition.power_use)
-	for kind: String in ships.values():
-		power_use += int(ship_catalog[kind].power_use)
+	if station_id.is_empty():
+		for kind: String in ships.values():
+			power_use += int(ship_catalog[kind].power_use)
 	level = 1 + int((modules.size() - 1) / 4.0)
 
 func power_balance() -> int:
@@ -78,8 +90,10 @@ func tick() -> void:
 	changed.emit()
 
 func placement_error(world_position: Vector2, kind: String) -> String:
-	if region_context != null and not region_context.primary_station_visible():
-		return "Station construction is Home-only. Jump back to Earth."
+	if region_context != null and region_context.current_region != locations.station_region(base_id()):
+		return "View this station’s region before building."
+	if not station_id.is_empty() and not locations.outpost_catalog[locations.stations[station_id].kind].buildable_modules.has(kind):
+		return "Outposts support Solar, Storage, Space Dock and Teleport Gate only."
 	if not catalog.has(kind):
 		return "Choose a module first."
 	if not catalog[kind].get("buildable", true):
@@ -89,7 +103,7 @@ func placement_error(world_position: Vector2, kind: String) -> String:
 	var points: Array[Vector2] = footprint_points(world_position, kind)
 	var touching: bool = false
 	for point: Vector2 in points:
-		if not Geometry.contains_center(point):
+		if not grid_contains(point):
 			return "Build the entire footprint inside the station grid."
 		for existing: Vector2 in modules:
 			for occupied: Vector2 in footprint_points(existing, modules[existing]):
@@ -101,7 +115,7 @@ func placement_error(world_position: Vector2, kind: String) -> String:
 		return "Connect to an existing module's edge."
 	var definition: Dictionary = catalog[kind]
 	if materials < int(definition.cost):
-		return "Need %d more materials. Click drifting debris." % (int(definition.cost) - materials)
+		return "Need %d more %sMaterials." % [int(definition.cost) - materials, "local " if not station_id.is_empty() else ""]
 	if power_balance() + int(definition.power_output) - int(definition.power_use) < 0:
 		return "Not enough power. Build a Solar Panel."
 	return ""
@@ -112,7 +126,7 @@ func build(world_position: Vector2, kind: String) -> String:
 		return error
 	var old_level: int = level
 	materials -= int(catalog[kind].cost)
-	locations.add_structure(locations.primary_station(), kind, world_position)
+	locations.add_structure(base_id(), kind, world_position)
 	recalculate()
 	module_built.emit(world_position, kind)
 	changed.emit()
@@ -134,7 +148,7 @@ func add_minerals(amount: int) -> void:
 func module_count_with(capability: String) -> int:
 	var count: int = 0
 	for kind: String in modules.values():
-		if catalog[kind].has(capability):
+		if catalog.get(kind, {}).has(capability):
 			count += 1
 	return count
 
@@ -230,7 +244,8 @@ func structure_definition(structure_id: String) -> Dictionary:
 	return definition_for(structure.kind, int(structure.state.get("tier", 1)))
 
 func definition_for(kind: String, tier: int) -> Dictionary:
-	var definition: Dictionary = catalog.get(kind, {}).duplicate(true)
+	var definition: Dictionary = catalog.get(kind, locations.outpost_catalog.get(kind, {})).duplicate(true)
+	if not catalog.has(kind): definition.merge({"cost": 0, "power_output": 0, "power_use": 0, "capacity": 0}, true)
 	var upgrades: Array = definition.get("upgrades", [])
 	for index in range(mini(tier - 1, upgrades.size())):
 		definition.merge(upgrades[index].stats, true)
@@ -239,7 +254,7 @@ func definition_for(kind: String, tier: int) -> Dictionary:
 func next_upgrade(world_position: Vector2) -> Dictionary:
 	if not modules.has(world_position):
 		return {}
-	var upgrades: Array = catalog[modules[world_position]].get("upgrades", [])
+	var upgrades: Array = catalog.get(modules[world_position], {}).get("upgrades", [])
 	var index: int = tier_at(world_position) - 1
 	return upgrades[index] if index < upgrades.size() else {}
 
@@ -247,6 +262,7 @@ func upgrade_resource_amount(resource: String) -> int:
 	match resource:
 		"materials": return materials
 		"minerals": return minerals
+	if not station_id.is_empty(): return int(locations.stations[station_id].inventory.get(resource, -1))
 	return int(research.trade.inventory.get(resource, -1)) if research != null else -1
 
 func upgrade_cost_text(cost: Dictionary) -> String:
@@ -282,7 +298,9 @@ func upgrade_module(world_position: Vector2) -> String:
 		match resource:
 			"materials": materials -= amount
 			"minerals": minerals -= amount
-			_: research.trade.inventory[resource] -= amount
+			_:
+				if station_id.is_empty(): research.trade.inventory[resource] -= amount
+				else: locations.stations[station_id].inventory[resource] -= amount
 	structure_state(world_position)["tier"] = tier_at(world_position) + 1
 	recalculate()
 	module_upgraded.emit(world_position)
@@ -290,6 +308,7 @@ func upgrade_module(world_position: Vector2) -> String:
 	return ""
 
 func ship_error(kind: String) -> String:
+	if not station_id.is_empty(): return "Ships are purchased at Home."
 	if not ship_catalog.has(kind):
 		return "Unknown ship type."
 	var definition: Dictionary = ship_catalog[kind]
@@ -314,7 +333,7 @@ func buy_ship(kind: String) -> String:
 func module_refund(world_position: Vector2) -> int:
 	if not modules.has(world_position):
 		return 0
-	var definition: Dictionary = catalog[modules[world_position]]
+	var definition: Dictionary = definition_for(modules[world_position], 1)
 	var invested: int = int(definition.cost)
 	if decommission_rules.refund_upgrade_materials:
 		var upgrades: Array = definition.get("upgrades", [])
@@ -325,8 +344,8 @@ func module_refund(world_position: Vector2) -> int:
 func demolition_error(world_position: Vector2) -> String:
 	if not modules.has(world_position):
 		return "Select a placed module."
-	if decommission_rules.protect_starting_habitat and world_position == Vector2.ZERO:
-		return "The starting habitat is your permanent colony core."
+	if (station_id.is_empty() and decommission_rules.protect_starting_habitat and world_position == Vector2.ZERO) or (not station_id.is_empty() and structure_id_at(world_position) == locations.stations[station_id].structure_id):
+		return "The starting habitat is your permanent colony core." if station_id.is_empty() else "The outpost core cannot be demolished."
 	var definition: Dictionary = definition_at(world_position)
 	if power_balance() - int(definition.power_output) + int(definition.power_use) < 0:
 		return "Decommission power consumers first, or add generation."
@@ -376,7 +395,7 @@ func module_unlocked(kind: String) -> bool:
 	return true
 
 func footprint_size(kind: String) -> Vector2:
-	var size: Array = catalog[kind].get("footprint", [1, 1])
+	var size: Array = catalog.get(kind, {}).get("footprint", [1, 1])
 	return Vector2(size[0], size[1])
 
 func footprint_points(origin: Vector2, kind: String) -> Array[Vector2]:
@@ -400,7 +419,7 @@ func modules_connected(a: Vector2, b: Vector2) -> bool:
 
 # Position APIs are primary-station adapters, not global structure identity.
 func structure_id_at(point: Vector2) -> String:
-	return locations.structure_at(locations.primary_station(), point)
+	return locations.structure_at(base_id(), point)
 
 func structure_state(point: Vector2) -> Dictionary:
 	return locations.structures[structure_id_at(point)].state
@@ -416,4 +435,30 @@ func capability_states(capability: String, defaults: Dictionary) -> Dictionary:
 	return result
 
 func import_capability_states(capability: String, values: Dictionary) -> void:
-	locations.import_position_state(capability, values)
+	locations.import_position_state(capability, values, station_id)
+
+func base_id() -> String:
+	return locations.primary_station() if station_id.is_empty() else station_id
+
+func scoped_station(id: String) -> StationModel:
+	if id == locations.primary_station(): return self
+	var scoped := StationModel.new()
+	scoped.locations = locations
+	scoped.station_id = id
+	scoped.catalog = catalog.duplicate(true)
+	var core: String = locations.stations[id].kind
+	scoped.catalog[core] = definition_for(core, 1)
+	scoped.research = research
+	scoped.region_context = region_context
+	scoped.recalculate()
+	scoped.changed.connect(func() -> void: changed.emit())
+	return scoped
+
+func build_grid_dimensions() -> Vector2i:
+	if station_id.is_empty(): return Geometry.grid_dimensions
+	var grid: Dictionary = locations.stations[station_id].get("grid", {})
+	return Vector2i(int(grid.get("columns", Geometry.grid_dimensions.x)), int(grid.get("rows", Geometry.grid_dimensions.y)))
+
+func grid_contains(point: Vector2) -> bool:
+	var extent: Vector2 = Vector2(build_grid_dimensions() - Vector2i.ONE) * 0.5 * Geometry.MODULE_SIZE
+	return point.is_finite() and absf(point.x) <= extent.x and absf(point.y) <= extent.y

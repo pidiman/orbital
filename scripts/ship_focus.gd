@@ -43,15 +43,15 @@ func fit_grid() -> void:
 	ship_id = -1
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var area := Rect2(28, 300, maxf(200, viewport_size.x - 440), maxf(160, viewport_size.y - 448))
-	var grid_size: Vector2 = Vector2(StationGeometry.grid_dimensions) * game.board.cell_size
+	var grid_size: Vector2 = Vector2(game.board.model.build_grid_dimensions()) * game.board.cell_size
 	zoom = Vector2.ONE * minf(area.size.x / grid_size.x, area.size.y / grid_size.y)
 	position = game.board.center + (viewport_size * 0.5 - area.get_center()) / zoom
 	force_update_scroll()
 
 func pan_bounds() -> Rect2:
 	var area := Rect2(Vector2.ZERO, get_viewport_rect().size)
-	if game.fleet.regions.primary_station_visible():
-		var extent: Vector2 = Vector2(StationGeometry.grid_dimensions) * game.board.cell_size * 0.5
+	if game.board.visible:
+		var extent: Vector2 = Vector2(game.board.model.build_grid_dimensions()) * game.board.cell_size * 0.5
 		area = area.merge(Rect2(game.board.center - extent, extent * 2.0))
 	else:
 		for content: Dictionary in game.fleet.regions.records[game.fleet.regions.current_region].contents:

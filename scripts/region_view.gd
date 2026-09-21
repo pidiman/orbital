@@ -61,7 +61,7 @@ func _draw() -> void:
 
 	var world: RefCounted = fleet.model.locations
 	var outpost_id: String = world.outpost_at(regions.current_region, world.rules.primary_station.owner)
-	if not outpost_id.is_empty():
+	if not outpost_id.is_empty() and not get_parent().board.visible:
 		var station: Dictionary = world.stations[outpost_id]
 		var structure: Dictionary = world.structures[station.structure_id]
 		var outpost: Dictionary = world.outpost_catalog[station.kind]
