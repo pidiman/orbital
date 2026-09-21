@@ -25,6 +25,7 @@ func _init(station: StationModel, mining_fleet: MiningFleet, seed_value: int = -
 	fleet = mining_fleet
 	collection = Collection.new(station, mining_fleet, self)
 	fleet.collection = collection
+	fleet.completed.connect(_on_mined)
 	rules = configuration.duplicate(true) if not configuration.is_empty() else JSON.parse_string(FileAccess.get_file_as_string("res://data/supply.json"))
 	if seed_value < 0:
 		rng.randomize()
@@ -46,6 +47,7 @@ func advance(delta: float) -> void:
 func _step(delta: float) -> void:
 	elapsed += delta
 	advance_floating(delta)
+	sync_mining_nodes()
 	collection.advance(delta)
 	for debris_id: int in debris.keys():
 		var piece: Dictionary = debris[debris_id]
@@ -102,6 +104,7 @@ func _spawn_debris(_initial: bool = false, region_id: String = "home") -> void:
 	next_debris_id += 1
 	floating[region_id].pieces[next_debris_id] = {"position": center + Vector2(random.randf_range(-extent.x, extent.x), random.randf_range(-extent.y, extent.y)), "velocity": Vector2.ZERO, "resource": resource, "amount": random.randi_range(int(definition.amount_min), int(definition.amount_max)), "remaining": float(floating_rules.lifetime_seconds)}
 	record.rng_state = str(random.state)
+	sync_mining_nodes()
 
 func ensure_floating_region(region_id: String) -> void:
 	if floating.has(region_id) or not fleet.regions.is_discovered(region_id): return
@@ -114,8 +117,14 @@ func advance_floating(delta: float) -> void:
 		ensure_floating_region(region_id)
 		var pool: Dictionary = floating[region_id]
 		for id: int in pool.pieces.keys():
+			var target: int = mining_target(region_id, id)
+			if target != -1 and fleet.asteroids.get(target, {}).get("claimed", false): continue
 			pool.pieces[id].remaining -= delta
-			if pool.pieces[id].remaining <= 0.0: pool.pieces.erase(id)
+			if pool.pieces[id].remaining <= 0.0:
+				pool.pieces.erase(id)
+				if target != -1:
+					fleet.asteroids.erase(target)
+					fleet.resource_targets.erase(target)
 		pool.timer += delta
 		if pool.timer + 0.0000001 >= float(floating_rules.spawn_seconds):
 			pool.timer -= float(floating_rules.spawn_seconds)
@@ -132,6 +141,7 @@ func salvage(debris_id: int, receiver: Callable = Callable(), limit: int = -1, r
 	if not available.has(debris_id): return 0
 	var piece: Dictionary = available[debris_id]
 	var resource: String = str(piece.get("resource", "materials"))
+	if floating_rules.types.get(resource, {}).get("requires_mining", false): return 0
 	# Existing ship cargo is Materials-only; do not mislabel other resources.
 	if receiver.is_valid() and resource != "materials": return 0
 	var amount: int = int(piece.amount) if limit < 0 else mini(int(piece.amount), limit)
@@ -171,4 +181,47 @@ func validate_floating(data: Dictionary, records: Dictionary, allocator: int) ->
 			var remaining: Variant = piece.get("remaining")
 			if not (amount is int or amount is float) or not is_finite(amount) or amount < 1 or amount != floor(amount) or amount > 9007199254740991: return "Invalid floating-resource amount."
 			if not (remaining is int or remaining is float) or not is_finite(remaining) or remaining <= 0.0: return "Invalid floating-resource lifetime."
+	return ""
+
+func mining_target(region: String, piece_id: int) -> int:
+	for target: int in fleet.resource_targets:
+		var binding: Dictionary = fleet.resource_targets[target]
+		if binding.region == region and binding.piece_id == piece_id: return target
+	return -1
+
+func sync_mining_nodes() -> void:
+	for region: String in floating:
+		for piece_id: int in floating[region].pieces:
+			var piece: Dictionary = floating[region].pieces[piece_id]
+			if not floating_rules.types[piece.resource].get("requires_mining", false) or mining_target(region, piece_id) != -1: continue
+			var target: int = fleet.next_discovery_id
+			fleet.next_discovery_id -= 1
+			fleet.resource_targets[target] = {"region": region, "piece_id": piece_id, "resource": piece.resource}
+			fleet.asteroids[target] = {"minerals": int(piece.amount), "claimed": false}
+
+func _on_mined(_unit: Variant, target: int, _amount: int) -> void:
+	if not fleet.resource_targets.has(target): return
+	var binding: Dictionary = fleet.resource_targets[target]
+	var pool: Dictionary = floating[binding.region].pieces
+	if fleet.asteroids.has(target):
+		pool[binding.piece_id].amount = fleet.asteroids[target].minerals
+	else:
+		pool.erase(binding.piece_id)
+		fleet.resource_targets.erase(target)
+
+func validate_mining_nodes(bindings: Dictionary, pools: Dictionary, fleet_data: Dictionary) -> String:
+	var seen: Dictionary = {}
+	for id: int in fleet_data.asteroids:
+		if id < 0 and not fleet_data.asteroids[id].get("persistent", false) and not bindings.has(id): return "Missing resource mining binding."
+	for id: Variant in bindings:
+		var binding: Variant = bindings[id]
+		if not id is int or id >= -1 or id <= fleet_data.next_discovery_id or not fleet_data.asteroids.has(id): return "Invalid resource mining target ID."
+		if not binding is Dictionary or not binding.get("region") is String or not pools.has(binding.region) or not binding.get("piece_id") is int or not pools[binding.region].pieces.has(binding.piece_id): return "Missing floating mining node."
+		var piece: Dictionary = pools[binding.region].pieces[binding.piece_id]
+		if binding.get("resource") != piece.resource or not floating_rules.types[piece.resource].get("requires_mining", false): return "Invalid mining resource."
+		var key: String = "%s/%s" % [binding.region, binding.piece_id]
+		if seen.has(key): return "Duplicate floating mining node."
+		seen[key] = true
+		var rock: Dictionary = fleet_data.asteroids[id]
+		if rock.minerals != piece.amount or rock.has("region_id") or rock.has("sector_id") or rock.get("persistent", false): return "Mining node quantity or ownership mismatch."
 	return ""

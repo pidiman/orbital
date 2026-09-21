@@ -21,6 +21,9 @@ var docking: RefCounted
 var collection: RefCounted
 var model: StationModel
 var asteroids: Dictionary = {}
+const RESOURCE_FIELDS: Array[String] = ["resource_targets"]
+# Typed floating-node bindings; asteroids retains the legacy quantity/job projection.
+var resource_targets: Dictionary = {}
 # Canonical mining assignments are keyed by stable, typed actor identity.
 var mining_assignments: Dictionary = {}
 # Legacy primary-station/UI/save adapter. Values reference the canonical job timers.
@@ -98,6 +101,8 @@ func dispatch(asteroid_id: int, selected_ship: int = -1) -> String:
 			return error
 	var units: Dictionary = mining_units()
 	if units.is_empty():
+		if target_resource(asteroid_id) != "minerals":
+			return "Build a Xeno Miner in this region to extract Xenocrystal nodes. Remote mining requires an outpost."
 		if asteroid_region(asteroid_id) != regions.HOME:
 			return "Local mining requires an outpost and a Miner sent through a Teleport Gate."
 		return "Build a Miner in Ships or a Mining Ship module first."
@@ -109,8 +114,9 @@ func dispatch(asteroid_id: int, selected_ship: int = -1) -> String:
 		if unit_busy(unit):
 			continue
 		var capability: Dictionary = units[unit]
+		if str(capability.get("resource", "minerals")) != target_resource(asteroid_id): continue
 		var actor: Dictionary = model.locations.actor_for(unit)
-		var route: Dictionary = model.locations.mining_route(actor, asteroid_id, asteroid_region(asteroid_id))
+		var route: Dictionary = mining_route(actor, asteroid_id)
 		if route.is_empty():
 			continue
 		route["legacy_unit"] = unit
@@ -120,6 +126,8 @@ func dispatch(asteroid_id: int, selected_ship: int = -1) -> String:
 		dispatched.emit(unit, asteroid_id)
 		changed.emit()
 		return ""
+	if target_resource(asteroid_id) != "minerals":
+		return "No idle mining ship with the matching resource capability is in this region. Build a Xeno Miner for Xenocrystals."
 	if asteroid_region(asteroid_id) == regions.HOME:
 		return "Selected Miner is busy." if selected_ship != -1 else "All Mining Ships are busy. Wait for a mission to finish."
 	return "No idle Miner is in this region. Remote mining requires a local outpost and a Miner sent through a gate."
@@ -237,10 +245,11 @@ func tick() -> void:
 			if asteroid.minerals <= 0:
 				asteroids.erase(job.target)
 		# Cargo is delivered on the same completion tick as before; no new travel leg.
-		assignment.cargo.minerals = amount
-		var delivered: int = model.locations.receive(assignment.destination, "minerals", int(assignment.cargo.minerals))
-		assignment.cargo.minerals -= delivered
-		total_mined += amount
+		var resource: String = target_resource(int(job.target))
+		assignment.cargo[resource] = amount
+		var delivered: int = diplomacy.receive_goods(resource, amount) if assignment.destination.station_id == model.locations.primary_station() and diplomacy.goods_catalog.has(resource) else model.locations.receive(assignment.destination, resource, amount)
+		assignment.cargo[resource] -= delivered
+		if resource == "minerals": total_mined += amount
 		completed.emit(unit, int(job.target), amount)
 	for ship_id: int in survey_jobs.keys():
 		var job: Dictionary = survey_jobs[ship_id]
@@ -331,6 +340,7 @@ func _discover_region(region_id: String) -> void:
 	regions.announce_discovery(region_id)
 
 func asteroid_region(asteroid_id: int) -> String:
+	if resource_targets.has(asteroid_id): return resource_targets[asteroid_id].region
 	return str(asteroids.get(asteroid_id, {}).get("region_id", Regions.HOME))
 
 func mining_assignment(unit: Variant) -> Dictionary:
@@ -349,7 +359,7 @@ func import_mining_jobs(values: Dictionary) -> void:
 	mining_assignments.clear()
 	for unit: Variant in values:
 		var actor: Dictionary = model.locations.actor_for(unit)
-		var route: Dictionary = model.locations.mining_route(actor, int(values[unit].target), asteroid_region(int(values[unit].target)), true)
+		var route: Dictionary = mining_route(actor, int(values[unit].target), true)
 		if route.is_empty():
 			continue
 		route["legacy_unit"] = unit
@@ -373,6 +383,20 @@ func mining_error(ship_id: int, asteroid_id: int) -> String:
 		return "Selected Miner is busy."
 	if not asteroids.has(asteroid_id):
 		return "That asteroid has left the sector."
+	if mining_resource(ship_id) != target_resource(asteroid_id):
+		return "This ship mines %s only; choose a matching node." % mining_resource(ship_id).capitalize()
 	if model.locations.ship_region(ship_id) != asteroid_region(asteroid_id):
 		return "Send the Miner through a Teleport Gate to the asteroid's region first."
 	return mining_work_error(ship_id)
+
+func target_resource(target: int) -> String:
+	return str(resource_targets.get(target, {}).get("resource", "minerals"))
+
+func mining_resource(unit: Variant) -> String:
+	var definition: Dictionary = model.ship_catalog[model.ships[unit]] if unit is int else model.definition_at(unit)
+	return str(definition.get("mining", {}).get("resource", "minerals"))
+
+func mining_route(actor: Dictionary, target: int, legacy: bool = false) -> Dictionary:
+	var route: Dictionary = model.locations.mining_route(actor, target, asteroid_region(target), legacy)
+	if not route.is_empty(): route.cargo = {target_resource(target): 0}
+	return route

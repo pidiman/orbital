@@ -43,7 +43,7 @@ static func run() -> Dictionary:
 	checks.own_identity = outpost_id != "station:home" and not outpost_id.is_empty()
 	if outpost_id.is_empty(): return checks
 	var station: Dictionary = model.locations.stations[outpost_id]
-	checks.local_inventory = station.inventory == {"minerals": 0} and station.region == "venus" and station.owner == "player"
+	checks.local_inventory = station.inventory == {"minerals": 0, "xenocrystal": 0} and station.region == "venus" and station.owner == "player"
 	checks.structure_identity = model.locations.structures[station.structure_id].station_id == outpost_id and model.locations.structures[station.structure_id].region == "venus"
 	checks.founding_state = station.founding.state == "established" and station.founding.ship_id == jump and station.founding.paid.materials == 60 and model.locations.ships[jump].founding.station_id == outpost_id
 	checks.hull_survives = model.ships.has(jump) and model.locations.ships[jump].station_id == "station:home"

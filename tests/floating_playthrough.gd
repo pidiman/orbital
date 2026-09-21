@@ -8,12 +8,15 @@ func _ready() -> void:
 	var hud = game.hud
 	game.model.materials = 0
 	for kind: String in ["materials", "minerals", "xenocrystal"]:
-		stock.floating.home.pieces.clear()
+		preload("res://tests/floating_checks.gd").clear_pool(stock)
 		stock._spawn_debris()
 		var piece: Dictionary = stock.floating.home.pieces[stock.next_debris_id]
 		piece.position = Vector2(0.88, 0.8)
 		piece.resource = kind
 		piece.amount = 1
+		if kind == "xenocrystal":
+			checks.xeno_requires_mining = stock.salvage(stock.next_debris_id) == 0
+			continue
 		game.debris._sync_view()
 		game.ship_camera.position = game.debris.pieces[0].point
 		game.ship_camera.force_update_scroll()
@@ -33,7 +36,7 @@ func _ready() -> void:
 	game.model.build(Vector2(-58, 0), "space_depot")
 	game.model.buy_ship("material_ship")
 	var id: int = game.model.next_ship_id
-	stock.floating.home.pieces.clear()
+	preload("res://tests/floating_checks.gd").clear_pool(stock)
 	for kind: String in ["minerals", "xenocrystal", "materials"]:
 		stock._spawn_debris()
 		var piece: Dictionary = stock.floating.home.pieces[stock.next_debris_id]

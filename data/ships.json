@@ -9,7 +9,8 @@
     "mining": {
       "seconds": 8,
       "yield": 18,
-      "repeat": true
+      "repeat": true,
+      "resource": "minerals"
     },
     "art": "mining_ship",
     "dock_type": "miner"
@@ -68,5 +69,23 @@
     },
     "art": "scout",
     "dock_type": "jump_ship"
+  },
+  "xeno_miner": {
+    "name": "Xeno Miner",
+    "cost": 70,
+    "power_use": 3,
+    "color": "72dbcb",
+    "description": "Mines Xenocrystal nodes only; 1 crystal per 20-second cycle.",
+    "effect": "1 Xenocrystal / 20s · 3 power",
+    "mining": {
+      "resource": "xenocrystal",
+      "seconds": 20,
+      "yield": 1,
+      "repeat": true,
+      "assignment_label": "Assign Xeno node",
+      "target_label": "Xenocrystal node"
+    },
+    "art": "mining_ship",
+    "dock_type": "xeno_miner"
   }
 }

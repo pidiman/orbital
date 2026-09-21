@@ -7,7 +7,7 @@ func _ready() -> void:
 	var hud = game.hud
 	# Legal construction with a fixed funding fixture; purchases/actions use UI.
 	game.model.materials = 10000
-	for x in range(1, 5): game.model.build(Vector2(x * 58, 0), "solar")
+	for x in range(1, 6): game.model.build(Vector2(x * 58, 0), "solar")
 	game.model.build(Vector2(0, 58), "space_depot")
 	game.model.build(Vector2(58, 58), "research_lab")
 	game.fleet.diplomacy.inventory.tech = 2
@@ -20,7 +20,7 @@ func _ready() -> void:
 	for kind: String in game.model.ship_catalog:
 		await use(hud.ship_buttons[kind])
 		ids[kind] = game.model.next_ship_id
-	checks.catalog_buys_all_roles = game.model.ships.size() == 5
+	checks.catalog_buys_all_roles = game.model.ships.size() == game.model.ship_catalog.size()
 	checks.one_tile_per_ship = hud.ship_tiles.size() == game.model.ships.size()
 	checks.no_command_list_in_catalog = not hud.panel.is_ancestor_of(hud.ship_rows)
 	checks.inline_title = absf(hud.title_label.get_global_rect().get_center().y - hud.toolbar.get_global_rect().get_center().y) < 12

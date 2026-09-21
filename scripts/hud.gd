@@ -526,7 +526,7 @@ func _refresh_ships() -> void:
 			status = "Trading · %ds" % fleet.diplomacy.jobs[ship_id].remaining
 		for capability: String in capability_buttons[ship_id]:
 			var button: Button = capability_buttons[ship_id][capability]
-			button.text = "%s #%d · %s" % [definition.name, ship_id, status if not status.is_empty() else SHIP_ACTIONS[capability]]
+			button.text = "%s #%d · %s" % [definition.name, ship_id, status if not status.is_empty() else str(definition[capability].get("assignment_label", SHIP_ACTIONS[capability]))]
 			var work_error: String = fleet.mining_work_error(ship_id) if capability == "mining" else fleet.transport.work_error(ship_id)
 			if capability == "founding":
 				work_error = ""
@@ -560,7 +560,7 @@ func _command_ship(ship_id: int, capability: String = "") -> void:
 		"mining":
 			close_panels()
 			ship_assignment_requested.emit(ship_id)
-			message("Miner #%d selected. Click a violet asteroid; mining repeats until depleted." % ship_id, false, 8.0)
+			message("%s #%d selected. Click a %s; mining repeats until depleted." % [definition.name, ship_id, definition.mining.get("target_label", "violet Ore asteroid")], false, 8.0)
 		"survey":
 			if not fleet.regions.primary_station_visible():
 				region_navigation.open_region(fleet.regions.current_region, ship_id)

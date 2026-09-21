@@ -78,7 +78,7 @@ static func validate_assignments(assignments: Dictionary, fleet: MiningFleet, ol
 			return "Mining identity disagrees with legacy mission."
 		seen[unit] = true
 		var target: int = int(old_jobs[unit].target)
-		var expected: Dictionary = fleet.model.locations.mining_route(actor, target, fleet.asteroid_region(target), legacy)
+		var expected: Dictionary = fleet.mining_route(actor, target, legacy)
 		if expected.is_empty():
 			return "Mining route is not supported by current location policy."
 		for field: String in expected:

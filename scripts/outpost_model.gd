@@ -76,7 +76,7 @@ func summary(region_id: String) -> String:
 	if id.is_empty():
 		return "No outpost. Send a Jump Ship through a gate, then use Found outpost in Ships."
 	var station: Dictionary = world.stations[id]
-	return "%s · Local Minerals: %d · Hauling to Home is not available yet." % [catalog[station.kind].name, station.inventory.minerals]
+	return "%s · Local Minerals: %d · Xenocrystals: %d · Hauling to Home is not available yet." % [catalog[station.kind].name, station.inventory.minerals, station.inventory.get("xenocrystal", 0)]
 
 func validate(world: Dictionary, regions: Dictionary, next_ship_id: int) -> String:
 	var seen: Dictionary = {}

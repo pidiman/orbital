@@ -6,7 +6,8 @@
       "materials": 60
     },
     "storage": {
-      "minerals": 0
+      "minerals": 0,
+      "xenocrystal": 0
     },
     "position": [
       400,

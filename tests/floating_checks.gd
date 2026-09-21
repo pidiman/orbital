@@ -23,7 +23,7 @@ static func run() -> Dictionary:
 	var amounts: Dictionary = {"materials": {}, "minerals": {}, "xenocrystal": {}}
 	var quadrants: Dictionary = {}
 	for i in range(20000):
-		supply.floating.home.pieces.clear()
+		clear_pool(supply)
 		supply._spawn_debris()
 		var piece: Dictionary = supply.floating.home.pieces.values()[0]
 		counts[piece.resource] += 1
@@ -35,7 +35,8 @@ static func run() -> Dictionary:
 	checks.whole_grid = quadrants.size() == 4
 	model.materials = 0
 	for kind: String in counts:
-		supply.floating.home.pieces.clear()
+		for resource: String in supply.floating_rules.types: supply.floating_rules.types[resource].weight = 1 if resource == kind else 0
+		clear_pool(supply)
 		supply._spawn_debris()
 		var id: int = supply.next_debris_id
 		var piece: Dictionary = supply.floating.home.pieces[id]
@@ -44,7 +45,8 @@ static func run() -> Dictionary:
 		var before: int = model.materials if kind == "materials" else (model.minerals if kind == "minerals" else fleet.diplomacy.inventory.xenocrystal)
 		var received: int = supply.salvage(id)
 		var after: int = model.materials if kind == "materials" else (model.minerals if kind == "minerals" else fleet.diplomacy.inventory.xenocrystal)
-		checks["credit_" + kind] = received == 1 and after == before + 1
+		checks["credit_" + kind] = (received == 0 and after == before) if kind == "xenocrystal" else (received == 1 and after == before + 1)
+	supply.floating_rules = JSON.parse_string(FileAccess.get_file_as_string("res://data/floating_resources.json"))
 	fleet._discover_region("venus")
 	supply.advance(0.1)
 	checks.remote_pool = supply.debris_in("venus").size() == 5
@@ -57,6 +59,11 @@ static func run() -> Dictionary:
 	checks.future_deterministic = store.snapshot() == future
 	var legacy: Dictionary = snapshot.duplicate(true)
 	legacy.extensions.erase("floating_resources")
+	legacy.extensions.erase("resource_mining")
+	var legacy_rocks: Dictionary = store._decode(legacy.state.fleet.asteroids)
+	var legacy_bindings: Dictionary = store._decode(snapshot.extensions.resource_mining.resource_targets)
+	for target: int in legacy_bindings: legacy_rocks.erase(target)
+	legacy.state.fleet.asteroids = store._encode(legacy_rocks)
 	checks.old_save_loads = store.restore(legacy).is_empty() and supply.floating.is_empty()
 	supply.advance(0.05)
 	checks.old_save_initializes = supply.floating.has("home") and supply.floating.has("venus")
@@ -66,3 +73,10 @@ static func run() -> Dictionary:
 	checks.invalid_atomic = not store.restore(invalid).is_empty() and store.snapshot() == stable
 	print("Floating distribution: ", counts, "; restore error: ", error)
 	return checks
+
+static func clear_pool(supply: RefCounted) -> void:
+	for target: int in supply.fleet.resource_targets.keys():
+		if supply.fleet.resource_targets[target].region == "home":
+			supply.fleet.asteroids.erase(target)
+			supply.fleet.resource_targets.erase(target)
+	supply.floating.home.pieces.clear()

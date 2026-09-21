@@ -17,6 +17,8 @@ static func run() -> Dictionary:
 	checks.build = model.build(Vector2(-58, 0), "space_depot").is_empty() and model.capacity == 150
 	checks.deploy = stock.collection.deploy(id).is_empty()
 	stock.debris = {1: {"position": Vector2(0.5, 0.5), "velocity": Vector2.ZERO, "amount": 10}}
+	for target: int in stock.fleet.resource_targets: stock.fleet.asteroids.erase(target)
+	stock.fleet.resource_targets.clear()
 	stock.floating.clear()
 	stock.next_debris_id = 1
 	var before: int = model.materials

@@ -42,13 +42,18 @@ func _sync_view() -> void:
 	for asteroid_id: int in fleet.asteroids:
 		if fleet.asteroids[asteroid_id].get("persistent", false) and fleet.asteroid_region(asteroid_id) == fleet.regions.current_region:
 			_add_discovery_marker(asteroid_id)
+	for target: int in fleet.resource_targets:
+		var binding: Dictionary = fleet.resource_targets[target]
+		if binding.region != fleet.regions.current_region: continue
+		var piece: Dictionary = supply.floating[binding.region].pieces[binding.piece_id]
+		rocks[target] = {"point": Vector2(piece.position.x * (area.x - 380.0), 145.0 + piece.position.y * (area.y - 255.0)), "angle": supply.elapsed * 0.06}
 	asteroid_count = rocks.size()
 
 func handle_click(point: Vector2) -> bool:
 	for asteroid_id: int in rocks:
 		if (get_canvas_transform().affine_inverse() * point).distance_to(rocks[asteroid_id].point) <= 34.0:
 			var error: String = fleet.dispatch(asteroid_id, selected_ship)
-			notice.emit("Mining Ship dispatched. Minerals arrive when the timer ends." if error.is_empty() else error, not error.is_empty())
+			notice.emit("Mining ship dispatched. %s arrive when the timer ends." % fleet.target_resource(asteroid_id).capitalize() if error.is_empty() else error, not error.is_empty())
 			if error.is_empty():
 				selected_ship = -1
 			get_viewport().set_input_as_handled()
@@ -57,6 +62,12 @@ func handle_click(point: Vector2) -> bool:
 
 func _on_completed(unit: Variant, asteroid_id: int, amount: int) -> void:
 	var point: Vector2 = rocks[asteroid_id].point if rocks.has(asteroid_id) else board.center
+	var resource: String = fleet.mining_resource(unit)
+	if resource != "minerals":
+		var region: String = fleet.model.locations.actor_record(fleet.model.locations.actor_for(unit)).region
+		notice.emit("+%d %s%s. Extraction complete." % [amount, resource.capitalize(), " in local outpost storage" if region != fleet.regions.HOME else ""], false)
+		if not fleet.asteroids.has(asteroid_id): rocks.erase(asteroid_id)
+		return
 	var region: String = fleet.model.locations.actor_record(fleet.model.locations.actor_for(unit)).region
 	if region == fleet.regions.current_region:
 		minerals_delivered.emit(amount, point)
@@ -117,6 +128,8 @@ func _draw() -> void:
 		if not fleet.asteroids.has(asteroid_id) or fleet.asteroid_region(asteroid_id) != fleet.regions.current_region:
 			continue
 		var rock: Dictionary = rocks[asteroid_id]
+		var resource: String = fleet.target_resource(asteroid_id)
+		var tint: Color = Color(supply.floating_rules.types[resource].color) if resource != "minerals" else ORE
 		var point: Vector2 = rock.point
 		var hovered: bool = get_global_mouse_position().distance_to(point) <= 34.0
 		draw_circle(point, 34, Color(0.57, 0.39, 0.86, 0.17 if hovered else 0.07))
@@ -124,13 +137,13 @@ func _draw() -> void:
 		var polygon := PackedVector2Array([Vector2(-24, -8), Vector2(-14, -25), Vector2(8, -27), Vector2(25, -10), Vector2(21, 15), Vector2(1, 26), Vector2(-22, 16)])
 		draw_colored_polygon(polygon, Color("393249"))
 		polygon.append(polygon[0])
-		draw_polyline(polygon, ORE, 2.0, true)
+		draw_polyline(polygon, tint, 2.0, true)
 		draw_circle(Vector2(-8, -6), 7.0, Color("242738"))
 		draw_circle(Vector2(10, 8), 5.0, Color("242738"))
 		draw_polyline(PackedVector2Array([Vector2(-5, 15), Vector2(0, 5), Vector2(13, -5), Vector2(10, -18)]), Color("9273c5"), 2.0, true)
 		draw_set_transform(Vector2.ZERO)
 		if not fleet.asteroids[asteroid_id].claimed:
-			draw_string(font, point + Vector2(-41, 48), "ORE · %d" % fleet.asteroids[asteroid_id].minerals, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ORE)
+			draw_string(font, point + Vector2(-41, 48), "%s · %d" % ["ORE" if resource == "minerals" else resource.to_upper(), fleet.asteroids[asteroid_id].minerals], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ORE)
 
 func home_position(unit: Variant) -> Vector2:
 	if unit is Vector2:

@@ -87,6 +87,8 @@ static func run() -> Dictionary:
 	checks.stable_dock_assignment = fleet.mining_assignments.has("structure/" + model.structure_id_at(dock)) and fleet.mining_assignment(dock).policy == "local"
 	checks.collection_deploy = store.supply.collection.deploy(collector).is_empty()
 	store.supply.debris = {1: {"position": Vector2(0.5, 0.5), "velocity": Vector2.ZERO, "amount": 10}}
+	for resource_target: int in store.supply.fleet.resource_targets: store.supply.fleet.asteroids.erase(resource_target)
+	store.supply.fleet.resource_targets.clear()
 	store.supply.floating.clear()
 	store.supply.next_debris_id = 1
 	store.supply.collection.advance(0.1)

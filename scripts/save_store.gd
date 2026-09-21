@@ -83,6 +83,8 @@ func snapshot() -> Dictionary:
 	document.extensions.research["schema_version"] = 1
 	_merge_fields(document.extensions, "gate_transport", fleet.transport, Transport.FIELDS)
 	document.extensions.gate_transport["schema_version"] = 1
+	_merge_fields(document.extensions, "resource_mining", fleet, Fleet.RESOURCE_FIELDS)
+	document.extensions.resource_mining["schema_version"] = 1
 	_merge_fields(document.extensions, "floating_resources", supply, Supply.FLOATING_FIELDS)
 	document.extensions.floating_resources["schema_version"] = 1
 	_merge_fields(document.extensions, "material_collection", supply.collection, Collection.FIELDS)
@@ -333,6 +335,17 @@ func restore(document: Variant) -> String:
 		for pool: Dictionary in floating_data.values():
 			for id: int in pool.pieces:
 				if supply_data.debris.has(id): return "Duplicate legacy/floating resource ID."
+	var resource_data: Dictionary = {"resource_targets": {}}
+	if migrated.extensions.has("resource_mining"):
+		resource_data = _extension_fields(migrated.extensions, "resource_mining", candidate_fleet, Fleet.RESOURCE_FIELDS)
+		if not decode_error.is_empty(): return decode_error
+	error = candidate_supply.validate_mining_nodes(resource_data.resource_targets, floating_data, fleet_data)
+	if not error.is_empty(): return error
+	candidate_fleet.resource_targets = resource_data.resource_targets
+	for unit: Variant in fleet_data.jobs:
+		var capability: Dictionary = candidate.ship_catalog[station_data.ships[unit]].mining if unit is int else candidate.definition_at(unit).mining
+		if str(capability.get("resource", "minerals")) != candidate_fleet.target_resource(int(fleet_data.jobs[unit].target)):
+			return "Mining capability does not match target resource."
 	candidate_supply.collection.sync_depots()
 	var collection_data: Dictionary = {"jobs": {}, "depots": candidate_supply.collection.depots.duplicate(true)}
 	if migrated.extensions.has("material_collection"):
@@ -374,6 +387,9 @@ func restore(document: Variant) -> String:
 			return error
 		if legacy_outposts and location_data.stations.size() != 1:
 			return "Outpost state requires its extension."
+		for station: Dictionary in location_data.stations.values():
+			if station.has("inventory") and station.inventory is Dictionary and not station.inventory.has("xenocrystal"):
+				station.inventory["xenocrystal"] = 0
 		error = candidate_fleet.outposts.validate(location_data, region_data, int(station_data.next_ship_id))
 		if not error.is_empty():
 			return error
@@ -420,6 +436,7 @@ func restore(document: Variant) -> String:
 	_apply_fields(fleet.transport, transport_data, Transport.FIELDS)
 	_apply_fields(fleet.regions, region_data, Regions.FIELDS)
 	_apply_fields(model, station_data, STATION_FIELDS)
+	fleet.resource_targets = resource_data.resource_targets
 	_apply_fields(fleet, fleet_data, FLEET_FIELDS)
 	_apply_fields(supply, supply_data, SUPPLY_FIELDS)
 	supply.floating = floating_data

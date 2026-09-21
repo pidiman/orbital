@@ -599,5 +599,70 @@
         "description": "Parking capacity: 8 matching ships"
       }
     ]
+  },
+  "xeno_miner_dock": {
+    "name": "Xeno Dock",
+    "cost": 25,
+    "power_use": 1,
+    "power_output": 0,
+    "capacity": 0,
+    "color": "72dbcb",
+    "description": "Parking for 2 Xeno Miners. Jobs do not require a dock.",
+    "effect": "2 parking slots · 1 power",
+    "docking": {
+      "ship_type": "xeno_miner",
+      "capacity": 2
+    },
+    "art": "ship_dock",
+    "upgrades": [
+      {
+        "cost": {
+          "materials": 30
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "xeno_miner",
+            "capacity": 3
+          }
+        },
+        "description": "Parking capacity: 3 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 55
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "xeno_miner",
+            "capacity": 4
+          }
+        },
+        "description": "Parking capacity: 4 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 90
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "xeno_miner",
+            "capacity": 6
+          }
+        },
+        "description": "Parking capacity: 6 matching ships"
+      },
+      {
+        "cost": {
+          "materials": 140
+        },
+        "stats": {
+          "docking": {
+            "ship_type": "xeno_miner",
+            "capacity": 8
+          }
+        },
+        "description": "Parking capacity: 8 matching ships"
+      }
+    ]
   }
 }

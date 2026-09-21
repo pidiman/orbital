@@ -20,6 +20,7 @@ func _sync_view() -> void:
 	var available: Dictionary = supply.debris_in(supply.fleet.regions.current_region)
 	for debris_id: int in available:
 		var source: Dictionary = available[debris_id]
+		if supply.mining_target(supply.fleet.regions.current_region, debris_id) != -1: continue
 		var point := Vector2(source.position.x * (area.x - 380.0), 145.0 + source.position.y * (area.y - 255.0))
 		pieces.append({"resource": source.get("resource", "materials"), "amount": source.amount, "id": debris_id, "point": point, "angle": fmod(debris_id * 2.399, TAU) + supply.elapsed * 0.2})
 	debris_count = pieces.size()
@@ -28,6 +29,9 @@ func handle_click(point: Vector2) -> bool:
 	for i in range(pieces.size() - 1, -1, -1):
 		var piece: Dictionary = pieces[i]
 		if (get_canvas_transform().affine_inverse() * point).distance_to(piece.point) <= 27:
+			if supply.floating_rules.types[piece.resource].get("requires_mining", false):
+				get_parent().hud.message("A Xeno Miner is required to extract this node.")
+				return true
 			var collected: int = supply.salvage(int(piece.id), Callable(), -1, supply.fleet.regions.current_region)
 			if collected == 0:
 				full_storage.emit()

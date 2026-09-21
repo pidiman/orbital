@@ -20,7 +20,8 @@
       "weight": 0.2,
       "amount_min": 1,
       "amount_max": 1,
-      "color": "72dbcb"
+      "color": "72dbcb",
+      "requires_mining": true
     }
   }
 }
