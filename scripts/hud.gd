@@ -903,8 +903,8 @@ func _layout_menus() -> void:
 	if not is_instance_valid(toolbar): return
 	var viewport_size := get_viewport().get_visible_rect().size
 	toolbar.columns = 7
-	menu_scroll.position = Vector2(230, 12)
-	menu_scroll.size = Vector2(viewport_size.x - 258, 60)
+	menu_scroll.position = Vector2(278, 12)
+	menu_scroll.size = Vector2(viewport_size.x - 306, 60)
 	toolbar.custom_minimum_size.y = 44
 	title_label.position = Vector2(42, 20)
 	var tray_top: float = resource_bar.position.y + resource_bar.size.y + 8.0

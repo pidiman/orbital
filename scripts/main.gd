@@ -1,5 +1,6 @@
 extends Node2D
 const SaveStore = preload("res://scripts/save_store.gd")
+var session_pause: CanvasLayer
 var persistence: SaveStore
 var save_path: String = SaveStore.DEFAULT_PATH
 # Used only by isolated restart probes; never exposed as a gameplay control.
@@ -125,6 +126,10 @@ func _ready() -> void:
 	hud.load_requested.connect(_manual_load)
 	fleet.regions.location_changed.connect(_update_region_view)
 	fleet.regions.discovered.connect(_region_discovered)
+	session_pause = preload("res://scripts/session_pause.gd").new()
+	session_pause.game = self
+	session_pause.name = "SessionPause"
+	add_child(session_pause)
 	_update_region_view()
 	_sync_readouts()
 	if resumed:
