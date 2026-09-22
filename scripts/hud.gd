@@ -667,6 +667,18 @@ func inspect_module(world_position: Vector2) -> void:
 	tabs.current_tab = 2
 	_refresh_upgrade()
 
+func deselect_module() -> void:
+	selected_position = Vector2.INF
+	# StationBoard owns the actual drawn inspect frame separately from the HUD
+	# selection value. Clear it explicitly and redraw so the frame disappears
+	# immediately on both ESC and empty-map clicks.
+	var board: Node = get_parent().board
+	board.inspected_position = Vector2.INF
+	board.queue_redraw()
+	# Deselecting is view-only. If its detail panel is open, dismiss that panel
+	# while leaving the underlying module and all of its state untouched.
+	if is_instance_valid(panel) and panel.visible: close_panels()
+
 func _refresh_upgrade() -> void:
 	var is_refinery: bool = get_parent().board.visible and build_model.modules.has(selected_position) and build_model.definition_at(selected_position).has("conversion")
 	refinery_selector.visible = is_refinery
@@ -1002,6 +1014,7 @@ func _input(event: InputEvent) -> void:
 			close_panels()
 		else:
 			deselect_ship()
+			deselect_module()
 		choose("")
 		get_viewport().set_input_as_handled()
 

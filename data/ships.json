@@ -53,7 +53,7 @@
       "speed": 0.22,
       "cargo_capacity": 1
     },
-    "art": "trader",
+    "art": "material_ship",
     "dock_type": "material_ship"
   },
   "jump_ship": {

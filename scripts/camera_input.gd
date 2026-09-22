@@ -66,7 +66,9 @@ func _click(point: Vector2) -> void:
 	if game.get_node("ShipInteraction").handle_click(point): return
 	if game.asteroids.handle_click(point): return
 	if game.debris.handle_click(point): return
-	game.board.handle_click(point)
+	if game.board.handle_click(point): return
+	# Empty map clicks clear an inspected module without touching its model state.
+	game.hud.deselect_module()
 
 func edge_direction(point: Vector2) -> Vector2:
 	if not game.preferences.values.edge_scrolling or pending or game.hud.has_open_panel() or game.hud.pointer_over_ui(point): return Vector2.ZERO

@@ -128,6 +128,30 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 		canvas.draw_circle(Vector2(0, 10), 4, jump)
 		canvas.draw_line(Vector2(-17, 4), Vector2(-28, 16), jump, 3)
 		canvas.draw_line(Vector2(17, 4), Vector2(28, 16), jump, 3)
+	elif kind == "material_ship":
+		# Salvage vessel: a broad amber scoop leads into a compact cargo hold,
+		# with small rear thrusters. It shares the normal ship scale.
+		var amber := Color("e8ad5b", opacity)
+		var hull := Color("a9b7bd", opacity)
+		var dark := Color("263746", opacity)
+		var salvage_hull := PackedVector2Array([Vector2(0, -22), Vector2(10, -9), Vector2(9, 17), Vector2(0, 21), Vector2(-9, 17), Vector2(-10, -9)])
+		canvas.draw_colored_polygon(salvage_hull, hull)
+		canvas.draw_polyline(PackedVector2Array([Vector2(0, -22), Vector2(10, -9), Vector2(9, 17), Vector2(0, 21), Vector2(-9, 17), Vector2(-10, -9), Vector2(0, -22)]), amber, 2.0, true)
+		# Wide forward scoop/claw for grabbing floating debris.
+		canvas.draw_line(Vector2(-9, -9), Vector2(-18, -17), amber, 3, true)
+		canvas.draw_line(Vector2(9, -9), Vector2(18, -17), amber, 3, true)
+		canvas.draw_line(Vector2(-18, -17), Vector2(-12, -21), amber, 3, true)
+		canvas.draw_line(Vector2(18, -17), Vector2(12, -21), amber, 3, true)
+		canvas.draw_line(Vector2(-12, -21), Vector2(12, -21), amber, 2, true)
+		# Compact cargo hold behind the scoop.
+		canvas.draw_rect(Rect2(-7, -3, 14, 15), dark)
+		canvas.draw_rect(Rect2(-7, -3, 14, 15), amber, false, 1.5)
+		canvas.draw_line(Vector2(-5, 4), Vector2(5, 4), Color("f1c77e", opacity * 0.7), 1.5, true)
+		# Twin rear thrusters.
+		canvas.draw_circle(Vector2(-5, 20), 3, amber)
+		canvas.draw_circle(Vector2(5, 20), 3, amber)
+		canvas.draw_line(Vector2(-5, 22), Vector2(-5, 28), Color("f6d28d", opacity * 0.55), 2, true)
+		canvas.draw_line(Vector2(5, 22), Vector2(5, 28), Color("f6d28d", opacity * 0.55), 2, true)
 	elif kind == "trader":
 		var hull := PackedVector2Array([Vector2(0, -22), Vector2(13, -8), Vector2(13, 18), Vector2(-13, 18), Vector2(-13, -8)])
 		canvas.draw_colored_polygon(hull, ink)
@@ -160,7 +184,7 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 		for x in [-9, 3]:
 			canvas.draw_rect(Rect2(x, -7, 6, 14), cyan)
 		canvas.draw_line(Vector2(-12, 16), Vector2(12, 16), ink * Color(1, 1, 1, 0.5), 2)
-	if kind != "mining_ship" and kind != "xeno_mining_ship" and kind != "connector_tube":
+	if kind != "mining_ship" and kind != "xeno_mining_ship" and kind != "connector_tube" and kind != "material_ship":
 		for direction: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
 			canvas.draw_circle(direction * 25, 2.3, ink)
 	canvas.draw_set_transform(Vector2.ZERO)
