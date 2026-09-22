@@ -20,7 +20,7 @@ func _ready() -> void:
 	margin.add_child(column)
 	var header := HBoxContainer.new()
 	column.add_child(header)
-	var title: Label = hud._label(header, "DEVELOPER · HOME", 18, Color("dca1eb"))
+	var title: Label = hud._label(header, "DEVELOPER", 18, Color("dca1eb"))
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	close_button = _button(header, "Close / F9")
 	close_button.pressed.connect(hide)
@@ -32,12 +32,20 @@ func _ready() -> void:
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 8)
 	scroll.add_child(body)
-	var note: Label = hud._label(body, "Development tools. Grants target Home and are included in ordinary saves. Materials respect storage capacity.", 13, hud.MUTED)
+	var note: Label = hud._label(body, "Development tools. Grants target the viewed station and are included in ordinary saves. Materials respect storage capacity.", 13, hud.MUTED)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	for resource: String in ["materials", "minerals"]:
-		var button: Button = _button(body, "+100 " + resource.capitalize())
-		button.pressed.connect(func() -> void: grant(resource, 100))
+	for resource: String in ["materials", "minerals", "tech", "xenocrystal"]:
+		var amount: int = 10 if resource in ["tech", "xenocrystal"] else 100
+		var name: String = "Xenocrystals" if resource == "xenocrystal" else resource.capitalize()
+		var button: Button = _button(body, "+%d %s" % [amount, name])
+		button.pressed.connect(func() -> void: grant(resource, amount))
 		buttons[resource] = button
+	var all_button: Button = _button(body, "+1000 All Resources")
+	all_button.pressed.connect(func() -> void:
+		grant("materials", 1000)
+		grant("minerals", 1000)
+		grant("tech", 1000)
+		grant("xenocrystal", 1000))
 	result_label = hud._label(body, "F9 toggles this developer panel.", 13, hud.INK)
 	result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	get_viewport().size_changed.connect(layout)
@@ -69,6 +77,22 @@ func toggle() -> void:
 func grant(resource: String, amount: int) -> void:
 	if not Config.DEBUG_MODE: return
 	var locations = hud.model.locations
-	var received: int = locations.receive(locations.destination(locations.primary_station()), resource, amount)
-	result_label.text = "Home: +%d %s." % [received, resource.capitalize()]
+	var region: String = hud.fleet.regions.current_region
+	var home_region: String = locations.station_region(locations.primary_station())
+	var station_id: String = locations.primary_station() if region == home_region else locations.outpost_at(region, locations.rules.primary_station.owner)
+	if station_id.is_empty():
+		result_label.text = "No outpost in this region. Build one before granting local resources."
+		hud.message("DEV · " + result_label.text, true)
+		return
+	var destination: Dictionary = locations.destination(station_id)
+	var received: int = 0
+	if station_id == locations.primary_station() and hud.fleet.diplomacy.goods_catalog.has(resource):
+		received = hud.fleet.diplomacy.receive_goods(resource, amount)
+	else:
+		if station_id != locations.primary_station() and resource == "materials":
+			var local: StationModel = hud.model.scoped_station(station_id)
+			amount = mini(amount, maxi(0, local.capacity - local.materials))
+		received = locations.receive(destination, resource, amount)
+	var label: String = "Home" if station_id == locations.primary_station() else str(locations.stations[station_id].get("kind", "Outpost")).capitalize()
+	result_label.text = "%s: +%d %s." % [label, received, resource.capitalize()]
 	hud.message("DEV · " + result_label.text)

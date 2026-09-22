@@ -80,6 +80,11 @@ func receive(destination_record: Dictionary, resource: String, amount: int) -> i
 		return 0
 	if station_id != primary_station():
 		var inventory: Dictionary = stations[station_id].get("inventory", {})
+		# Outpost inventories from older saves predate Tech as a local good;
+		# initialize recognized resources on first receipt so authoritative grant
+		# paths remain usable after migration.
+		if not inventory.has(resource) and resource in ["materials", "minerals", "tech", "xenocrystal"]:
+			inventory[resource] = 0
 		if not inventory.has(resource):
 			return 0
 		inventory[resource] += amount

@@ -103,7 +103,14 @@ func show_load() -> void:
 	scroll.add_child(list)
 	var entries: Array = library.entries()
 	for entry: Dictionary in entries:
-		action(entry.name + "\n" + entry.detail, func() -> void: request_load(entry), list)
+		var row := HBoxContainer.new()
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		list.add_child(row)
+		var load_entry_button: Button = action(entry.name + "\n" + entry.detail, func() -> void: request_load(entry), row)
+		load_entry_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var delete_button: Button = action("Delete", func() -> void: request_delete(entry), row)
+		delete_button.disabled = not library.can_delete(entry)
+		if delete_button.disabled: delete_button.tooltip_text = "The active save cannot be deleted."
 	if entries.is_empty():
 		var empty := Label.new()
 		empty.text = "No saved colonies yet."
@@ -114,6 +121,25 @@ func request_load(entry: Dictionary) -> void:
 	if library.has_unsaved_changes():
 		confirm("Load this save? Unsaved progress will be lost.", func() -> void: _load(entry))
 	else: _load(entry)
+
+func request_delete(entry: Dictionary) -> void:
+	if not library.can_delete(entry):
+		game.hud.message("The active save cannot be deleted.", true)
+		return
+	confirm("Delete save “%s”? This cannot be undone." % entry.name, func() -> void: _delete(entry))
+
+func _delete(entry: Dictionary) -> void:
+	var error: String = library.delete_entry(entry)
+	if error.is_empty():
+		show_load()
+		game.hud.message("Deleted “%s”." % entry.name)
+	else:
+		begin("Could not delete save")
+		var warning := Label.new()
+		warning.text = error
+		body.add_child(warning)
+		action("Back", show_load)
+		action("Cancel", close)
 
 func _load(entry: Dictionary) -> void:
 	var error: String = library.load_entry(entry)

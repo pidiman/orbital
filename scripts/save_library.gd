@@ -5,6 +5,7 @@ var directory: String = "user://saves"
 var legacy_path: String = OrbitalSaveStore.DEFAULT_PATH
 var current_name: String = ""
 var autosave_name: String = "Autosave"
+var active_source_path: String = ""
 var index := ConfigFile.new()
 var baseline: Dictionary = {}
 var enabled: bool = false
@@ -21,6 +22,7 @@ func _init(value: OrbitalSaveStore, folder: String = "user://saves", legacy: Str
 		autosave_name = str(index.get_value("session", "autosave", "Autosave"))
 		store.path = slot_path(current_name if not current_name.is_empty() else autosave_name)
 		if not FileAccess.file_exists(store.path) and FileAccess.file_exists(legacy_path): store.path = legacy_path
+		active_source_path = store.path if FileAccess.file_exists(store.path) else ""
 	store.saved.connect(_saved)
 
 func slot_path(label: String) -> String:
@@ -52,6 +54,8 @@ func save_named(label: String) -> String:
 	if not error.is_empty():
 		current_name = previous
 		store.path = previous_path
+	else:
+		active_source_path = store.path
 	return error
 
 func load_entry(entry: Dictionary) -> String:
@@ -65,6 +69,7 @@ func load_entry(entry: Dictionary) -> String:
 		return error
 	current_name = entry.name
 	store.path = slot_path(current_name)
+	active_source_path = entry.path
 	store.autosave_blocked = false
 	index.set_value("session", "name", current_name)
 	index.set_value("session", "autosave", autosave_name)
@@ -83,6 +88,7 @@ func unnamed() -> void:
 	store.autosave_blocked = false
 	store.autosave_elapsed = 0.0
 	store.dirty = false
+	active_source_path = ""
 	index.set_value("session", "name", "")
 	index.set_value("session", "autosave", autosave_name)
 	if store.enabled: index.save(directory.path_join("slots.cfg"))
@@ -102,6 +108,22 @@ func entries() -> Array[Dictionary]:
 	if FileAccess.file_exists(legacy_path): result.append(_entry(legacy_path, "Legacy save"))
 	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.modified > b.modified)
 	return result
+
+func can_delete(entry: Dictionary) -> bool:
+	if entry.is_empty(): return false
+	# The active path may be the legacy single-file fallback or the current
+	# named slot. Never let the browser remove the game currently in memory.
+	return str(entry.path) != str(store.path) and str(entry.path) != str(active_source_path)
+
+func delete_entry(entry: Dictionary) -> String:
+	if not can_delete(entry): return "The active save cannot be deleted."
+	var file: String = str(entry.path)
+	if not FileAccess.file_exists(file): return "That save no longer exists."
+	var error: Error = DirAccess.remove_absolute(ProjectSettings.globalize_path(file))
+	if error != OK: return "Could not delete that save."
+	index.erase_section_key("names", file.get_file())
+	index.save(directory.path_join("slots.cfg"))
+	return ""
 
 func _entry(file: String, label: String) -> Dictionary:
 	var level: String = "Unknown colony"

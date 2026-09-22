@@ -7,3 +7,6 @@ build/
 *.wasm
 *.pck
 .DS_Store
+
+# Summer Engine local-only state (SummerGit, caches, locks)
+.summer/local/
