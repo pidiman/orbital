@@ -553,22 +553,32 @@ func restore(document: Variant) -> String:
 		station_data.power_output = candidate.power_output
 		station_data.power_use = candidate.power_use
 		station_data.level = candidate.level
+		var ownership_rows: Array[String] = []
+		for ship_id: int in candidate.locations.ships:
+			var ship_record: Dictionary = candidate.locations.ships[ship_id]
+			var ship_kind: String = str(ship_record.kind)
+			var ship_power: int = int(candidate.ship_catalog.get(ship_kind, {}).get("power_use", 0))
+			ownership_rows.append("#%d:%s:%s:%d" % [ship_id, ship_kind, str(ship_record.station_id), ship_power])
+		print("Legacy migration canonical power: generated=%d used=%d ships=%s" % [candidate.power_output, candidate.power_use, ", ".join(ownership_rows)])
 	fleet.docking.suspended = true
 	# Commit only after the whole graph has passed validation. Existing model references survive.
 	_apply_fields(fleet.research, research_data, Research.FIELDS)
 	_apply_fields(fleet.transport, transport_data, Transport.FIELDS)
 	_apply_fields(fleet.regions, region_data, Regions.FIELDS)
 	_apply_fields(model, station_data, STATION_FIELDS)
-	model.scoped_cache.clear()
-	model.connectivity_dirty = true
-	model.recalculate()
 	fleet.resource_targets = resource_data.resource_targets
 	_apply_fields(fleet, fleet_data, FLEET_FIELDS)
 	_apply_fields(supply, supply_data, SUPPLY_FIELDS)
 	supply.floating = floating_data
 	_apply_fields(supply.collection, collection_data, Collection.FIELDS)
+	# Apply canonical locations after legacy projection setters (notably the
+	# station ship projection) so they cannot overwrite migrated ownership.
+	# Recalculate only after this copy: power_use includes station-owned ships.
 	for field: String in Locations.FIELDS:
 		model.locations.set(field, candidate.locations.get(field))
+	model.scoped_cache.clear()
+	model.connectivity_dirty = true
+	model.recalculate()
 	fleet.mining_assignments = candidate_fleet.mining_assignments
 	fleet.hauling.jobs = candidate_fleet.hauling.jobs
 	fleet.cargo.routes = candidate_fleet.cargo.routes
