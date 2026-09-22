@@ -6,6 +6,7 @@ var points: Dictionary = {}
 var angles: Dictionary = {}
 var origins: Dictionary = {}
 var missions: Dictionary = {}
+var mining_states: Dictionary = {}
 var regions: Dictionary = {}
 var ship_kinds: Dictionary = {}
 var mining_jobs: Dictionary = {}
@@ -28,6 +29,7 @@ func reset() -> void:
 	points.clear()
 	origins.clear()
 	missions.clear()
+	mining_states.clear()
 	regions.clear()
 
 func _module_removed(point: Vector2) -> void:
@@ -35,6 +37,7 @@ func _module_removed(point: Vector2) -> void:
 	points.erase(point)
 	origins.erase(point)
 	missions.erase(point)
+	mining_states.erase(point)
 	regions.erase(point)
 
 func speed_for(unit: Variant) -> float:
@@ -77,6 +80,7 @@ func advance_visual(delta: float) -> void:
 		if missions.get(unit, "") != mission:
 			origins[unit] = position_for(unit)
 			missions[unit] = mission
+			if mining_jobs.has(unit): _set_mining_state(unit, "FLYING_TO")
 		var target: Vector2 = target_for(unit)
 		var direction: Vector2 = target - Vector2(points.get(unit, origins.get(unit, game.asteroids.home_position(unit))))
 		var busy: bool = not mission.is_empty()
@@ -99,13 +103,37 @@ func advance_visual(delta: float) -> void:
 			# quantized point in one frame and pausing until the next model tick.
 			var eased: float = distance * (1.0 - exp(-float(settings.follow_rate) * step))
 			points[unit] = Vector2(points[unit]).move_toward(target, minf(eased, speed_for(unit) * step))
+		_update_mining_state(unit, target)
 	for unit: Variant in points.keys():
 		if not alive.has(unit):
 			angles.erase(unit)
 			points.erase(unit)
 			origins.erase(unit)
 			missions.erase(unit)
+			mining_states.erase(unit)
 			regions.erase(unit)
+
+func _update_mining_state(unit: Variant, target: Vector2) -> void:
+	var next_state: String = "IDLE"
+	if mining_jobs.has(unit):
+		var job: Dictionary = mining_jobs[unit]
+		if returning(job):
+			next_state = "FLYING_BACK"
+		elif mining_states.get(unit, "") == "EXTRACTING":
+			next_state = "EXTRACTING"
+		elif points.has(unit) and Vector2(points[unit]).is_equal_approx(target):
+			next_state = "EXTRACTING"
+		else:
+			next_state = "FLYING_TO"
+	_set_mining_state(unit, next_state)
+
+func _set_mining_state(unit: Variant, next_state: String) -> void:
+	if mining_states.get(unit, "") == next_state: return
+	mining_states[unit] = next_state
+	print("Ship %s: state changed to %s -> beam %s" % [str(unit), next_state, "ON" if next_state == "EXTRACTING" else "OFF"])
+
+func mining_state(unit: Variant) -> String:
+	return str(mining_states.get(unit, "IDLE"))
 
 func mission_key(unit: Variant) -> String:
 	var fleet: RefCounted = game.fleet
