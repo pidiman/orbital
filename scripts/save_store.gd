@@ -78,7 +78,7 @@ func snapshot() -> Dictionary:
 		document["extensions"] = {}
 	# Connectivity is derived from the structure graph. The marker lets the
 	# loader distinguish canonical economy fields from pre-connectivity saves.
-	document.extensions["connectivity"] = {"schema_version": 1}
+	document.extensions["connectivity"] = {"schema_version": 2}
 	if not document.extensions.has("outposts"):
 		document.extensions["outposts"] = {}
 	document.extensions.outposts["schema_version"] = 1
@@ -264,9 +264,15 @@ func restore(document: Variant) -> String:
 	var connectivity_extension: Variant = migrated.extensions.get("connectivity", {})
 	if not connectivity_extension is Dictionary:
 		return "Invalid connectivity extension."
-	var strict_connectivity_economy: bool = connectivity_extension.get("schema_version", 0) == 1
-	if connectivity_extension.has("schema_version") and not strict_connectivity_economy:
+	var connectivity_schema: int = int(connectivity_extension.get("schema_version", 0))
+	var strict_connectivity_economy: bool = connectivity_schema == 2
+	if connectivity_extension.has("schema_version") and connectivity_schema > 2:
 		return "This connectivity extension requires a newer reader."
+	# A save is current only when it carries the latest structural markers. Any
+	# older v2 save enters one tolerant migration pass; its cached derived
+	# economy is never treated as authoritative.
+	var strict_current_save: bool = strict_connectivity_economy and migrated.extensions.has("world_locations") and migrated.extensions.has("docking") and migrated.extensions.has("outposts")
+	var legacy_migration_mode: bool = not strict_current_save
 	var legacy_outposts: bool = not migrated.extensions.has("outposts")
 	if not legacy_outposts:
 		if not migrated.extensions.outposts is Dictionary or migrated.extensions.outposts.get("schema_version") != 1 or not migrated.extensions.has("world_locations"):
@@ -304,7 +310,7 @@ func restore(document: Variant) -> String:
 	# one-module connectivity cache before validating derived economy fields.
 	candidate.connectivity_dirty = true
 	candidate.recalculate()
-	if candidate.power_output != int(station_data.power_output) or candidate.capacity != int(station_data.capacity) or candidate.level != int(station_data.level):
+	if candidate.power_output != int(station_data.power_output) or candidate.power_use != int(station_data.power_use) or candidate.capacity != int(station_data.capacity) or candidate.level != int(station_data.level):
 		if strict_connectivity_economy:
 			return "Saved economy disagrees with installed module/ship definitions."
 		# Pre-connectivity v2 saves cached economy from a model where every
@@ -414,6 +420,8 @@ func restore(document: Variant) -> String:
 	_apply_fields(candidate_fleet.research, research_data, Research.FIELDS)
 	_apply_fields(candidate_fleet.transport, transport_data, Transport.FIELDS)
 	_apply_fields(candidate_supply.collection, collection_data, Collection.FIELDS)
+	var migrated_dock_ids: Dictionary = {}
+	var migrated_dock_refund: int = 0
 	for ship_id: int in candidate_fleet.transport.jobs:
 		candidate.locations.begin_transit(ship_id, candidate_fleet.transport.jobs[ship_id].destination)
 	if migrated.extensions.has("world_locations"):
@@ -434,10 +442,29 @@ func restore(document: Variant) -> String:
 				# Old outposts had only a marker and mining inventory; no built grid to move.
 				if location_data.structures.has(station.get("structure_id", "")):
 					location_data.structures[station.structure_id].position = Vector2.ZERO
+		# Normalize retired per-type docks before any docking reservation is
+		# validated. Their stable structure IDs remain valid for old assignments.
+		for structure_id: String in location_data.structures:
+			var structure: Dictionary = location_data.structures[structure_id]
+			var definition: Dictionary = candidate.catalog.get(structure.kind, {})
+			if not definition.has("docking") or not definition.has("migration_replacement"):
+				continue
+			var old_tier: int = maxi(1, int(structure.state.get("tier", 1)))
+			var tier_map: Dictionary = definition.get("migration_tiers", {})
+			var mapped_tier: int = int(tier_map.get(str(old_tier), 1))
+			var replacement: String = str(definition.migration_replacement)
+			structure.kind = replacement
+			structure.state["tier"] = mapped_tier
+			migrated_dock_ids[structure_id] = true
+			migrated_dock_refund += maxi(0, int(definition.cost) - int(candidate.catalog[replacement].cost))
 		error = candidate_fleet.outposts.validate(location_data, region_data, int(station_data.next_ship_id))
 		if not error.is_empty():
 			return error
 		_apply_fields(candidate.locations, location_data, Locations.FIELDS)
+		for structure_id: String in migrated_dock_ids:
+			var migrated_structure: Dictionary = candidate.locations.structures[structure_id]
+			station_data.modules[migrated_structure.position] = migrated_structure.kind
+			station_data.module_tiers[migrated_structure.position] = int(migrated_structure.state.get("tier", 1))
 		error = LocationValidation.validate_projections(candidate, station_data, research_data, transport_data, collection_data)
 		if not error.is_empty():
 			return error
@@ -455,7 +482,7 @@ func restore(document: Variant) -> String:
 		var job: Dictionary = trade_data.jobs[ship_id]
 		if job.has("destination") and job.destination != candidate.locations.local_destination(ship_id): return "Invalid trade storage destination."
 	candidate.recalculate()
-	if candidate.power_use != int(station_data.power_use):
+	if not legacy_migration_mode and candidate.power_use != int(station_data.power_use):
 		return "Saved power disagrees with station ship ownership."
 	error = LocationValidation.validate_gate_bindings(transport_data, candidate)
 	if not error.is_empty():
@@ -483,26 +510,30 @@ func restore(document: Variant) -> String:
 	error = candidate_fleet.cargo.validate(cargo_data)
 	if not error.is_empty(): return error
 	_apply_fields(candidate_fleet.cargo, cargo_data, Cargo.FIELDS)
-	if migrated.extensions.has("docking") and not retired_exploration:
+	if migrated.extensions.has("docking") and not retired_exploration and migrated.extensions.has("world_locations"):
 		var docking_data: Dictionary = _extension_fields(migrated.extensions, "docking", candidate_fleet.docking, Docking.FIELDS)
 		if not decode_error.is_empty(): return decode_error
+		candidate_fleet.docking.ships = docking_data.ships.duplicate(true)
+		candidate_fleet.docking.usage = docking_data.usage.duplicate(true)
 		error = candidate_fleet.docking.validate(docking_data)
-		if not error.is_empty(): return error
+		if not error.is_empty():
+			# Saves written before the universal Space Dock migration may contain
+			# stale reservations. Reconcile them after migration; invalid slots
+			# become homeless instead of blocking the whole save.
+			candidate_fleet.docking.reconcile()
 	else:
 		candidate_fleet.docking.reconcile()
-	# Migrate retired structures only after validating the complete old graph.
+	# Migrate any remaining retired structures. Dock structures were normalized
+	# above so reservation validation could use universal Space Dock capacity.
 	# Same identity/position preserves connectivity, references and station layout.
 	var replaced_modules: int = 0
-	var replaced_docks: int = 0
-	var replacement_refund: int = 0
+	var replaced_docks: int = migrated_dock_ids.size()
+	var replacement_refund: int = migrated_dock_refund
 	for structure: Dictionary in candidate.locations.structures.values():
 		var definition: Dictionary = candidate.catalog.get(structure.kind, {})
 		if not definition.has("migration_replacement"): continue
 		var replacement: String = definition.migration_replacement
-		if definition.has("docking"):
-			structure.state["tier"] = int(definition.migration_tiers[str(int(structure.state.get("tier", 1)))])
-			replaced_docks += 1
-		else:
+		if not definition.has("docking"):
 			candidate_fleet.cancel_unit(structure.position)
 			replaced_modules += 1
 		replacement_refund += maxi(0, int(definition.cost) - int(candidate.catalog[replacement].cost))
@@ -513,6 +544,15 @@ func restore(document: Variant) -> String:
 		for field: String in STATION_FIELDS: station_data[field] = candidate.get(field)
 		fleet_data.jobs = candidate_fleet.jobs
 		candidate_fleet.docking.reconcile()
+	if legacy_migration_mode:
+		# All migrations are complete. Recompute every derived station value from
+		# the canonical migrated graph and discard stale legacy projections.
+		candidate.connectivity_dirty = true
+		candidate.recalculate()
+		station_data.capacity = candidate.capacity
+		station_data.power_output = candidate.power_output
+		station_data.power_use = candidate.power_use
+		station_data.level = candidate.level
 	fleet.docking.suspended = true
 	# Commit only after the whole graph has passed validation. Existing model references survive.
 	_apply_fields(fleet.research, research_data, Research.FIELDS)
