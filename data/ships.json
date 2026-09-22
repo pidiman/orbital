@@ -104,5 +104,20 @@
       "region": "home"
     },
     "art": "trader"
+  },
+  "cargo_ship": {
+    "name": "Cargo Ship",
+    "cost": 120,
+    "power_use": 4,
+    "color": "b789e8",
+    "description": "Automated regional gate shuttle for bulk resources.",
+    "effect": "50-unit shuttle · 4 power",
+    "cargo_shuttle": {
+      "capacity": 50,
+      "load_seconds": 2,
+      "resource_order": ["materials", "minerals", "tech", "xenocrystal"]
+    },
+    "art": "cargo_ship",
+    "dock_type": "cargo_ship"
   }
 }

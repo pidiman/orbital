@@ -56,6 +56,20 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 		for x in [-18, 0, 18]: canvas.draw_line(Vector2(x, -9), Vector2(x, 9), tube.lightened(0.25), 2)
 		for x in range(1, tier):
 			canvas.draw_line(Vector2(-20 + x * 12, -12), Vector2(-20 + x * 12, 12), Color("d6f4e8", opacity), 1.5)
+	elif kind == "cargo_ship":
+		var violet := Color("b789e8", opacity)
+		var dark := Color("3a2859", opacity)
+		var hull := PackedVector2Array([Vector2(0, -38), Vector2(9, -25), Vector2(9, 28), Vector2(0, 36), Vector2(-9, 28), Vector2(-9, -25)])
+		canvas.draw_colored_polygon(hull, dark)
+		canvas.draw_polyline(PackedVector2Array([Vector2(0, -38), Vector2(9, -25), Vector2(9, 28), Vector2(0, 36), Vector2(-9, 28), Vector2(-9, -25), Vector2(0, -38)]), violet, 3, true)
+		for y in [-20, 0, 20]:
+			for side in [-1, 1]:
+				canvas.draw_rect(Rect2(side * 21 - 8, y - 7, 16, 14), Color("7652a7", opacity))
+				canvas.draw_rect(Rect2(side * 21 - 8, y - 7, 16, 14), violet, false, 1.5)
+		canvas.draw_circle(Vector2(-5, 33), 4, Color("ff9be8", opacity * 0.8))
+		canvas.draw_circle(Vector2(5, 33), 4, Color("ff9be8", opacity * 0.8))
+		canvas.draw_line(Vector2(-5, 37), Vector2(-5, 46), Color("ffb4ee", opacity * 0.55), 3)
+		canvas.draw_line(Vector2(5, 37), Vector2(5, 46), Color("ffb4ee", opacity * 0.55), 3)
 	elif kind == "mining_ship":
 		var violet := Color(0.73, 0.65, 0.96, opacity)
 		canvas.draw_rect(Rect2(-23, -22, 46, 44), Color(0.12, 0.16, 0.23, opacity))

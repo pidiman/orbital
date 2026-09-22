@@ -92,7 +92,7 @@ func _draw() -> void:
 		if fleet.transport.jobs.has(ship_id):
 			var point: Vector2 = ship_position(ship_id)
 			var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
-			ModuleArt.draw_module(self, point, definition.get("art", "scout"), 0.55, 0.5, get_parent().ship_motion.angle_for(ship_id))
+			ModuleArt.draw_module(self, point, definition.get("art", "scout"), _ship_scale(definition), 0.5, get_parent().ship_motion.angle_for(ship_id))
 			draw_string(font, point + Vector2(-30, 40), "In transit", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ORE)
 			continue
 		if fleet.collection != null and fleet.collection.jobs.has(ship_id):
@@ -100,7 +100,7 @@ func _draw() -> void:
 		var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
 		if not fleet.jobs.has(ship_id):
 			var point: Vector2 = ship_position(ship_id)
-			ModuleArt.draw_module(self, point, definition.get("art", "scout"), 0.55, 1.0, get_parent().ship_motion.angle_for(ship_id))
+			ModuleArt.draw_module(self, point, definition.get("art", "scout"), _ship_scale(definition), 1.0, get_parent().ship_motion.angle_for(ship_id))
 			var text: String = "%s #%d" % [definition.name, ship_id]
 			if fleet.regions.survey_jobs.has(ship_id):
 				text = "Scouting %ds" % fleet.regions.survey_jobs[ship_id].remaining
@@ -161,6 +161,9 @@ func home_position(unit: Variant) -> Vector2:
 		return board.world_to_screen(ship.purchase_position) + Vector2(0, 30)
 	var index: int = int(unit) - 1
 	return Vector2(get_viewport_rect().size.x - 410.0 - int(index / 7.0) * 62, 235 + (index % 7) * 63)
+
+func _ship_scale(definition: Dictionary) -> float:
+	return 1.65 if definition.get("art", "") == "cargo_ship" else 0.55
 
 func _add_discovery_marker(asteroid_id: int) -> void:
 	if fleet.asteroids[asteroid_id].has("region_id"):

@@ -121,6 +121,7 @@ func _ready() -> void:
 	camera_input.game = self
 	add_child(camera_input)
 	fleet.hauling.notice.connect(hud.message)
+	fleet.cargo.notice.connect(hud.message)
 	supply.collection.notice.connect(hud.message)
 	hud.tool_selected.connect(_select_tool)
 	hud.ship_assignment_requested.connect(func(ship_id: int) -> void: asteroids.selected_ship = ship_id)

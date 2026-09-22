@@ -52,13 +52,13 @@ func can_pioneer(ship_id: int) -> bool:
 func is_pioneer(ship_id: int, destination: String) -> bool:
 	return can_pioneer(ship_id) and not has_gate(destination)
 
-func jump_error(gate: Variant, ship_id: int, destination: String) -> String:
+func jump_error(gate: Variant, ship_id: int, destination: String, allow_cargo: bool = false) -> String:
 	var id: String = gate_id(gate)
 	if not all_gates().has(id): return "Build a Teleport Gate in the departure region first."
 	if not fleet.model.ships.has(ship_id): return "Select an owned ship."
 	var structure: Dictionary = fleet.model.locations.structures[id]
 	if location(ship_id) != structure.region: return "Ship must be in the departure gate's region."
-	if fleet.unit_busy(ship_id): return "Ship is busy. Choose an idle ship."
+	if fleet.unit_busy(ship_id) and not (allow_cargo and fleet.cargo != null and fleet.cargo.routes.has(ship_id)): return "Ship is busy. Choose an idle ship."
 	if not fleet.regions.is_discovered(destination): return "Survey the destination region first."
 	if destination == structure.region: return "Choose another region."
 	if not has_gate(destination) and not can_pioneer(ship_id): return "The destination region needs a Teleport Gate."
@@ -70,8 +70,8 @@ func jump_error(gate: Variant, ship_id: int, destination: String) -> String:
 		if int(inventory.get(good, 0)) < amount: return "Departure storage needs %d %s for this jump." % [amount, fleet.diplomacy.goods_catalog[good].name]
 	return ""
 
-func jump(gate: Variant, ship_id: int, destination: String) -> String:
-	var error: String = jump_error(gate, ship_id, destination)
+func jump(gate: Variant, ship_id: int, destination: String, allow_cargo: bool = false) -> String:
+	var error: String = jump_error(gate, ship_id, destination, allow_cargo)
 	if not error.is_empty(): return error
 	var id: String = gate_id(gate)
 	var structure: Dictionary = fleet.model.locations.structures[id]

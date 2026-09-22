@@ -11,6 +11,7 @@ const Locations = preload("res://scripts/world_locations.gd")
 const LocationValidation = preload("res://scripts/location_save_validation.gd")
 const Hauling = preload("res://scripts/refinery_hauling.gd")
 const Docking = preload("res://scripts/docking_model.gd")
+const Cargo = preload("res://scripts/cargo_shuttle.gd")
 const VERSION: int = 2
 const DEFAULT_PATH: String = "user://orbital-save.json"
 const STATION_FIELDS: Array[String] = ["modules", "module_tiers", "ships", "next_ship_id", "materials", "minerals", "capacity", "power_output", "power_use", "level", "ticks", "tick_elapsed", "refinery_progress", "total_refined"]
@@ -39,6 +40,7 @@ func _init(station: StationModel, mining: Fleet, region_supply: Supply) -> void:
 	supply = region_supply
 	fleet.hauling.changed.connect(request_autosave)
 	fleet.docking.changed.connect(request_autosave)
+	fleet.cargo.changed.connect(request_autosave)
 	fleet.outposts.changed.connect(request_autosave)
 	fleet.research.changed.connect(request_autosave)
 	fleet.transport.changed.connect(request_autosave)
@@ -81,6 +83,8 @@ func snapshot() -> Dictionary:
 	document.extensions.refinery_hauling["schema_version"] = 1
 	_merge_fields(document.extensions, "docking", fleet.docking, Docking.FIELDS)
 	document.extensions.docking["schema_version"] = 1
+	_merge_fields(document.extensions, "cargo_shuttle", fleet.cargo, Cargo.FIELDS)
+	document.extensions.cargo_shuttle["schema_version"] = 1
 	_merge_fields(document.extensions, "research", fleet.research, Research.FIELDS)
 	document.extensions.research["schema_version"] = 1
 	_merge_fields(document.extensions, "gate_transport", fleet.transport, Transport.FIELDS)
@@ -454,6 +458,11 @@ func restore(document: Variant) -> String:
 	error = candidate_fleet.hauling.validate(hauling_data)
 	if not error.is_empty(): return error
 	_apply_fields(candidate_fleet.hauling, hauling_data, Hauling.FIELDS)
+	var cargo_data: Dictionary = _extension_fields(migrated.extensions, "cargo_shuttle", candidate_fleet.cargo, Cargo.FIELDS)
+	if not decode_error.is_empty(): return decode_error
+	error = candidate_fleet.cargo.validate(cargo_data)
+	if not error.is_empty(): return error
+	_apply_fields(candidate_fleet.cargo, cargo_data, Cargo.FIELDS)
 	if migrated.extensions.has("docking") and not retired_exploration:
 		var docking_data: Dictionary = _extension_fields(migrated.extensions, "docking", candidate_fleet.docking, Docking.FIELDS)
 		if not decode_error.is_empty(): return decode_error
@@ -499,6 +508,7 @@ func restore(document: Variant) -> String:
 		model.locations.set(field, candidate.locations.get(field))
 	fleet.mining_assignments = candidate_fleet.mining_assignments
 	fleet.hauling.jobs = candidate_fleet.hauling.jobs
+	fleet.cargo.routes = candidate_fleet.cargo.routes
 	fleet.docking.ships = candidate_fleet.docking.ships
 	fleet.docking.usage = candidate_fleet.docking.usage
 	fleet.docking.suspended = false

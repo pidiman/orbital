@@ -11,6 +11,7 @@ var trade_panel: PanelContainer
 var research_panel: PanelContainer
 var research_button: Button
 var gate_panel: PanelContainer
+var cargo_route_panel: PanelContainer
 var tech_label: Label
 var xenocrystal_label: Label
 var menu_scroll: ScrollContainer
@@ -43,7 +44,7 @@ var panel_closes: Dictionary = {}
 var active_menu: String = ""
 var footer: PanelContainer
 var capability_buttons: Dictionary = {}
-const SHIP_ACTIONS: Dictionary = {"hauling": "Assign refinery", "mining": "Assign asteroid", "survey": "Explore regions", "trade": "Trade with contact", "collection": "Deploy locally", "founding": "Found outpost", "gate_building": "Build Teleport Gate"}
+const SHIP_ACTIONS: Dictionary = {"hauling": "Assign refinery", "mining": "Assign asteroid", "survey": "Explore regions", "trade": "Trade with contact", "collection": "Deploy locally", "founding": "Found outpost", "gate_building": "Build Teleport Gate", "cargo_shuttle": "Assign shuttle route"}
 const Fleet = preload("res://scripts/mining_fleet.gd")
 signal new_game_requested
 signal save_requested
@@ -284,6 +285,10 @@ func _ready() -> void:
 	gate_panel.hud = self
 	gate_panel.fleet = fleet
 	root.add_child(gate_panel)
+	cargo_route_panel = preload("res://scripts/cargo_route_panel.gd").new()
+	cargo_route_panel.hud = self
+	cargo_route_panel.fleet = fleet
+	root.add_child(cargo_route_panel)
 	_setup_menus()
 	_setup_ship_tray()
 	fleet.docking.changed.connect(_refresh_ships)
@@ -526,6 +531,8 @@ func _refresh_ships() -> void:
 			status = "Scouting · %ds" % fleet.regions.survey_jobs[ship_id].remaining
 		elif fleet.diplomacy.jobs.has(ship_id):
 			status = "Trading · %ds" % fleet.diplomacy.jobs[ship_id].remaining
+		elif fleet.cargo.routes.has(ship_id):
+			status = str(fleet.cargo.routes[ship_id].status)
 		for capability: String in capability_buttons[ship_id]:
 			var button: Button = capability_buttons[ship_id][capability]
 			button.text = "%s #%d · %s" % [definition.name, ship_id, status if not status.is_empty() else str(definition[capability].get("assignment_label", SHIP_ACTIONS[capability]))]
@@ -543,6 +550,9 @@ func _refresh_ships() -> void:
 			if capability == "hauling" and fleet.hauling.jobs.has(ship_id):
 				button.text = "Stop hauling"
 				button.disabled = false
+			if capability == "cargo_shuttle" and fleet.cargo.routes.has(ship_id):
+				button.text = "Cancel shuttle route"
+				button.disabled = false
 			if capability != "founding": button.tooltip_text = work_error
 		sell_buttons[ship_id].text = "Decommission · +%d M" % model.ship_refund(ship_id)
 
@@ -559,6 +569,10 @@ func _command_ship(ship_id: int, capability: String = "") -> void:
 	if capability == "hauling" and fleet.hauling.jobs.has(ship_id):
 		fleet.hauling.stop(ship_id)
 		message("Hauler will stop after delivering its cargo." if fleet.hauling.jobs.has(ship_id) else "Hauling stopped.")
+		return
+	if capability == "cargo_shuttle" and fleet.cargo.routes.has(ship_id):
+		fleet.cargo.cancel(ship_id)
+		message("Cargo Ship route cancelled.")
 		return
 	if not definition.has(capability) or fleet.unit_busy(ship_id):
 		return
@@ -596,6 +610,8 @@ func _command_ship(ship_id: int, capability: String = "") -> void:
 		"trade":
 			region_navigation.panel.hide()
 			trade_panel.open_contacts(ship_id)
+		"cargo_shuttle":
+			cargo_route_panel.open_for(ship_id)
 
 func _trade_completed(contact_id: String, offer_id: String) -> void:
 	var diplomacy: RefCounted = fleet.diplomacy
@@ -854,6 +870,7 @@ func _setup_menus() -> void:
 	_wrap_panel(panel, "Build / Ships")
 	_wrap_panel(research_panel, "Research")
 	_wrap_panel(gate_panel, "Gate / Travel")
+	_wrap_panel(cargo_route_panel, "Cargo Route")
 	_install_secondary_panels()
 	resource_bar.resized.connect(_layout_menus)
 	get_viewport().size_changed.connect(_layout_menus)
