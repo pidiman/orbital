@@ -1,14 +1,14 @@
 class_name ModuleArt
 extends RefCounted
 
-static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale_factor: float = 1.0, opacity: float = 1.0) -> void:
+static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale_factor: float = 1.0, opacity: float = 1.0, facing: float = 0.0) -> void:
 	var ink := Color("c8dce7")
 	var cyan := Color("71d8d0")
 	var gold := Color("e8ba76")
 	ink.a = opacity
 	cyan.a = opacity
 	gold.a = opacity
-	canvas.draw_set_transform(center, 0.0, Vector2.ONE * scale_factor)
+	canvas.draw_set_transform(center, facing, Vector2.ONE * scale_factor)
 	if kind == "ship_dock":
 		canvas.draw_rect(Rect2(-26, -22, 52, 44), Color(0.08, 0.16, 0.24, opacity))
 		canvas.draw_line(Vector2(-26, 22), Vector2(-26, -22), ink, 3)

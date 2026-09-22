@@ -3,6 +3,7 @@ extends Node
 var game: Node2D
 var settings: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/ship_motion.json"))
 var points: Dictionary = {}
+var angles: Dictionary = {}
 var origins: Dictionary = {}
 var missions: Dictionary = {}
 var regions: Dictionary = {}
@@ -17,17 +18,20 @@ func _ready() -> void:
 	game.model.ship_built.connect(_ship_purchased)
 
 func _ship_purchased(id: int) -> void:
+	angles[id] = deg_to_rad(float(settings.idle_angle_degrees))
 	points[id] = game.asteroids.home_position(id)
 	origins[id] = points[id]
 	regions[id] = game.model.locations.ship_region(id)
 
 func reset() -> void:
+	angles.clear()
 	points.clear()
 	origins.clear()
 	missions.clear()
 	regions.clear()
 
 func _module_removed(point: Vector2) -> void:
+	angles.erase(point)
 	points.erase(point)
 	origins.erase(point)
 	missions.erase(point)
@@ -36,6 +40,9 @@ func _module_removed(point: Vector2) -> void:
 func speed_for(unit: Variant) -> float:
 	var kind: String = str(ship_kinds.get(unit, ""))
 	return maxf(1.0, float(settings.ship_speeds.get(kind, settings.speed)))
+
+func angle_for(unit: Variant) -> float:
+	return float(angles.get(unit, deg_to_rad(float(settings.idle_angle_degrees))))
 
 func position_for(unit: Variant) -> Vector2:
 	return points.get(unit, game.asteroids.home_position(unit))
@@ -61,6 +68,7 @@ func advance_visual(delta: float) -> void:
 		var region: String = fleet.transport.location(unit) if unit is int else fleet.regions.HOME
 		if region != viewed_region: continue
 		if regions.get(unit, region) != region:
+			angles.erase(unit)
 			points.erase(unit)
 			origins.erase(unit)
 			missions.erase(unit)
@@ -70,6 +78,17 @@ func advance_visual(delta: float) -> void:
 			origins[unit] = position_for(unit)
 			missions[unit] = mission
 		var target: Vector2 = target_for(unit)
+		var direction: Vector2 = target - Vector2(points.get(unit, origins.get(unit, game.asteroids.home_position(unit))))
+		var busy: bool = not mission.is_empty()
+		var desired: float = angle_for(unit) if busy else deg_to_rad(float(settings.idle_angle_degrees))
+		if direction.length() > float(settings.facing_arrival_distance):
+			desired = direction.angle() + PI / 2.0 # All current ship art noses point up.
+		if not points.has(unit) and not busy:
+			desired = deg_to_rad(float(settings.idle_angle_degrees))
+		if not angles.has(unit):
+			angles[unit] = desired
+		else:
+			angles[unit] = rotate_toward(float(angles[unit]), desired, deg_to_rad(float(settings.turn_speed_degrees)) * clampf(delta, 0.0, float(settings.max_frame_delta)))
 		if not points.has(unit):
 			# Newly created view/load/region: choose a valid current-phase point.
 			points[unit] = target
@@ -82,6 +101,7 @@ func advance_visual(delta: float) -> void:
 			points[unit] = Vector2(points[unit]).move_toward(target, minf(eased, speed_for(unit) * step))
 	for unit: Variant in points.keys():
 		if not alive.has(unit):
+			angles.erase(unit)
 			points.erase(unit)
 			origins.erase(unit)
 			missions.erase(unit)

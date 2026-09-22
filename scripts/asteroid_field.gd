@@ -92,7 +92,7 @@ func _draw() -> void:
 		if fleet.transport.jobs.has(ship_id):
 			var point: Vector2 = ship_position(ship_id)
 			var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
-			ModuleArt.draw_module(self, point, definition.get("art", "scout"), 0.55, 0.5)
+			ModuleArt.draw_module(self, point, definition.get("art", "scout"), 0.55, 0.5, get_parent().ship_motion.angle_for(ship_id))
 			draw_string(font, point + Vector2(-30, 40), "In transit", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ORE)
 			continue
 		if fleet.collection != null and fleet.collection.jobs.has(ship_id):
@@ -100,7 +100,7 @@ func _draw() -> void:
 		var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
 		if not fleet.jobs.has(ship_id):
 			var point: Vector2 = ship_position(ship_id)
-			ModuleArt.draw_module(self, point, definition.get("art", "scout"), 0.55)
+			ModuleArt.draw_module(self, point, definition.get("art", "scout"), 0.55, 1.0, get_parent().ship_motion.angle_for(ship_id))
 			var text: String = "%s #%d" % [definition.name, ship_id]
 			if fleet.regions.survey_jobs.has(ship_id):
 				text = "Scouting %ds" % fleet.regions.survey_jobs[ship_id].remaining
@@ -118,7 +118,7 @@ func _draw() -> void:
 		draw_dashed_line(start, target, Color(0.72, 0.62, 0.96, 0.4), 1.5, 7.0)
 		var progress: float = 1.0 - float(job.remaining) / float(job.duration)
 		var ship_point: Vector2 = ship_position(unit)
-		ModuleArt.draw_module(self, ship_point, "mining_ship", 0.55)
+		ModuleArt.draw_module(self, ship_point, "mining_ship", 0.55, 1.0, get_parent().ship_motion.angle_for(unit))
 		draw_arc(target, 34.0, -PI / 2, -PI / 2 + TAU * maxf(0.01, progress), 48, ORE, 3.0, true)
 		draw_string(font, target + Vector2(-21, 51), "%ds" % job.remaining, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ORE)
 	# Legacy module-owned miners also finish their cosmetic return after the
@@ -127,7 +127,7 @@ func _draw() -> void:
 		if unit is Vector2 and not fleet.jobs.has(unit) and fleet.regions.primary_station_visible():
 			var point: Vector2 = ship_position(unit)
 			if point.distance_to(home_position(unit)) > 1.0:
-				ModuleArt.draw_module(self, point, "mining_ship", 0.55)
+				ModuleArt.draw_module(self, point, "mining_ship", 0.55, 1.0, get_parent().ship_motion.angle_for(unit))
 	for asteroid_id: int in rocks:
 		if not fleet.asteroids.has(asteroid_id) or fleet.asteroid_region(asteroid_id) != fleet.regions.current_region:
 			continue

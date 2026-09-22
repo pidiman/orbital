@@ -11,7 +11,7 @@ func _draw() -> void:
 		var job: Dictionary = supply.collection.jobs[ship_id]
 		var point: Vector2 = ship_position(ship_id)
 		var definition: Dictionary = supply.model.ship_catalog[supply.model.ships[ship_id]]
-		ModuleArt.draw_module(self, point, definition.get("art", "trader"), 0.45)
+		ModuleArt.draw_module(self, point, definition.get("art", "trader"), 0.45, 1.0, get_parent().ship_motion.angle_for(ship_id))
 		if job.cargo > 0:
 			draw_circle(point + Vector2(13, 0), 4, Color("eebd76"))
 

@@ -17,5 +17,8 @@
       0.35
     ]
   },
-  "follow_rate": 14.0
+  "follow_rate": 14.0,
+  "turn_speed_degrees": 240.0,
+  "idle_angle_degrees": 0.0,
+  "facing_arrival_distance": 1.0
 }
