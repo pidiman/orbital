@@ -199,6 +199,7 @@ func _restore_presentation() -> void:
 	board.selected = ""
 	board.inspected_position = Vector2.INF
 	board.pulses.clear()
+	board.connector_masks_dirty = true
 	asteroids.selected_ship = -1
 	asteroids.rocks.clear()
 	asteroids._sync_view()

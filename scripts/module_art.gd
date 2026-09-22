@@ -1,7 +1,7 @@
 class_name ModuleArt
 extends RefCounted
 
-static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale_factor: float = 1.0, opacity: float = 1.0, facing: float = 0.0, tier: int = 1) -> void:
+static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale_factor: float = 1.0, opacity: float = 1.0, facing: float = 0.0, tier: int = 1, connector_mask: int = 0) -> void:
 	var ink := Color("c8dce7")
 	var cyan := Color("71d8d0")
 	var gold := Color("e8ba76")
@@ -61,13 +61,25 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 		canvas.draw_line(Vector2(10, 9), Vector2(4, -2), cyan, 2)
 	elif kind == "connector_tube":
 		var tube := Color("4e9eaa", opacity)
-		canvas.draw_rect(Rect2(-25, -11, 50, 22), Color(0.08, 0.18, 0.24, opacity))
-		canvas.draw_rect(Rect2(-25, -11, 50, 22), tube, false, 2.5)
-		canvas.draw_line(Vector2(-18, -6), Vector2(18, -6), Color("a5e4df", opacity), 2)
-		canvas.draw_line(Vector2(-18, 6), Vector2(18, 6), Color("2c6675", opacity), 2)
-		for x in [-18, 0, 18]: canvas.draw_line(Vector2(x, -9), Vector2(x, 9), tube.lightened(0.25), 2)
-		for x in range(1, tier):
-			canvas.draw_line(Vector2(-20 + x * 12, -12), Vector2(-20 + x * 12, 12), Color("d6f4e8", opacity), 1.5)
+		var sealed := Color("24414b", opacity)
+		var inner := Color("b2e8df", opacity)
+		var width: float = 14.0
+		# Rounded central corridor chamber; arms are added only where a neighbor opens.
+		canvas.draw_circle(Vector2.ZERO, 13, Color("0b2029", opacity))
+		canvas.draw_circle(Vector2.ZERO, 13, tube, false, 2.5, true)
+		var arms: Array[Dictionary] = [
+			{"bit": 1, "rect": Rect2(-25, -width * 0.5, 18, width), "a": Vector2(-25, 0), "b": Vector2(-12, 0)},
+			{"bit": 2, "rect": Rect2(7, -width * 0.5, 18, width), "a": Vector2(12, 0), "b": Vector2(25, 0)},
+			{"bit": 4, "rect": Rect2(-width * 0.5, -25, width, 18), "a": Vector2(0, -25), "b": Vector2(0, -12)},
+			{"bit": 8, "rect": Rect2(-width * 0.5, 7, width, 18), "a": Vector2(0, 12), "b": Vector2(0, 25)}
+		]
+		for arm: Dictionary in arms:
+			var connected: bool = (connector_mask & int(arm.bit)) != 0
+			canvas.draw_rect(arm.rect, Color("102a34", opacity))
+			canvas.draw_line(arm.a, arm.b, inner if connected else sealed, 3.0, true)
+			if not connected:
+				canvas.draw_line(arm.a - (arm.b - arm.a).normalized() * 2.0, arm.a + (arm.b - arm.a).normalized() * 2.0, sealed, 4.0, true)
+		for x in range(1, tier): canvas.draw_circle(Vector2(-6 + x * 6, 0), 1.5, inner)
 	elif kind == "cargo_ship":
 		var violet := Color("b789e8", opacity)
 		var dark := Color("3a2859", opacity)

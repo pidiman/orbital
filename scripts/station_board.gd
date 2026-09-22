@@ -14,10 +14,14 @@ var hover_cell: Vector2i = Vector2i(99, 99)
 var pulses: Array[Dictionary] = []
 var placement_cache: Array[Vector2i] = []
 var placement_cache_key: String = ""
+var connector_masks: Dictionary = {}
+var connector_masks_dirty: bool = true
 
 func _ready() -> void:
 	model.changed.connect(_invalidate_placement_cache)
 	model.module_built.connect(_on_built)
+	model.module_built.connect(_connector_structure_changed)
+	model.module_removed.connect(_connector_structure_changed)
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 
@@ -42,6 +46,10 @@ func _process(delta: float) -> void:
 
 func _on_built(world_position: Vector2, _kind: String) -> void:
 	pulses.append({"position": world_position, "time": 0.0})
+
+func _connector_structure_changed(_position: Vector2, _kind: String = "") -> void:
+	connector_masks_dirty = true
+	queue_redraw()
 
 func handle_click(point: Vector2) -> bool:
 	if not visible: return false
@@ -72,6 +80,11 @@ func _draw() -> void:
 		for cell: Vector2i in placement_cache:
 			draw_rect(Rect2(cell_position(cell) - Vector2.ONE * (cell_size / 2 - 3), Vector2.ONE * (cell_size - 6)), Color(0.3, 0.83, 0.73, 0.07))
 	var positions: Array = model.modules.keys()
+	if connector_masks_dirty:
+		connector_masks.clear()
+		for tube_position: Vector2 in model.modules:
+			if model.modules[tube_position] == "connector_tube": connector_masks[tube_position] = connector_neighbor_mask(tube_position, false)
+		connector_masks_dirty = false
 	for index in range(positions.size()):
 		var world_position: Vector2 = positions[index]
 		for other_index in range(index + 1, positions.size()):
@@ -79,7 +92,10 @@ func _draw() -> void:
 			if model.modules_connected(world_position, other):
 				draw_line(world_to_screen(world_position), world_to_screen(other), Color("627c8d"), 8)
 	for world_position: Vector2 in model.modules:
-		ModuleArt.draw_module(self, world_to_screen(world_position), model.catalog[model.modules[world_position]].get("art", model.modules[world_position]), cell_size / 58.0 * model.footprint_size(model.modules[world_position]).x, 1.0, module_facing(world_position), model.tier_at(world_position))
+		var kind: String = model.modules[world_position]
+		var art: String = model.catalog[kind].get("art", kind)
+		var connector_mask: int = int(connector_masks.get(world_position, 0)) if kind == "connector_tube" else 0
+		ModuleArt.draw_module(self, world_to_screen(world_position), art, cell_size / 58.0 * model.footprint_size(kind).x, 1.0, module_facing(world_position), model.tier_at(world_position), connector_mask)
 	for world_position: Vector2 in model.modules:
 		if model.catalog[model.modules[world_position]].has("upgrades"):
 			var point: Vector2 = world_to_screen(world_position) + Vector2(12, -19)
@@ -94,9 +110,29 @@ func _draw() -> void:
 		draw_rect(rect, color * Color(1, 1, 1, 0.12))
 		draw_rect(rect, color, false, 1.5)
 		if not model.modules.has(placement_position(get_global_mouse_position())):
-			ModuleArt.draw_module(self, world_to_screen(placement_position(get_global_mouse_position())), model.catalog[selected].get("art", selected), cell_size / 58.0 * model.footprint_size(selected).x, 0.55)
+			var preview_position: Vector2 = placement_position(get_global_mouse_position())
+			var preview_mask: int = connector_neighbor_mask(preview_position, false) if selected == "connector_tube" else 0
+			ModuleArt.draw_module(self, world_to_screen(preview_position), model.catalog[selected].get("art", selected), cell_size / 58.0 * model.footprint_size(selected).x, 0.55, 0.0, 1, preview_mask)
 	for pulse: Dictionary in pulses:
 		draw_circle(world_to_screen(pulse.position), 30 + pulse.time * 55, Color(0.45, 0.9, 0.8, (1.0 - pulse.time / 0.65) * 0.65), false, 2, true)
+
+func connector_neighbor_mask(world_position: Vector2, use_cache: bool = true) -> int:
+	if use_cache and connector_masks.has(world_position): return int(connector_masks[world_position])
+	var mask: int = 0
+	var offsets: Array[Dictionary] = [
+		{"bit": 1, "offset": Vector2.LEFT},
+		{"bit": 2, "offset": Vector2.RIGHT},
+		{"bit": 4, "offset": Vector2.UP},
+		{"bit": 8, "offset": Vector2.DOWN}
+	]
+	for neighbor: Dictionary in offsets:
+		var cell: Vector2 = world_position + neighbor.offset * Geometry.MODULE_SIZE
+		for existing: Vector2 in model.modules:
+			if existing == world_position: continue
+			if model.footprint_rect(existing, model.modules[existing]).has_point(cell):
+				mask |= int(neighbor.bit)
+				break
+	return mask
 
 # Presentation/input boundary: no viewport pixels or cell indices enter the model.
 func cell_to_world(cell: Vector2i) -> Vector2:
