@@ -76,6 +76,9 @@ func snapshot() -> Dictionary:
 	document["min_reader_version"] = int(document.get("min_reader_version", VERSION))
 	if not document.has("extensions"):
 		document["extensions"] = {}
+	# Connectivity is derived from the structure graph. The marker lets the
+	# loader distinguish canonical economy fields from pre-connectivity saves.
+	document.extensions["connectivity"] = {"schema_version": 1}
 	if not document.extensions.has("outposts"):
 		document.extensions["outposts"] = {}
 	document.extensions.outposts["schema_version"] = 1
@@ -258,6 +261,12 @@ func restore(document: Variant) -> String:
 	var migrated: Dictionary = migrate(document)
 	if not migrated.get("state") is Dictionary or not migrated.get("extensions", {}) is Dictionary:
 		return "Missing save state or invalid extensions."
+	var connectivity_extension: Variant = migrated.extensions.get("connectivity", {})
+	if not connectivity_extension is Dictionary:
+		return "Invalid connectivity extension."
+	var strict_connectivity_economy: bool = connectivity_extension.get("schema_version", 0) == 1
+	if connectivity_extension.has("schema_version") and not strict_connectivity_economy:
+		return "This connectivity extension requires a newer reader."
 	var legacy_outposts: bool = not migrated.extensions.has("outposts")
 	if not legacy_outposts:
 		if not migrated.extensions.outposts is Dictionary or migrated.extensions.outposts.get("schema_version") != 1 or not migrated.extensions.has("world_locations"):
@@ -291,9 +300,20 @@ func restore(document: Variant) -> String:
 	if not error.is_empty():
 		return error
 	_apply_fields(candidate, station_data, STATION_FIELDS)
+	# Applying the serialized module graph invalidates the candidate's initial
+	# one-module connectivity cache before validating derived economy fields.
+	candidate.connectivity_dirty = true
 	candidate.recalculate()
 	if candidate.power_output != int(station_data.power_output) or candidate.capacity != int(station_data.capacity) or candidate.level != int(station_data.level):
-		return "Saved economy disagrees with installed module/ship definitions."
+		if strict_connectivity_economy:
+			return "Saved economy disagrees with installed module/ship definitions."
+		# Pre-connectivity v2 saves cached economy from a model where every
+		# module was active. Connectivity is now derived on load, so adopt the
+		# canonical values before continuing instead of rejecting valid progress.
+		station_data.capacity = candidate.capacity
+		station_data.power_output = candidate.power_output
+		station_data.power_use = candidate.power_use
+		station_data.level = candidate.level
 	var trade_data: Dictionary = {}
 	var extension: Variant = migrated.get("extensions", {}).get("alien_trade", {})
 	if not extension is Dictionary:
