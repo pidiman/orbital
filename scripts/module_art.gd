@@ -1,7 +1,7 @@
 class_name ModuleArt
 extends RefCounted
 
-static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale_factor: float = 1.0, opacity: float = 1.0, facing: float = 0.0, tier: int = 1, connector_mask: int = 0) -> void:
+static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale_factor: float = 1.0, opacity: float = 1.0, facing: float = 0.0, tier: int = 1, connector_mask: int = 0, module_mask: int = 0) -> void:
 	var ink := Color("c8dce7")
 	var cyan := Color("71d8d0")
 	var gold := Color("e8ba76")
@@ -75,10 +75,22 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 		]
 		for arm: Dictionary in arms:
 			var connected: bool = (connector_mask & int(arm.bit)) != 0
-			canvas.draw_rect(arm.rect, Color("102a34", opacity))
-			canvas.draw_line(arm.a, arm.b, inner if connected else sealed, 3.0, true)
-			if not connected:
-				canvas.draw_line(arm.a - (arm.b - arm.a).normalized() * 2.0, arm.a + (arm.b - arm.a).normalized() * 2.0, sealed, 4.0, true)
+			if connected:
+				# Only connected tube sides extend into an open passage. This is
+				# what makes a straight tube visually different from a cross.
+				canvas.draw_rect(arm.rect, Color("102a34", opacity))
+				canvas.draw_line(arm.a, arm.b, inner, 3.0, true)
+			else:
+				# Seal the chamber at the inner edge; do not draw a dark arm.
+				var direction: Vector2 = (arm.a - arm.b).normalized()
+				var wall_center: Vector2 = arm.b + direction * 1.5
+				var tangent: Vector2 = Vector2(-direction.y, direction.x) * (width * 0.5)
+				canvas.draw_line(wall_center - tangent, wall_center + tangent, sealed, 4.0, true)
+		# A neighboring non-tube gets a small hatch, without opening the corridor topology.
+		for hatch: Dictionary in [{"bit": 1, "point": Vector2(-21, 0), "normal": Vector2.RIGHT}, {"bit": 2, "point": Vector2(21, 0), "normal": Vector2.LEFT}, {"bit": 4, "point": Vector2(0, -21), "normal": Vector2.DOWN}, {"bit": 8, "point": Vector2(0, 21), "normal": Vector2.UP}]:
+			if (module_mask & int(hatch.bit)) != 0 and (connector_mask & int(hatch.bit)) == 0:
+				canvas.draw_circle(hatch.point, 4, sealed)
+				canvas.draw_line(hatch.point, hatch.point + hatch.normal * 4.0, inner, 2.0, true)
 		for x in range(1, tier): canvas.draw_circle(Vector2(-6 + x * 6, 0), 1.5, inner)
 	elif kind == "cargo_ship":
 		var violet := Color("b789e8", opacity)
@@ -148,7 +160,7 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 		for x in [-9, 3]:
 			canvas.draw_rect(Rect2(x, -7, 6, 14), cyan)
 		canvas.draw_line(Vector2(-12, 16), Vector2(12, 16), ink * Color(1, 1, 1, 0.5), 2)
-	if kind != "mining_ship" and kind != "xeno_mining_ship":
+	if kind != "mining_ship" and kind != "xeno_mining_ship" and kind != "connector_tube":
 		for direction: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
 			canvas.draw_circle(direction * 25, 2.3, ink)
 	canvas.draw_set_transform(Vector2.ZERO)

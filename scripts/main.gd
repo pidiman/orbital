@@ -229,6 +229,7 @@ func _update_region_view() -> void:
 	region_view.queue_redraw()
 	var outpost: String = model.locations.outpost_at(fleet.regions.current_region, model.locations.rules.primary_station.owner)
 	board.model = model if outpost.is_empty() else model.scoped_station(outpost)
+	board.connector_masks_dirty = true
 	board.grid_radius = (board.model.build_grid_dimensions() - Vector2i.ONE) / 2
 	board.placement_cache_key = ""
 	board.visible = home or not outpost.is_empty()

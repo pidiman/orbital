@@ -18,6 +18,9 @@ var elapsed: float = 0.0
 var pending: float = 0.0
 var debris_elapsed: float = 0.0
 var asteroid_elapsed: float = 0.0
+# View projections rebuild on simulation changes, not once per rendered frame.
+# This is transient and intentionally excluded from save fields.
+var presentation_revision: int = 0
 var rng := RandomNumberGenerator.new()
 
 func _init(station: StationModel, mining_fleet: MiningFleet, seed_value: int = -1, configuration: Dictionary = {}, floating_configuration: Dictionary = {}) -> void:
@@ -47,6 +50,7 @@ func advance(delta: float) -> void:
 
 func _step(delta: float) -> void:
 	elapsed += delta
+	presentation_revision += 1
 	advance_floating(delta)
 	sync_mining_nodes()
 	collection.advance(delta)

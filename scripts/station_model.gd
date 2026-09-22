@@ -56,6 +56,10 @@ var power_use: int = 2
 var level: int = 1
 var ticks: int = 0
 var tick_elapsed: float = 0.0
+var connected_modules: Dictionary = {}
+var connectivity_key: String = ""
+var connectivity_dirty: bool = true
+var scoped_cache: Dictionary = {}
 
 func _init() -> void:
 	locations = Locations.new(self)
@@ -66,6 +70,7 @@ func _init() -> void:
 	recalculate()
 
 func recalculate() -> void:
+	_refresh_connectivity()
 	var is_home: bool = station_id.is_empty() or station_id == locations.primary_station()
 	var station: Dictionary = locations.stations.get(station_id, {})
 	var outpost: Dictionary = {} if is_home else locations.outpost_catalog.get(str(station.get("kind", "")), {})
@@ -74,6 +79,7 @@ func recalculate() -> void:
 	power_output = int(outpost.get("base_power", 3))
 	power_use = 0
 	for world_position: Vector2 in modules:
+		if not connected_modules.get(world_position, false): continue
 		var definition: Dictionary = definition_at(world_position)
 		capacity += int(definition.capacity)
 		power_output += int(definition.power_output)
@@ -131,6 +137,7 @@ func build(world_position: Vector2, kind: String) -> String:
 	var old_level: int = level
 	materials -= int(catalog[kind].cost)
 	locations.add_structure(base_id(), kind, world_position)
+	connectivity_dirty = true
 	recalculate()
 	module_built.emit(world_position, kind)
 	changed.emit()
@@ -151,8 +158,9 @@ func add_minerals(amount: int) -> void:
 
 func module_count_with(capability: String) -> int:
 	var count: int = 0
-	for kind: String in modules.values():
-		if catalog.get(kind, {}).has(capability):
+	for world_position: Vector2 in modules:
+		var kind: String = modules[world_position]
+		if catalog.get(kind, {}).has(capability) and is_module_active(world_position):
 			count += 1
 	return count
 
@@ -204,6 +212,7 @@ func set_refinery_running(world_position: Vector2, running: bool) -> String:
 	return ""
 
 func refinery_pause_reason(world_position: Vector2) -> String:
+	if not is_module_active(world_position): return "Disconnected"
 	if not refinery_running(world_position): return "Stopped"
 	var recipe: Dictionary = refinery_recipe(world_position)
 	if refinery_buffer_space(world_position) < int(recipe.output): return "buffer full · paused"
@@ -220,6 +229,7 @@ func _refine() -> void:
 	var produced: int = 0
 	for world_position: Vector2 in modules:
 		if not definition_at(world_position).has("conversion"): continue
+		if not is_module_active(world_position): continue
 		var recipe: Dictionary = refinery_recipe(world_position)
 		if not refinery_pause_reason(world_position).is_empty(): continue
 		var progress: int = int(refinery_progress.get(world_position, 0)) + 1
@@ -390,6 +400,7 @@ func demolish_module(world_position: Vector2) -> String:
 	for resource: String in structure_state(world_position).get("output_buffer", {}):
 		recover_goods(resource, int(structure_state(world_position).output_buffer[resource]))
 	locations.structures.erase(structure_id_at(world_position))
+	connectivity_dirty = true
 	recalculate()
 	# Keep existing stock and the full refund, even after removing Storage.
 	# Above-capacity stock can be spent; salvage/refining pause until there is room.
@@ -448,6 +459,41 @@ func modules_connected(a: Vector2, b: Vector2) -> bool:
 				return true
 	return false
 
+func is_module_active(world_position: Vector2) -> bool:
+	return bool(connected_modules.get(world_position, false))
+
+func is_structure_active(structure_id: String) -> bool:
+	if not locations.structures.has(structure_id): return false
+	var structure: Dictionary = locations.structures[structure_id]
+	var scope: StationModel = self if structure.station_id == base_id() else scoped_station(structure.station_id)
+	return scope.is_module_active(structure.position)
+
+func _refresh_connectivity() -> void:
+	if not connectivity_dirty: return
+	var key: String = station_id + str(modules)
+	connectivity_key = key
+	connectivity_dirty = false
+	connected_modules.clear()
+	if modules.is_empty(): return
+	var core: Vector2 = Vector2.ZERO
+	if not station_id.is_empty():
+		var station: Dictionary = locations.stations.get(station_id, {})
+		var core_id: String = str(station.get("structure_id", ""))
+		if locations.structures.has(core_id): core = locations.structures[core_id].position
+	if not modules.has(core):
+		# Legacy layouts without a recognizable core remain functional on load.
+		for position: Vector2 in modules:
+			connected_modules[position] = true
+		return
+	var frontier: Array[Vector2] = [core]
+	connected_modules[core] = true
+	while not frontier.is_empty():
+		var current: Vector2 = frontier.pop_front()
+		for candidate: Vector2 in modules:
+			if connected_modules.has(candidate) or not modules_connected(current, candidate): continue
+			connected_modules[candidate] = true
+			frontier.append(candidate)
+
 # Position APIs are primary-station adapters, not global structure identity.
 func structure_id_at(point: Vector2) -> String:
 	return locations.structure_at(base_id(), point)
@@ -458,7 +504,7 @@ func structure_state(point: Vector2) -> Dictionary:
 func capability_states(capability: String, defaults: Dictionary) -> Dictionary:
 	var result: Dictionary = {}
 	for point: Vector2 in modules:
-		if definition_at(point).has(capability):
+		if is_module_active(point) and definition_at(point).has(capability):
 			var state: Dictionary = structure_state(point)
 			if not state.has(capability):
 				state[capability] = defaults.duplicate(true)
@@ -473,6 +519,7 @@ func base_id() -> String:
 
 func scoped_station(id: String) -> StationModel:
 	if id == locations.primary_station(): return self
+	if scoped_cache.has(id): return scoped_cache[id]
 	var scoped := StationModel.new()
 	scoped.locations = locations
 	scoped.station_id = id
@@ -488,6 +535,7 @@ func scoped_station(id: String) -> StationModel:
 	scoped.changed.connect(func() -> void:
 		recalculate()
 		changed.emit())
+	scoped_cache[id] = scoped
 	return scoped
 
 func build_grid_dimensions() -> Vector2i:

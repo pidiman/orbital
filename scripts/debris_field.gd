@@ -7,15 +7,21 @@ var art = preload("res://scripts/debris_art.gd").new()
 # Projected snapshots only; authority lives in RegionSupply.
 var pieces: Array[Dictionary] = []
 var debris_count: int = 0
+var last_revision: int = -1
+var last_region: String = ""
 
 func _ready() -> void:
 	_sync_view()
 
 func _process(_delta: float) -> void:
-	_sync_view()
+	var region: String = supply.fleet.regions.current_region
+	if last_revision != supply.presentation_revision or last_region != region:
+		_sync_view()
 	queue_redraw()
 
 func _sync_view() -> void:
+	last_revision = supply.presentation_revision
+	last_region = supply.fleet.regions.current_region
 	pieces.clear()
 	var area: Vector2 = get_viewport_rect().size
 	var available: Dictionary = supply.debris_in(supply.fleet.regions.current_region)
@@ -54,7 +60,8 @@ func _draw() -> void:
 		draw_circle(piece.point, 25, Color(0.94, 0.72, 0.40, 0.07 if not hovered else 0.18))
 		draw_arc(piece.point, 23, -0.3, 1.0, 14, Color("b28a53"), 1, true)
 		draw_arc(piece.point, 23, 2.8, 4.1, 14, Color("b28a53"), 1, true)
-		draw_set_transform(piece.point, piece.angle, Vector2.ONE * _visual_scale(piece))
+		var angle: float = fmod(float(piece.id) * 2.399 + supply.elapsed * 0.2, TAU)
+		draw_set_transform(piece.point, angle, Vector2.ONE * _visual_scale(piece))
 		if not piece.visual_variant.is_empty():
 			art.draw_variant(self, piece.visual_variant)
 		else:

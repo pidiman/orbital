@@ -18,7 +18,7 @@ func docks() -> Dictionary:
 	var result: Dictionary = {}
 	for id: String in fleet.model.locations.structures:
 		var definition: Dictionary = fleet.model.structure_definition(id)
-		if definition.has("docking"):
+		if definition.has("docking") and fleet.model.is_structure_active(id):
 			result[id] = definition.docking
 	return result
 

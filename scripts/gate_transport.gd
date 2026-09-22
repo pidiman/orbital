@@ -37,7 +37,8 @@ func gate_id(gate: Variant) -> String:
 func all_gates() -> Array[String]:
 	var result: Array[String] = []
 	for id: String in fleet.model.locations.structures:
-		if fleet.model.structure_definition(id).has("teleport"): result.append(id)
+		var structure: Dictionary = fleet.model.locations.structures[id]
+		if fleet.model.structure_definition(id).has("teleport") and fleet.model.is_structure_active(id): result.append(id)
 	return result
 
 func has_gate(region: String) -> bool:

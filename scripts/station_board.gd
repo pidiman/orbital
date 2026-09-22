@@ -15,6 +15,7 @@ var pulses: Array[Dictionary] = []
 var placement_cache: Array[Vector2i] = []
 var placement_cache_key: String = ""
 var connector_masks: Dictionary = {}
+var connector_module_masks: Dictionary = {}
 var connector_masks_dirty: bool = true
 
 func _ready() -> void:
@@ -38,11 +39,15 @@ func cell_position(cell: Vector2i) -> Vector2:
 	return center + Vector2(cell) * cell_size
 
 func _process(delta: float) -> void:
-	hover_cell = cell_at(get_global_mouse_position())
+	var next_hover: Vector2i = cell_at(get_global_mouse_position())
+	var needs_redraw: bool = next_hover != hover_cell
+	hover_cell = next_hover
 	for pulse: Dictionary in pulses:
 		pulse.time += delta
+	var pulse_count: int = pulses.size()
 	pulses = pulses.filter(func(p: Dictionary) -> bool: return p.time < 0.65)
-	queue_redraw()
+	needs_redraw = needs_redraw or pulse_count > 0 or not pulses.is_empty()
+	if needs_redraw: queue_redraw()
 
 func _on_built(world_position: Vector2, _kind: String) -> void:
 	pulses.append({"position": world_position, "time": 0.0})
@@ -82,20 +87,32 @@ func _draw() -> void:
 	var positions: Array = model.modules.keys()
 	if connector_masks_dirty:
 		connector_masks.clear()
+		connector_module_masks.clear()
 		for tube_position: Vector2 in model.modules:
-			if model.modules[tube_position] == "connector_tube": connector_masks[tube_position] = connector_neighbor_mask(tube_position, false)
+			if model.modules[tube_position] == "connector_tube":
+				var mask: int = connector_neighbor_mask(tube_position, false)
+				connector_masks[tube_position] = mask
+				connector_module_masks[tube_position] = connector_module_mask(tube_position)
+				print("Tube tiling recalculated at %s: mask=%d -> %s" % [str(tube_position), mask, connector_variant(mask)])
 		connector_masks_dirty = false
 	for index in range(positions.size()):
 		var world_position: Vector2 = positions[index]
 		for other_index in range(index + 1, positions.size()):
 			var other: Vector2 = positions[other_index]
-			if model.modules_connected(world_position, other):
+			if model.modules[world_position] == "connector_tube" and model.modules[other] == "connector_tube" and model.modules_connected(world_position, other):
 				draw_line(world_to_screen(world_position), world_to_screen(other), Color("627c8d"), 8)
 	for world_position: Vector2 in model.modules:
 		var kind: String = model.modules[world_position]
 		var art: String = model.catalog[kind].get("art", kind)
 		var connector_mask: int = int(connector_masks.get(world_position, 0)) if kind == "connector_tube" else 0
-		ModuleArt.draw_module(self, world_to_screen(world_position), art, cell_size / 58.0 * model.footprint_size(kind).x, 1.0, module_facing(world_position), model.tier_at(world_position), connector_mask)
+		var module_mask: int = int(connector_module_masks.get(world_position, 0)) if kind == "connector_tube" else 0
+		var active: bool = model.is_module_active(world_position)
+		ModuleArt.draw_module(self, world_to_screen(world_position), art, cell_size / 58.0 * model.footprint_size(kind).x, 1.0 if active else 0.32, module_facing(world_position), model.tier_at(world_position), connector_mask, module_mask)
+		if not active:
+			var inactive_point: Vector2 = world_to_screen(world_position) + Vector2(0, -20)
+			draw_circle(inactive_point, 7, Color("6b7780", 0.9))
+			draw_line(inactive_point - Vector2(3, 3), inactive_point + Vector2(3, 3), Color("e88982"), 2)
+			draw_line(inactive_point + Vector2(-3, 3), inactive_point + Vector2(3, -3), Color("e88982"), 2)
 	for world_position: Vector2 in model.modules:
 		if model.catalog[model.modules[world_position]].has("upgrades"):
 			var point: Vector2 = world_to_screen(world_position) + Vector2(12, -19)
@@ -112,7 +129,7 @@ func _draw() -> void:
 		if not model.modules.has(placement_position(get_global_mouse_position())):
 			var preview_position: Vector2 = placement_position(get_global_mouse_position())
 			var preview_mask: int = connector_neighbor_mask(preview_position, false) if selected == "connector_tube" else 0
-			ModuleArt.draw_module(self, world_to_screen(preview_position), model.catalog[selected].get("art", selected), cell_size / 58.0 * model.footprint_size(selected).x, 0.55, 0.0, 1, preview_mask)
+			ModuleArt.draw_module(self, world_to_screen(preview_position), model.catalog[selected].get("art", selected), cell_size / 58.0 * model.footprint_size(selected).x, 0.55, 0.0, 1, preview_mask, connector_module_mask(preview_position))
 	for pulse: Dictionary in pulses:
 		draw_circle(world_to_screen(pulse.position), 30 + pulse.time * 55, Color(0.45, 0.9, 0.8, (1.0 - pulse.time / 0.65) * 0.65), false, 2, true)
 
@@ -128,7 +145,30 @@ func connector_neighbor_mask(world_position: Vector2, use_cache: bool = true) ->
 	for neighbor: Dictionary in offsets:
 		var cell: Vector2 = world_position + neighbor.offset * Geometry.MODULE_SIZE
 		for existing: Vector2 in model.modules:
-			if existing == world_position: continue
+			if existing == world_position or model.modules[existing] != "connector_tube": continue
+			if model.footprint_rect(existing, model.modules[existing]).has_point(cell):
+				mask |= int(neighbor.bit)
+				break
+	return mask
+
+func connector_variant(mask: int) -> String:
+	match mask:
+		0: return "ISOLATED"
+		1, 2, 4, 8: return "DEAD_END"
+		3: return "STRAIGHT_HORIZONTAL"
+		12: return "STRAIGHT_VERTICAL"
+		5, 6, 9, 10: return "CORNER"
+		7, 11, 13, 14: return "T_JUNCTION"
+		15: return "CROSSROADS"
+	return "ISOLATED"
+
+func connector_module_mask(world_position: Vector2) -> int:
+	var mask: int = 0
+	var offsets: Array[Dictionary] = [{"bit": 1, "offset": Vector2.LEFT}, {"bit": 2, "offset": Vector2.RIGHT}, {"bit": 4, "offset": Vector2.UP}, {"bit": 8, "offset": Vector2.DOWN}]
+	for neighbor: Dictionary in offsets:
+		var cell: Vector2 = world_position + neighbor.offset * Geometry.MODULE_SIZE
+		for existing: Vector2 in model.modules:
+			if existing == world_position or model.modules[existing] == "connector_tube": continue
 			if model.footprint_rect(existing, model.modules[existing]).has_point(cell):
 				mask |= int(neighbor.bit)
 				break
@@ -170,6 +210,11 @@ func screen_footprint(origin: Vector2, kind: String) -> Rect2:
 func module_facing(world_position: Vector2) -> float:
 	if model.modules.get(world_position, "") != "connector_tube":
 		return 0.0
+	var cached_mask: int = int(connector_masks.get(world_position, -1))
+	if cached_mask >= 0:
+		var horizontal_cached: bool = (cached_mask & 3) != 0
+		var vertical_cached: bool = (cached_mask & 12) != 0
+		return PI / 2.0 if vertical_cached and not horizontal_cached else 0.0
 	var horizontal: bool = false
 	var vertical: bool = false
 	for other: Vector2 in model.modules:

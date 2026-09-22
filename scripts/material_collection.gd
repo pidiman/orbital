@@ -135,7 +135,7 @@ func depots_in(region_id: String) -> Dictionary:
 	var result: Dictionary = {}
 	for id: String in model.locations.structures:
 		var structure: Dictionary = model.locations.structures[id]
-		if structure.region == region_id and structure.owner == model.locations.rules.primary_station.owner and model.catalog.get(structure.kind, {}).has("material_depot"):
+		if structure.region == region_id and structure.owner == model.locations.rules.primary_station.owner and model.catalog.get(structure.kind, {}).has("material_depot") and model.is_structure_active(id):
 			if not structure.state.has("material_depot"): structure.state["material_depot"] = {"delivered": 0}
 			result[structure.position] = structure.state.material_depot
 	return result

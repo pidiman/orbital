@@ -15,6 +15,8 @@ var asteroid_count: int = 0
 var selected_ship: int = -1
 var font: Font = ThemeDB.fallback_font
 const ORE := Color("baa1f5")
+var last_revision: int = -1
+var last_region: String = ""
 
 func _ready() -> void:
 	fleet.completed.connect(_on_completed)
@@ -24,10 +26,14 @@ func _ready() -> void:
 	_sync_view()
 
 func _process(_delta: float) -> void:
-	_sync_view()
+	var region: String = supply.fleet.regions.current_region
+	if last_revision != supply.presentation_revision or last_region != region:
+		_sync_view()
 	queue_redraw()
 
 func _sync_view() -> void:
+	last_revision = supply.presentation_revision
+	last_region = supply.fleet.regions.current_region
 	var area: Vector2 = get_viewport_rect().size
 	for asteroid_id: int in rocks.keys():
 		if not fleet.asteroids.has(asteroid_id) or fleet.asteroid_region(asteroid_id) != fleet.regions.current_region:
@@ -150,7 +156,8 @@ func _draw() -> void:
 			continue
 		var hovered: bool = get_global_mouse_position().distance_to(point) <= 34.0
 		draw_circle(point, 34, Color(0.57, 0.39, 0.86, 0.17 if hovered else 0.07))
-		draw_set_transform(point, rock.angle)
+		var angle: float = fmod(float(asteroid_id) * 2.399 + supply.elapsed * 0.06, TAU)
+		draw_set_transform(point, angle)
 		var polygon := PackedVector2Array([Vector2(-24, -8), Vector2(-14, -25), Vector2(8, -27), Vector2(25, -10), Vector2(21, 15), Vector2(1, 26), Vector2(-22, 16)])
 		draw_colored_polygon(polygon, Color("393249"))
 		polygon.append(polygon[0])

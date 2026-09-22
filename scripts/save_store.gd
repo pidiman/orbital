@@ -499,6 +499,9 @@ func restore(document: Variant) -> String:
 	_apply_fields(fleet.transport, transport_data, Transport.FIELDS)
 	_apply_fields(fleet.regions, region_data, Regions.FIELDS)
 	_apply_fields(model, station_data, STATION_FIELDS)
+	model.scoped_cache.clear()
+	model.connectivity_dirty = true
+	model.recalculate()
 	fleet.resource_targets = resource_data.resource_targets
 	_apply_fields(fleet, fleet_data, FLEET_FIELDS)
 	_apply_fields(supply, supply_data, SUPPLY_FIELDS)
