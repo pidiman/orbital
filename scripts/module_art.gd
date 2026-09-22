@@ -47,6 +47,18 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 			canvas.draw_line(Vector2(x, -16), Vector2(x, 16), gold * Color(1, 1, 1, 0.45), 2)
 		canvas.draw_rect(Rect2(-7, -5, 14, 10), Color(0.08, 0.12, 0.18, opacity))
 		canvas.draw_line(Vector2(-3, 0), Vector2(3, 0), gold, 2)
+	elif kind == "material_depot":
+		# Open industrial launch pad: visibly different from the enclosed Storage crate.
+		var steel := Color("687f8b", opacity)
+		canvas.draw_circle(Vector2.ZERO, 20, Color("172b36", opacity))
+		canvas.draw_arc(Vector2.ZERO, 25, PI, TAU, 24, steel, 3, true)
+		canvas.draw_line(Vector2(-22, 9), Vector2(22, 9), cyan, 3)
+		canvas.draw_line(Vector2(-17, 9), Vector2(-17, -15), steel, 3)
+		canvas.draw_line(Vector2(17, 9), Vector2(17, -15), steel, 3)
+		canvas.draw_line(Vector2(17, -15), Vector2(27, -25), gold, 3)
+		canvas.draw_circle(Vector2(27, -25), 4, gold)
+		canvas.draw_line(Vector2(-10, 9), Vector2(-4, -2), cyan, 2)
+		canvas.draw_line(Vector2(10, 9), Vector2(4, -2), cyan, 2)
 	elif kind == "connector_tube":
 		var tube := Color("4e9eaa", opacity)
 		canvas.draw_rect(Rect2(-25, -11, 50, 22), Color(0.08, 0.18, 0.24, opacity))
@@ -70,14 +82,28 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 		canvas.draw_circle(Vector2(5, 33), 4, Color("ff9be8", opacity * 0.8))
 		canvas.draw_line(Vector2(-5, 37), Vector2(-5, 46), Color("ffb4ee", opacity * 0.55), 3)
 		canvas.draw_line(Vector2(5, 37), Vector2(5, 46), Color("ffb4ee", opacity * 0.55), 3)
-	elif kind == "mining_ship":
-		var violet := Color(0.73, 0.65, 0.96, opacity)
-		canvas.draw_rect(Rect2(-23, -22, 46, 44), Color(0.12, 0.16, 0.23, opacity))
-		canvas.draw_rect(Rect2(-23, -22, 46, 44), violet, false, 1.0)
-		var ship := PackedVector2Array([Vector2(0, -19), Vector2(13, 6), Vector2(18, 14), Vector2(5, 10), Vector2(0, 15), Vector2(-5, 10), Vector2(-18, 14), Vector2(-13, 6)])
-		canvas.draw_colored_polygon(ship, ink)
-		canvas.draw_rect(Rect2(-4, -5, 8, 9), violet)
-		canvas.draw_line(Vector2(-4, 17), Vector2(4, 17), cyan, 3)
+	elif kind == "mining_ship" or kind == "xeno_mining_ship":
+		var premium: bool = kind == "xeno_mining_ship"
+		var accent := Color("62e4dc", opacity) if premium else Color("e8ad5b", opacity)
+		var hull_color := Color("9aaebb", opacity) if not premium else Color("b8e5e0", opacity)
+		var ship := PackedVector2Array([Vector2(0, -23), Vector2(9, -10), Vector2(11, 16), Vector2(4, 20), Vector2(0, 15), Vector2(-4, 20), Vector2(-11, 16), Vector2(-9, -10)])
+		canvas.draw_colored_polygon(ship, hull_color)
+		canvas.draw_polyline(PackedVector2Array([Vector2(0, -23), Vector2(9, -10), Vector2(11, 16), Vector2(4, 20), Vector2(0, 15), Vector2(-4, 20), Vector2(-11, 16), Vector2(-9, -10), Vector2(0, -23)]), accent, 2, true)
+		canvas.draw_rect(Rect2(-5, -5, 10, 13), Color("273748", opacity))
+		canvas.draw_line(Vector2(-10, 10), Vector2(-17, 19), accent, 3)
+		canvas.draw_line(Vector2(10, 10), Vector2(17, 19), accent, 3)
+		canvas.draw_circle(Vector2(0, -13), 3, accent)
+	elif kind == "jump_ship":
+		var jump := Color("6ce0d5", opacity)
+		var heavy := Color("a9c2d5", opacity)
+		var hull := PackedVector2Array([Vector2(0, -30), Vector2(15, -13), Vector2(17, 18), Vector2(7, 27), Vector2(-7, 27), Vector2(-17, 18), Vector2(-15, -13)])
+		canvas.draw_colored_polygon(hull, heavy)
+		canvas.draw_polyline(PackedVector2Array([Vector2(0, -30), Vector2(15, -13), Vector2(17, 18), Vector2(7, 27), Vector2(-7, 27), Vector2(-17, 18), Vector2(-15, -13), Vector2(0, -30)]), jump, 3, true)
+		canvas.draw_rect(Rect2(-8, -8, 16, 19), Color("29364a", opacity))
+		canvas.draw_circle(Vector2(0, 10), 8, Color("b18bea", opacity))
+		canvas.draw_circle(Vector2(0, 10), 4, jump)
+		canvas.draw_line(Vector2(-17, 4), Vector2(-28, 16), jump, 3)
+		canvas.draw_line(Vector2(17, 4), Vector2(28, 16), jump, 3)
 	elif kind == "trader":
 		var hull := PackedVector2Array([Vector2(0, -22), Vector2(13, -8), Vector2(13, 18), Vector2(-13, 18), Vector2(-13, -8)])
 		canvas.draw_colored_polygon(hull, ink)
@@ -110,6 +136,7 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 		for x in [-9, 3]:
 			canvas.draw_rect(Rect2(x, -7, 6, 14), cyan)
 		canvas.draw_line(Vector2(-12, 16), Vector2(12, 16), ink * Color(1, 1, 1, 0.5), 2)
-	for direction: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
-		canvas.draw_circle(direction * 25, 2.3, ink)
+	if kind != "mining_ship" and kind != "xeno_mining_ship":
+		for direction: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
+			canvas.draw_circle(direction * 25, 2.3, ink)
 	canvas.draw_set_transform(Vector2.ZERO)

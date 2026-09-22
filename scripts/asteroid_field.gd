@@ -118,7 +118,14 @@ func _draw() -> void:
 		draw_dashed_line(start, target, Color(0.72, 0.62, 0.96, 0.4), 1.5, 7.0)
 		var progress: float = 1.0 - float(job.remaining) / float(job.duration)
 		var ship_point: Vector2 = ship_position(unit)
-		ModuleArt.draw_module(self, ship_point, "mining_ship", 0.55, 1.0, get_parent().ship_motion.angle_for(unit))
+		var mining_art: String = "mining_ship"
+		if unit is int and fleet.model.ships.has(unit): mining_art = fleet.model.ship_catalog[fleet.model.ships[unit]].get("art", "mining_ship")
+		ModuleArt.draw_module(self, ship_point, mining_art, 0.55, 1.0, get_parent().ship_motion.angle_for(unit))
+		var beam_color: Color = Color("62e4dc") if fleet.target_resource(job.target) == "xenocrystal" else Color("f0aa55")
+		var beam_direction: Vector2 = target - ship_point
+		if beam_direction.length() > 1.0:
+			draw_line(ship_point + beam_direction.normalized() * 9.0, target, Color(beam_color, 0.18), 7.0, true)
+			draw_line(ship_point + beam_direction.normalized() * 9.0, target, beam_color, 1.8, true)
 		draw_arc(target, 34.0, -PI / 2, -PI / 2 + TAU * maxf(0.01, progress), 48, ORE, 3.0, true)
 		draw_string(font, target + Vector2(-21, 51), "%ds" % job.remaining, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ORE)
 	# Legacy module-owned miners also finish their cosmetic return after the

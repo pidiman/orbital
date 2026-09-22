@@ -248,7 +248,7 @@
     "description": "Automated material drop-off at Earth.",
     "effect": "+50 capacity · uses 2 power",
     "material_depot": {},
-    "art": "storage"
+    "art": "material_depot"
   },
   "connector_tube": {
     "name": "Connector Tube",
