@@ -427,6 +427,9 @@ func restore(document: Variant) -> String:
 	else:
 		candidate_supply.collection.migrate_job_locations()
 		candidate_fleet.transport.migrate_job_locations()
+	for ship_id: int in trade_data.jobs:
+		var job: Dictionary = trade_data.jobs[ship_id]
+		if job.has("destination") and job.destination != candidate.locations.local_destination(ship_id): return "Invalid trade storage destination."
 	candidate.recalculate()
 	if candidate.power_use != int(station_data.power_use):
 		return "Saved power disagrees with station ship ownership."
@@ -720,16 +723,16 @@ func _validate_collection(data: Dictionary, station: Dictionary, mining: Diction
 		var job: Variant = data.jobs[ship_id]
 		if not job is Dictionary:
 			return "Invalid collection assignment."
-		if job.get("region") != Regions.HOME or not _valid_vector(job.get("position")) or not _valid_vector(job.get("depot")):
-			return "Invalid home collection position."
+		if not regions.records.has(job.get("region")) or not _valid_vector(job.get("position")) or not _valid_vector(job.get("depot")):
+			return "Invalid regional collection position."
 		if not _integer(job.get("cargo"), 0) or job.cargo > int(definitions.ship_catalog[station.ships[ship_id]].collection.cargo_capacity) or not _integer(job.get("target"), -1):
 			return "Invalid collection cargo or target."
 		if not job.get("waiting") is bool or not job.get("status") is String:
 			return "Invalid collection waiting state."
 		if job.target != -1:
-			if job.cargo > 0 or targets.has(job.target):
+			if job.cargo > 0 or targets.has(str(job.region) + ":" + str(job.target)):
 				return "Duplicate collection reservation."
-			targets[job.target] = true
+			targets[str(job.region) + ":" + str(job.target)] = true
 	return ""
 
 func _extension_fields(extensions: Dictionary, key: String, target: Object, fields: Array[String]) -> Dictionary:
@@ -794,7 +797,7 @@ func _validate_research_transport(research_data: Dictionary, transport_data: Dic
 			if not good is String or not candidate.diplomacy.goods_catalog.has(good) or not _integer(job.cost[good], 0):
 				return "Invalid gate cost escrow."
 	for ship_id: int in station.ships:
-		if transport_data.jobs.has(ship_id) or transport_data.locations.get(ship_id, Regions.HOME) != Regions.HOME:
+		if transport_data.jobs.has(ship_id):
 			if (mining.jobs.has(ship_id) and (transport_data.jobs.has(ship_id) or not allow_local_mining)) or region_data.survey_jobs.has(ship_id) or trades.has(ship_id) or collectors.has(ship_id):
 				return "Relocated or in-transit ship has a conflicting work mission."
 	return ""

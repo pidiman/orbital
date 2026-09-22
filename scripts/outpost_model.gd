@@ -93,8 +93,11 @@ func validate(world: Dictionary, regions: Dictionary, next_ship_id: int) -> Stri
 		var structure: Dictionary = world.structures[station.structure_id]
 		if structure.station_id != id or structure.kind != station.kind:
 			return "Outpost structure disagrees with its station."
-		if not station.get("inventory") is Dictionary or station.inventory.keys().size() != catalog[station.kind].storage.keys().size():
+		if not station.get("inventory") is Dictionary:
 			return "Invalid outpost inventory."
+		for resource: String in station.inventory:
+			if not catalog[station.kind].storage.has(resource) and not fleet.diplomacy.goods_catalog.has(resource): return "Unknown local resource."
+			if not quantity(station.inventory[resource]): return "Invalid local resource quantity."
 		for resource: String in catalog[station.kind].storage:
 			if not quantity(station.inventory.get(resource)):
 				return "Invalid local resource quantity."

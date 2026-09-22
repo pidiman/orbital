@@ -43,7 +43,7 @@ var panel_closes: Dictionary = {}
 var active_menu: String = ""
 var footer: PanelContainer
 var capability_buttons: Dictionary = {}
-const SHIP_ACTIONS: Dictionary = {"hauling": "Assign refinery", "mining": "Assign asteroid", "survey": "Explore regions", "trade": "Trade with contact", "collection": "Deploy at Home", "founding": "Found outpost", "gate_building": "Build Teleport Gate"}
+const SHIP_ACTIONS: Dictionary = {"hauling": "Assign refinery", "mining": "Assign asteroid", "survey": "Explore regions", "trade": "Trade with contact", "collection": "Deploy locally", "founding": "Found outpost", "gate_building": "Build Teleport Gate"}
 const Fleet = preload("res://scripts/mining_fleet.gd")
 signal new_game_requested
 signal save_requested
@@ -579,13 +579,13 @@ func _command_ship(ship_id: int, capability: String = "") -> void:
 		"hauling":
 			close_panels()
 			hauling_assignment = ship_id
-			message("Click a Home Refinery to assign hauling. ESC cancels selection.", false, 8.0)
+			message("Click a local Refinery to assign hauling. ESC cancels selection.", false, 8.0)
 		"founding":
 			var error: String = fleet.outposts.found(ship_id)
 			message("Outpost founded with starter Materials. Build locally; hauling to Home is not available yet." if error.is_empty() else error, not error.is_empty(), 8.0)
 		"collection":
 			var error: String = fleet.collection.deploy(ship_id)
-			message("Material Ship deployed at Earth." if error.is_empty() else error, not error.is_empty())
+			message("Material Ship deployed in its region." if error.is_empty() else error, not error.is_empty())
 		"mining":
 			close_panels()
 			ship_assignment_requested.emit(ship_id)

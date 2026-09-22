@@ -67,7 +67,7 @@ func mining_route(actor: Dictionary, target_id: int, target_region: String, lega
 	var remote: bool = record.region != target_region
 	if remote and not ((legacy or rules.mining.allow_remote_from_primary) and record.region == station_region(primary_station())):
 		return {}
-	var destination_id: String = record.station_id
+	var destination_id: String = primary_station() if record.region == station_region(primary_station()) else record.station_id
 	if not remote and record.region != station_region(primary_station()):
 		destination_id = outpost_at(record.region, record.owner)
 		if destination_id.is_empty():
@@ -164,12 +164,14 @@ func import_locations(values: Dictionary) -> void:
 	for id: int in ships:
 		ships[id].region = values.get(id, station_region(primary_station()))
 
-func regional_survey_origin(ship_id: int, viewed_region: String) -> String:
-	# REVIEW before outposts: legacy regional surveys use the viewed route while
-	# their physical Home ship remains at Home. This explicit policy freezes play.
-	if rules.regional_survey.origin == "viewed_region_legacy":
-		return viewed_region
+func regional_survey_origin(ship_id: int, _viewed_region: String) -> String:
 	return ship_region(ship_id)
+
+func local_destination(ship_id: int) -> Dictionary:
+	if not ships.has(ship_id): return {}
+	var region: String = ship_region(ship_id)
+	var base: String = primary_station() if region == station_region(primary_station()) else outpost_at(region, ships[ship_id].owner)
+	return {} if base.is_empty() else destination(base)
 
 func outpost_at(region_id: String, owner: String) -> String:
 	for id: String in stations:

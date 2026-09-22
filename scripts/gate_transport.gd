@@ -29,8 +29,6 @@ func location(ship_id: int) -> String:
 func work_error(ship_id: int) -> String:
 	if jobs.has(ship_id):
 		return "Ship is in teleport transit."
-	if not fleet.model.locations.rules.work_regions.has(location(ship_id)):
-		return "Ship is stationed in %s. This operation away from Home is future scope." % fleet.regions.catalog[location(ship_id)].name
 	return ""
 
 func gate_id(gate: Variant) -> String:

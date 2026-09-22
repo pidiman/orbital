@@ -16,9 +16,12 @@ func assign(id: int, point: Vector2) -> String:
 	var error: String = fleet.transport.work_error(id)
 	if not error.is_empty(): return error
 	if fleet.unit_busy(id): return "This ship already has a job. Stop hauling before reassigning."
-	if not model.modules.has(point) or not model.definition_at(point).has("conversion"): return "Click a Refinery at Home."
+	var destination: Dictionary = model.locations.local_destination(id)
+	if destination.is_empty(): return "Found a local outpost before assigning hauling."
+	var local: StationModel = model.scoped_station(destination.station_id)
+	if not local.modules.has(point) or not local.definition_at(point).has("conversion"): return "Click a Refinery in this ship’s region."
 	var duration: int = int(model.ship_catalog[model.ships[id]].hauling.travel_seconds)
-	jobs[id] = {"refinery_id": model.structure_id_at(point), "region": model.locations.ship_region(id), "destination": model.locations.destination(model.locations.primary_station()), "phase": "pickup", "remaining": duration, "cargo": {}, "waiting": false, "status": "To refinery"}
+	jobs[id] = {"refinery_id": local.structure_id_at(point), "region": model.locations.ship_region(id), "destination": destination, "phase": "pickup", "remaining": duration, "cargo": {}, "waiting": false, "status": "To refinery"}
 	changed.emit()
 	fleet.changed.emit()
 	return ""
@@ -36,7 +39,11 @@ func cancel(id: int) -> void:
 	if not jobs.has(id): return
 	# Stop/decommission recovery never destroys carried goods or bypasses normal deliveries.
 	var job: Dictionary = jobs[id]
-	for resource: String in job.cargo: fleet.model.recover_goods(resource, int(job.cargo[resource]))
+	for resource: String in job.cargo:
+		if job.destination.station_id == fleet.model.locations.primary_station(): fleet.model.recover_goods(resource, int(job.cargo[resource]))
+		else:
+			var inventory: Dictionary = fleet.model.locations.stations[job.destination.station_id].inventory
+			inventory[resource] = int(inventory.get(resource, 0)) + int(job.cargo[resource])
 	jobs.erase(id)
 	changed.emit()
 	fleet.changed.emit()
@@ -58,16 +65,20 @@ func tick() -> void:
 	var model: StationModel = fleet.model
 	for id: int in jobs.keys():
 		var job: Dictionary = jobs[id]
+		var local: StationModel = model.scoped_station(job.destination.station_id)
 		var capability: Dictionary = model.ship_catalog[model.ships[id]].hauling
 		if job.remaining > 0:
 			job.remaining -= 1
 			if job.remaining > 0: continue
 		if job.phase == "delivery":
 			for resource: String in job.cargo.keys():
-				var room: int = maxi(0, model.capacity - model.upgrade_resource_amount(resource))
+				var room: int = maxi(0, local.capacity - local.upgrade_resource_amount(resource))
 				var amount: int = mini(int(job.cargo[resource]), room)
 				if amount > 0:
-					if fleet.diplomacy.inventory.has(resource): fleet.diplomacy.receive_goods(resource, amount)
+					if job.destination.station_id == model.locations.primary_station() and fleet.diplomacy.inventory.has(resource): fleet.diplomacy.receive_goods(resource, amount)
+					elif job.destination.station_id != model.locations.primary_station():
+						var inventory: Dictionary = model.locations.stations[job.destination.station_id].inventory
+						inventory[resource] = int(inventory.get(resource, 0)) + amount
 					else: model.locations.receive(job.destination, resource, amount)
 					job.cargo[resource] -= amount
 					if job.cargo[resource] == 0: job.cargo.erase(resource)
@@ -85,7 +96,7 @@ func tick() -> void:
 				cancel(id)
 				continue
 			var point: Vector2 = model.locations.structures[job.refinery_id].position
-			var buffer: Dictionary = model.refinery_buffer(point)
+			var buffer: Dictionary = local.refinery_buffer(point)
 			var room: int = int(capability.batch_size)
 			for resource: String in buffer.keys():
 				var amount: int = mini(room, int(buffer[resource]))
@@ -110,7 +121,7 @@ func validate(data: Dictionary) -> String:
 		var job: Variant = data.jobs[id]
 		if not id is int or not fleet.model.ships.has(id) or not fleet.model.ship_catalog[fleet.model.ships[id]].has("hauling") or fleet.unit_busy(id): return "Invalid Hauler assignment."
 		var capability: Dictionary = fleet.model.ship_catalog[fleet.model.ships[id]].hauling
-		if not job is Dictionary or not job.get("refinery_id") is String or job.get("region") != fleet.regions.HOME or fleet.model.locations.ship_region(id) != job.region or job.get("destination") != fleet.model.locations.destination(fleet.model.locations.primary_station()): return "Invalid hauling location."
+		if not job is Dictionary or not job.get("refinery_id") is String or fleet.model.locations.ship_region(id) != job.region or job.get("destination") != fleet.model.locations.local_destination(id): return "Invalid hauling location."
 		if not job.get("phase") in ["pickup", "delivery"] or not job.get("remaining") is int or job.remaining < 0 or job.remaining > int(capability.travel_seconds) or not job.get("waiting") is bool or not job.get("status") is String or not job.get("cargo") is Dictionary: return "Invalid hauling state."
 		if job.has("stop_after_delivery") and not job.stop_after_delivery is bool: return "Invalid hauling stop state."
 		var cargo: int = 0

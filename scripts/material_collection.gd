@@ -1,5 +1,5 @@
 extends RefCounted
-# Home-only logical region movement. Cross-region hauling is future scope.
+# Collection stays within the ship’s physical region and local storage.
 signal changed
 signal notice(message: String)
 const FIELDS: Array[String] = ["jobs", "depots"]
@@ -35,12 +35,12 @@ func deploy(ship_id: int) -> String:
 		return fleet.transport.work_error(ship_id)
 	if fleet.unit_busy(ship_id):
 		return "This ship is already on a mission."
-	if model.ship_catalog[model.ships[ship_id]].collection.get("region", "home") != fleet.regions.HOME:
-		return "Cross-region material hauling is not available yet."
-	if depots.is_empty():
-		return "Build a Space Depot before deploying a Material Ship."
-	var depot: Vector2 = depots.keys()[0]
-	jobs[ship_id] = {"depot_id": model.structure_id_at(depot), "destination": model.locations.ship_destination(ship_id), "region": model.locations.ship_region(ship_id), "position": Vector2(0.5, 0.5), "target": -1, "depot": depots.keys()[0], "cargo": 0, "waiting": false, "status": "Seeking debris"}
+	var destination: Dictionary = model.locations.local_destination(ship_id)
+	if destination.is_empty(): return "Found an outpost in this region before collecting Materials."
+	var local_depots: Dictionary = depots_in(model.locations.ship_region(ship_id))
+	if local_depots.is_empty(): return "Build a Space Depot in this region before deploying a Material Ship."
+	var depot: Vector2 = local_depots.keys()[0]
+	jobs[ship_id] = {"depot_id": model.locations.structure_at(destination.station_id, depot), "destination": destination, "region": model.locations.ship_region(ship_id), "position": depot_position(depot), "target": -1, "depot": depot, "cargo": 0, "waiting": false, "status": "Seeking debris"}
 	changed.emit()
 	fleet.changed.emit()
 	return ""
@@ -48,7 +48,9 @@ func deploy(ship_id: int) -> String:
 func cancel(ship_id: int) -> void:
 	if jobs.has(ship_id):
 		# Recovery refunds are allowed above capacity, as with prepaid trade cargo.
-		model.materials += int(jobs[ship_id].cargo)
+		var destination: Dictionary = jobs[ship_id].destination
+		if destination.station_id == model.locations.primary_station(): model.materials += int(jobs[ship_id].cargo)
+		elif model.locations.stations.has(destination.station_id): model.locations.stations[destination.station_id].inventory.materials += int(jobs[ship_id].cargo)
 		jobs.erase(ship_id)
 		model.changed.emit()
 		changed.emit()
@@ -85,7 +87,7 @@ func advance(delta: float) -> void:
 		if not local_depots.has(job.depot):
 			job.depot = local_depots.keys()[0]
 		# Preserve the old same-cell replacement preference, but bind its new ID.
-		job.depot_id = model.structure_id_at(job.depot)
+		job.depot_id = model.locations.structure_at(job.destination.station_id, job.depot)
 		job.destination = model.locations.destination(model.locations.structures[job.depot_id].station_id)
 		var available_debris: Dictionary = supply.debris_in(model.locations.ship_region(ship_id))
 		if job.cargo > 0:
@@ -94,12 +96,13 @@ func advance(delta: float) -> void:
 			if job.position != destination:
 				_status(job, "Returning · 1 M")
 				continue
-			var received: int = model.locations.receive(job.destination, "materials", int(job.cargo))
+			var local: StationModel = model.scoped_station(job.destination.station_id)
+			var received: int = model.locations.receive(job.destination, "materials", mini(int(job.cargo), maxi(0, local.capacity - local.materials)))
 			if received == 0:
 				_status(job, "Storage full", true)
 				continue
 			job.cargo -= received
-			depots[job.depot].delivered += received
+			local_depots[job.depot].delivered += received
 			_status(job, "Seeking debris")
 			changed.emit()
 			continue
@@ -110,7 +113,7 @@ func advance(delta: float) -> void:
 				if available_debris[debris_id].get("resource", "materials") != "materials": continue
 				var reserved: bool = false
 				for other: Dictionary in jobs.values():
-					if other != job and other.target == debris_id:
+					if other != job and other.region == job.region and other.target == debris_id:
 						reserved = true
 				var candidate: float = Vector2(0.5, 0.5).distance_squared_to(available_debris[debris_id].position)
 				if not reserved and candidate < distance:
@@ -123,17 +126,18 @@ func advance(delta: float) -> void:
 		var target: Vector2 = available_debris[job.target].position
 		job.position = job.position.move_toward(target, step)
 		if job.position == target:
-			supply.salvage(int(job.target), _receive.bind(job), int(capability.cargo_capacity))
+			supply.salvage(int(job.target), _receive.bind(job), int(capability.cargo_capacity), job.region)
 			job.target = -1
 			_status(job, "Returning · 1 M")
 			changed.emit()
 
 func depots_in(region_id: String) -> Dictionary:
 	var result: Dictionary = {}
-	for point: Vector2 in depots:
-		var id: String = model.structure_id_at(point)
-		if model.locations.structures[id].region == region_id:
-			result[point] = depots[point]
+	for id: String in model.locations.structures:
+		var structure: Dictionary = model.locations.structures[id]
+		if structure.region == region_id and structure.owner == model.locations.rules.primary_station.owner and model.catalog.get(structure.kind, {}).has("material_depot"):
+			if not structure.state.has("material_depot"): structure.state["material_depot"] = {"delivered": 0}
+			result[structure.position] = structure.state.material_depot
 	return result
 
 func migrate_job_locations() -> void:

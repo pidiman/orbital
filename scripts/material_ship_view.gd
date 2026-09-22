@@ -3,12 +3,13 @@ var supply: RefCounted
 var board: Node2D
 
 func _process(_delta: float) -> void:
-	visible = supply.fleet.regions.primary_station_visible()
+	visible = true
 	queue_redraw()
 
 func _draw() -> void:
 	for ship_id: int in supply.collection.jobs:
 		var job: Dictionary = supply.collection.jobs[ship_id]
+		if job.region != supply.fleet.regions.current_region: continue
 		var point: Vector2 = ship_position(ship_id)
 		var definition: Dictionary = supply.model.ship_catalog[supply.model.ships[ship_id]]
 		ModuleArt.draw_module(self, point, definition.get("art", "trader"), 0.45, 1.0, get_parent().ship_motion.angle_for(ship_id))

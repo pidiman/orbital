@@ -4,14 +4,11 @@
     "region": "home",
     "owner": "player"
   },
-  "work_regions": [
-    "home"
-  ],
   "mining": {
     "allow_remote_from_primary": false
   },
   "regional_survey": {
-    "origin": "viewed_region_legacy"
+    "origin": "physical_region"
   },
   "collection": {
     "supply_region": "home"

@@ -124,9 +124,11 @@ func refresh() -> void:
 	if not contact.is_empty():
 		var faction: Dictionary = diplomacy.factions[contact.faction]
 		standing_label.text = "%s · Standing %d / 100\n%s" % [faction.name, faction.standing, diplomacy.faction_catalog.get(contact.faction, {}).get("description", "Alien contact")]
+	var destination: Dictionary = fleet.model.locations.local_destination(ship_picker.get_selected_id())
+	var local_inventory: Dictionary = diplomacy.inventory if destination.is_empty() or destination.station_id == fleet.model.locations.primary_station() else fleet.model.locations.stations[destination.station_id].inventory
 	var goods: Array[String] = []
 	for good: String in diplomacy.goods_catalog:
-		goods.append("%s: %d" % [diplomacy.goods_catalog[good].name, diplomacy.inventory.get(good, 0)])
+		goods.append("%s: %d" % [diplomacy.goods_catalog[good].name, local_inventory.get(good, 0)])
 	inventory_label.text = "   ·   ".join(goods)
 	var ship_id: int = ship_picker.get_selected_id()
 	var job: Dictionary = diplomacy.jobs.get(ship_id, {})

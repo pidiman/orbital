@@ -106,7 +106,7 @@ static func validate_assignments(assignments: Dictionary, fleet: MiningFleet, ol
 static func validate_collection(collection: Dictionary, model: StationModel) -> String:
 	for ship_id: int in collection.jobs:
 		var job: Dictionary = collection.jobs[ship_id]
-		if job.get("destination") != model.locations.ship_destination(ship_id) or job.region != model.locations.ship_region(ship_id) or not job.get("depot_id") is String:
+		if job.get("destination") != model.locations.local_destination(ship_id) or job.region != model.locations.ship_region(ship_id) or not job.get("depot_id") is String:
 			return "Invalid collection owner, region or destination."
 		# A removed depot may remain assigned until the next supply step, as before.
 		if model.locations.structures.has(job.depot_id):

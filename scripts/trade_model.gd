@@ -60,11 +60,15 @@ func trade_error(ship_id: int, contact_id: String, offer_id: String) -> String:
 		return "Survey an alien anomaly to establish contact first."
 	if not offers.has(offer_id) or offers[offer_id].faction != contacts[contact_id].faction:
 		return "This contact does not offer that exchange."
+	var destination: Dictionary = model.locations.local_destination(ship_id)
+	if destination.is_empty(): return "Found an outpost here before trading."
+	if model.locations.ship_region(ship_id) != model.locations.station_region(model.locations.primary_station()) and contacts[contact_id].region_id != model.locations.ship_region(ship_id): return "Choose an alien contact in this ship’s region."
+	var local: StationModel = model.scoped_station(destination.station_id)
 	var offer: Dictionary = offers[offer_id]
 	if int(factions[offer.faction].standing) < int(offer.requires_standing):
 		return "Requires %d standing with %s." % [offer.requires_standing, factions[offer.faction].name]
 	for resource: String in offer.cost:
-		if int(model.get(resource)) < int(offer.cost[resource]):
+		if int(local.get(resource)) < int(offer.cost[resource]):
 			return "Cargo needs " + cost_text(offer.cost) + "."
 	return ""
 
@@ -74,11 +78,13 @@ func dispatch(ship_id: int, contact_id: String, offer_id: String) -> String:
 	if not error.is_empty():
 		return error
 	var offer: Dictionary = offers[offer_id]
+	var destination: Dictionary = model.locations.local_destination(ship_id)
+	var local: StationModel = model.scoped_station(destination.station_id)
 	for resource: String in offer.cost:
-		model.set(resource, int(model.get(resource)) - int(offer.cost[resource]))
+		local.set(resource, int(local.get(resource)) - int(offer.cost[resource]))
 	var duration: int = maxi(1, int(model.ship_catalog[model.ships[ship_id]].trade.seconds))
 	next_trade_id += 1
-	jobs[ship_id] = {"id": next_trade_id, "contact_id": contact_id, "offer_id": offer_id, "faction": offer.faction, "cost": offer.cost.duplicate(true), "goods": offer.goods.duplicate(true), "standing": int(offer.standing), "duration": duration, "remaining": duration}
+	jobs[ship_id] = {"destination": destination, "id": next_trade_id, "contact_id": contact_id, "offer_id": offer_id, "faction": offer.faction, "cost": offer.cost.duplicate(true), "goods": offer.goods.duplicate(true), "standing": int(offer.standing), "duration": duration, "remaining": duration}
 	mission_started.emit()
 	model.changed.emit()
 	changed.emit()
@@ -92,7 +98,11 @@ func tick() -> void:
 			continue
 		jobs.erase(ship_id)
 		for good: String in job.goods:
-			inventory[good] = int(inventory.get(good, 0)) + int(job.goods[good])
+			var destination: Dictionary = job.get("destination", model.locations.destination(model.locations.primary_station()))
+			if destination.station_id == model.locations.primary_station(): inventory[good] = int(inventory.get(good, 0)) + int(job.goods[good])
+			else:
+				var local_inventory: Dictionary = model.locations.stations[destination.station_id].inventory
+				local_inventory[good] = int(local_inventory.get(good, 0)) + int(job.goods[good])
 		var before: int = int(factions[job.faction].standing)
 		factions[job.faction].standing = clampi(before + int(job.standing), -100, 100)
 		_record(job, "completed", int(factions[job.faction].standing) - before)
@@ -105,8 +115,10 @@ func cancel(ship_id: int) -> void:
 	var job: Dictionary = jobs[ship_id]
 	jobs.erase(ship_id)
 	# Escrow is returned in full, even when storage was decommissioned in transit.
+	var destination: Dictionary = job.get("destination", model.locations.destination(model.locations.primary_station()))
+	var local: StationModel = model.scoped_station(destination.station_id)
 	for resource: String in job.cost:
-		model.set(resource, int(model.get(resource)) + int(job.cost[resource]))
+		local.set(resource, int(local.get(resource)) + int(job.cost[resource]))
 	_record(job, "cancelled", 0)
 	changed.emit()
 
