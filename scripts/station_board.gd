@@ -79,7 +79,7 @@ func _draw() -> void:
 			if model.modules_connected(world_position, other):
 				draw_line(world_to_screen(world_position), world_to_screen(other), Color("627c8d"), 8)
 	for world_position: Vector2 in model.modules:
-		ModuleArt.draw_module(self, world_to_screen(world_position), model.catalog[model.modules[world_position]].get("art", model.modules[world_position]), cell_size / 58.0 * model.footprint_size(model.modules[world_position]).x)
+		ModuleArt.draw_module(self, world_to_screen(world_position), model.catalog[model.modules[world_position]].get("art", model.modules[world_position]), cell_size / 58.0 * model.footprint_size(model.modules[world_position]).x, 1.0, module_facing(world_position), model.tier_at(world_position))
 	for world_position: Vector2 in model.modules:
 		if model.catalog[model.modules[world_position]].has("upgrades"):
 			var point: Vector2 = world_to_screen(world_position) + Vector2(12, -19)
@@ -130,6 +130,19 @@ func snap_offset() -> Vector2:
 func screen_footprint(origin: Vector2, kind: String) -> Rect2:
 	var rect: Rect2 = model.footprint_rect(origin, kind)
 	return Rect2(world_to_screen(rect.position), rect.size * cell_size / Geometry.MODULE_SIZE).grow(-2)
+
+func module_facing(world_position: Vector2) -> float:
+	if model.modules.get(world_position, "") != "connector_tube":
+		return 0.0
+	var horizontal: bool = false
+	var vertical: bool = false
+	for other: Vector2 in model.modules:
+		if other == world_position or not model.modules_connected(world_position, other):
+			continue
+		var delta: Vector2 = other - world_position
+		if absf(delta.x) >= absf(delta.y): horizontal = true
+		else: vertical = true
+	return PI / 2.0 if vertical and not horizontal else 0.0
 
 func _invalidate_placement_cache() -> void:
 	placement_cache_key = ""

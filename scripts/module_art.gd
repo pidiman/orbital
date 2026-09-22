@@ -1,7 +1,7 @@
 class_name ModuleArt
 extends RefCounted
 
-static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale_factor: float = 1.0, opacity: float = 1.0, facing: float = 0.0) -> void:
+static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale_factor: float = 1.0, opacity: float = 1.0, facing: float = 0.0, tier: int = 1) -> void:
 	var ink := Color("c8dce7")
 	var cyan := Color("71d8d0")
 	var gold := Color("e8ba76")
@@ -47,6 +47,15 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 			canvas.draw_line(Vector2(x, -16), Vector2(x, 16), gold * Color(1, 1, 1, 0.45), 2)
 		canvas.draw_rect(Rect2(-7, -5, 14, 10), Color(0.08, 0.12, 0.18, opacity))
 		canvas.draw_line(Vector2(-3, 0), Vector2(3, 0), gold, 2)
+	elif kind == "connector_tube":
+		var tube := Color("4e9eaa", opacity)
+		canvas.draw_rect(Rect2(-25, -11, 50, 22), Color(0.08, 0.18, 0.24, opacity))
+		canvas.draw_rect(Rect2(-25, -11, 50, 22), tube, false, 2.5)
+		canvas.draw_line(Vector2(-18, -6), Vector2(18, -6), Color("a5e4df", opacity), 2)
+		canvas.draw_line(Vector2(-18, 6), Vector2(18, 6), Color("2c6675", opacity), 2)
+		for x in [-18, 0, 18]: canvas.draw_line(Vector2(x, -9), Vector2(x, 9), tube.lightened(0.25), 2)
+		for x in range(1, tier):
+			canvas.draw_line(Vector2(-20 + x * 12, -12), Vector2(-20 + x * 12, 12), Color("d6f4e8", opacity), 1.5)
 	elif kind == "mining_ship":
 		var violet := Color(0.73, 0.65, 0.96, opacity)
 		canvas.draw_rect(Rect2(-23, -22, 46, 44), Color(0.12, 0.16, 0.23, opacity))

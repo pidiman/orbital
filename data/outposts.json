@@ -24,7 +24,8 @@
       "storage",
       "space_dock",
       "teleport_gate",
-      "space_depot"
+      "space_depot",
+      "connector_tube"
     ],
     "base_capacity": 300,
     "base_power": 0

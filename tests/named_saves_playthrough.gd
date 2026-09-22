@@ -45,6 +45,7 @@ func _ready() -> void:
 	game.save_dialogs.show_new()
 	await use(game.save_dialogs.body.get_child(1))
 	checks.fresh = game.model.materials == 130 and game.model.ships.is_empty() and game.fleet.research.researched.is_empty() and library.current_name.is_empty()
+	report("fresh_state", {"materials": game.model.materials, "ships": game.model.ships.size(), "research": game.fleet.research.researched.size(), "name": library.current_name, "error": game.hud.status_label.text})
 	checks.old_retained = FileAccess.file_exists(library.slot_path("First colony"))
 	store.advance(10.0)
 	checks.unnamed_autosave = FileAccess.file_exists(library.slot_path("Autosave")) and library.current_name.is_empty()

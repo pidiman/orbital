@@ -105,7 +105,7 @@ func placement_error(world_position: Vector2, kind: String) -> String:
 	if not module_unlocked(kind):
 		return "Research this module's technology in a Research Lab first."
 	var points: Array[Vector2] = footprint_points(world_position, kind)
-	var touching: bool = false
+	var touching: bool = modules.is_empty()
 	for point: Vector2 in points:
 		if not grid_contains(point):
 			return "Build the entire footprint inside the station grid."
@@ -116,7 +116,7 @@ func placement_error(world_position: Vector2, kind: String) -> String:
 				if Geometry.connected(point, occupied):
 					touching = true
 	if not touching:
-		return "Connect to an existing module's edge."
+		return "Must be placed next to an existing module or tube."
 	var definition: Dictionary = catalog[kind]
 	if materials < int(definition.cost):
 		return "Need %d more %sMaterials." % [int(definition.cost) - materials, "local " if not station_id.is_empty() else ""]
@@ -315,6 +315,11 @@ func apply_starting_resources() -> void:
 	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/new_game.json"))
 	materials = int(rules.materials_buffer)
 	for kind: String in rules.starter_modules: materials += int(catalog[kind].cost)
+	# Starter infrastructure is deliberately structural and free; it gives a
+	# fresh colony a connected expansion path without changing the economy.
+	for raw_position: Array in rules.get("starter_tubes", []):
+		locations.add_structure(base_id(), "connector_tube", Vector2(raw_position[0], raw_position[1]))
+	recalculate()
 
 func purchase_base() -> String:
 	if not station_id.is_empty(): return station_id

@@ -250,6 +250,22 @@
     "material_depot": {},
     "art": "storage"
   },
+  "connector_tube": {
+    "name": "Connector Tube",
+    "cost": 5,
+    "power_use": 0,
+    "power_output": 0,
+    "capacity": 0,
+    "color": "79c8c8",
+    "description": "A reinforced structural corridor for station expansion.",
+    "effect": "Structural connector · no power",
+    "art": "connector_tube",
+    "upgrades": [
+      {"cost": {"materials": 8}, "stats": {}, "description": "Reinforced tube plating"},
+      {"cost": {"materials": 12}, "stats": {}, "description": "Braced tube frame"},
+      {"cost": {"materials": 18}, "stats": {}, "description": "Hardened tube shell"}
+    ]
+  },
   "research_lab": {
     "name": "Research Lab",
     "cost": 40,

@@ -1,4 +1,5 @@
 {
   "starter_modules": ["space_depot", "space_dock", "solar"],
-  "materials_buffer": 50
+  "materials_buffer": 50,
+  "starter_tubes": [[58, 0], [-58, 0], [0, 58], [0, -58], [116, 0]]
 }
