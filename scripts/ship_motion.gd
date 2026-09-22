@@ -139,7 +139,10 @@ func target_for(unit: Variant) -> Vector2:
 	if mining_jobs.has(unit):
 		var job: Dictionary = mining_jobs[unit]
 		if returning(job) or not game.asteroids.rocks.has(job.target): return origin
-		return game.asteroids.rocks[job.target].point + Vector2(0, 30)
+		var asteroid_point: Vector2 = game.asteroids.rocks[job.target].point
+		var approach: Vector2 = asteroid_point - origin
+		if approach.length() < 1.0: approach = Vector2.UP
+		return asteroid_point - approach.normalized() * float(settings.get("mining_stop_offset", 58.0))
 	for pair: Array in [[fleet.diplomacy.jobs, "trade"], [fleet.regions.survey_jobs, "regional_survey"]]:
 		if pair[0].has(unit):
 			if returning(pair[0][unit]): return origin
