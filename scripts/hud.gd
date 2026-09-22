@@ -43,7 +43,7 @@ var panel_closes: Dictionary = {}
 var active_menu: String = ""
 var footer: PanelContainer
 var capability_buttons: Dictionary = {}
-const SHIP_ACTIONS: Dictionary = {"hauling": "Assign refinery", "mining": "Assign asteroid", "survey": "Explore regions", "trade": "Trade with contact", "collection": "Deploy at Home", "founding": "Found outpost"}
+const SHIP_ACTIONS: Dictionary = {"hauling": "Assign refinery", "mining": "Assign asteroid", "survey": "Explore regions", "trade": "Trade with contact", "collection": "Deploy at Home", "founding": "Found outpost", "gate_building": "Build Teleport Gate"}
 const Fleet = preload("res://scripts/mining_fleet.gd")
 signal new_game_requested
 signal save_requested
@@ -530,6 +530,9 @@ func _refresh_ships() -> void:
 			var button: Button = capability_buttons[ship_id][capability]
 			button.text = "%s #%d · %s" % [definition.name, ship_id, status if not status.is_empty() else str(definition[capability].get("assignment_label", SHIP_ACTIONS[capability]))]
 			var work_error: String = fleet.mining_work_error(ship_id) if capability == "mining" else fleet.transport.work_error(ship_id)
+			if capability == "gate_building":
+				work_error = ""
+				button.visible = not fleet.transport.has_gate(fleet.transport.location(ship_id))
 			if capability == "founding":
 				work_error = ""
 				button.text = "%s #%d · Found outpost" % [definition.name, ship_id]
@@ -560,6 +563,19 @@ func _command_ship(ship_id: int, capability: String = "") -> void:
 	if not definition.has(capability) or fleet.unit_busy(ship_id):
 		return
 	match capability:
+		"gate_building":
+			var region: String = fleet.transport.location(ship_id)
+			var outpost: String = model.locations.outpost_at(region, model.locations.ships[ship_id].owner)
+			if outpost.is_empty():
+				message("Found an outpost first, then build its Teleport Gate using local Materials.", true)
+				return
+			var module: String = definition.gate_building.module
+			if not model.module_unlocked(module):
+				message("Research Teleport Gate technology first.", true)
+				return
+			fleet.regions.set_location(region)
+			choose(module)
+			message("Place the 2×2 Teleport Gate on the outpost grid. Uses local Materials and power.", false, 10.0)
 		"hauling":
 			close_panels()
 			hauling_assignment = ship_id

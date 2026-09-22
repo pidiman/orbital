@@ -68,7 +68,11 @@
       "outpost": "mining_outpost"
     },
     "art": "scout",
-    "dock_type": "jump_ship"
+    "dock_type": "jump_ship",
+    "pioneer": {},
+    "gate_building": {
+      "module": "teleport_gate"
+    }
   },
   "xeno_miner": {
     "name": "Xeno Miner",

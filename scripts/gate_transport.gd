@@ -42,6 +42,18 @@ func all_gates() -> Array[String]:
 		if fleet.model.structure_definition(id).has("teleport"): result.append(id)
 	return result
 
+func has_gate(region: String) -> bool:
+	for id: String in all_gates():
+		var structure: Dictionary = fleet.model.locations.structures[id]
+		if structure.region == region and structure.owner == fleet.model.locations.rules.primary_station.owner: return true
+	return false
+
+func can_pioneer(ship_id: int) -> bool:
+	return fleet.model.ships.has(ship_id) and fleet.model.ship_catalog[fleet.model.ships[ship_id]].has("pioneer")
+
+func is_pioneer(ship_id: int, destination: String) -> bool:
+	return can_pioneer(ship_id) and not has_gate(destination)
+
 func jump_error(gate: Variant, ship_id: int, destination: String) -> String:
 	var id: String = gate_id(gate)
 	if not all_gates().has(id): return "Build a Teleport Gate in the departure region first."
@@ -51,11 +63,7 @@ func jump_error(gate: Variant, ship_id: int, destination: String) -> String:
 	if fleet.unit_busy(ship_id): return "Ship is busy. Choose an idle ship."
 	if not fleet.regions.is_discovered(destination): return "Survey the destination region first."
 	if destination == structure.region: return "Choose another region."
-	var destination_gate: bool = false
-	for other_id: String in all_gates():
-		var other: Dictionary = fleet.model.locations.structures[other_id]
-		if other.region == destination and other.owner == structure.owner: destination_gate = true
-	if not destination_gate: return "The destination region needs a Teleport Gate."
+	if not has_gate(destination) and not can_pioneer(ship_id): return "The destination region needs a Teleport Gate."
 	var base: StationModel = fleet.model.scoped_station(structure.station_id)
 	if base.power_balance() < 0: return "Departure station needs more Solar power."
 	var inventory: Dictionary = fleet.diplomacy.inventory if structure.station_id == fleet.model.locations.primary_station() else fleet.model.locations.stations[structure.station_id].inventory

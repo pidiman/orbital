@@ -40,10 +40,7 @@ func _ready() -> void:
 	jump_detail = hud._label(column, "", 13, hud.GOLD)
 	jump_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	jump_button = _button(column, "Transport ship")
-	jump_button.pressed.connect(func() -> void:
-		var error: String = fleet.transport.jump(selected_gate(), selected_ship(), selected_destination())
-		hud.message("Ship in transit. Station remains at Earth." if error.is_empty() else error, not error.is_empty())
-		refresh())
+	jump_button.pressed.connect(request_jump)
 	var locations_scroll := ScrollContainer.new()
 	locations_scroll.custom_minimum_size.y = 72
 	locations_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -55,6 +52,26 @@ func _ready() -> void:
 	fleet.model.changed.connect(refresh)
 	refresh()
 	hide()
+
+func request_jump() -> void:
+	var gate: Variant = selected_gate()
+	var ship: int = selected_ship()
+	var destination: String = selected_destination()
+	var error: String = fleet.transport.jump_error(gate, ship, destination)
+	if not error.is_empty():
+		hud.message(error, true)
+		return
+	if fleet.transport.is_pioneer(ship, destination):
+		var dialogs: CanvasLayer = hud.get_parent().save_dialogs
+		dialogs.confirm("One-way pioneer jump — no gate at destination for return. Continue?", func() -> void:
+			dialogs.close()
+			perform_jump(gate, ship, destination))
+	else: perform_jump(gate, ship, destination)
+
+func perform_jump(gate: Variant, ship: int, destination: String) -> void:
+	var error: String = fleet.transport.jump(gate, ship, destination)
+	hud.message("Ship in transit. Station remains at Earth." if error.is_empty() else error, not error.is_empty())
+	refresh()
 
 func _button(parent: Node, text: String) -> Button:
 	var button := Button.new()
@@ -118,16 +135,16 @@ func refresh() -> void:
 				destination_picker.select(destination_picker.item_count - 1)
 	for index in range(destination_picker.item_count):
 		var id: String = str(destination_picker.get_item_metadata(index))
-		destination_picker.set_item_text(index, "%s · %s" % [fleet.regions.catalog[id].name, "Discovered" if fleet.regions.is_discovered(id) else "Unknown"])
+		destination_picker.set_item_text(index, "%s · %s" % [fleet.regions.catalog[id].name, ("Gate available" if fleet.transport.has_gate(id) else "No gate") if fleet.regions.is_discovered(id) else "Unknown"])
 	var costs: Array[String] = []
 	if fleet.transport.all_gates().has(fleet.transport.gate_id(selected_gate())):
 		var capability: Dictionary = fleet.model.structure_definition(fleet.transport.gate_id(selected_gate())).teleport
 		for good: String in capability.cost:
 			costs.append("%d %s" % [capability.cost[good], fleet.diplomacy.goods_catalog[good].name])
-	jump_button.text = "Transport ship" + (" · " + " + ".join(costs) if not costs.is_empty() else "")
+	jump_button.text = ("Pioneer jump" if fleet.transport.is_pioneer(selected_ship(), selected_destination()) else "Transport ship") + (" · " + " + ".join(costs) if not costs.is_empty() else "")
 	jump_detail.text = fleet.transport.jump_error(selected_gate(), selected_ship(), selected_destination())
 	if jump_detail.text.is_empty():
-		jump_detail.text = "Ready. Only the selected ship will travel."
+		jump_detail.text = "One-way pioneer jump. Found an outpost, build Solar and a gate; return jumps need local Xenocrystals." if fleet.transport.is_pioneer(selected_ship(), selected_destination()) else "Ready. Only the selected ship will travel."
 	var lines: Array[String] = []
 	for ship_id: int in fleet.model.ships:
 		var status: String = fleet.regions.catalog[fleet.transport.location(ship_id)].name

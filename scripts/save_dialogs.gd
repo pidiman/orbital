@@ -46,6 +46,7 @@ func begin(title: String) -> void:
 		child.queue_free()
 	var heading := Label.new()
 	heading.text = title
+	heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	heading.add_theme_font_size_override("font_size", 22)
 	body.add_child(heading)
 

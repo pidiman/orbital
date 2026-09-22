@@ -244,4 +244,4 @@ func _update_region_view() -> void:
 	hud.refresh()
 
 func _region_discovered(region_id: String) -> void:
-	hud.message("%s surveyed. Deposits and anomalies recorded; ship travel requires gates at both ends." % fleet.regions.catalog[region_id].name, false, 8.0)
+	hud.message("%s surveyed. Deposits and anomalies recorded; Jump Ships can pioneer from a gate; other ships need gates at both ends." % fleet.regions.catalog[region_id].name, false, 8.0)
