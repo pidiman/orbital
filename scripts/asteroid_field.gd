@@ -156,6 +156,9 @@ func _draw() -> void:
 func home_position(unit: Variant) -> Vector2:
 	if unit is Vector2:
 		return board.world_to_screen(unit)
+	var ship: Dictionary = fleet.model.locations.ships.get(unit, {})
+	if ship.has("purchase_position") and ship.region == fleet.model.locations.station_region(ship.station_id):
+		return board.world_to_screen(ship.purchase_position) + Vector2(0, 30)
 	var index: int = int(unit) - 1
 	return Vector2(get_viewport_rect().size.x - 410.0 - int(index / 7.0) * 62, 235 + (index % 7) * 63)
 

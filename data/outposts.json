@@ -23,7 +23,8 @@
       "solar",
       "storage",
       "space_dock",
-      "teleport_gate"
+      "teleport_gate",
+      "space_depot"
     ],
     "base_capacity": 300,
     "base_power": 0

@@ -1,0 +1,4 @@
+{
+  "starter_modules": ["space_depot", "space_dock", "solar"],
+  "materials_buffer": 50
+}

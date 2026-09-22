@@ -44,7 +44,7 @@ func _ready() -> void:
 	checks.slot_survives_restart = restored_library.current_name == "First colony" and store.path == library.slot_path("First colony")
 	game.save_dialogs.show_new()
 	await use(game.save_dialogs.body.get_child(1))
-	checks.fresh = game.model.materials == 40 and game.model.ships.is_empty() and game.fleet.research.researched.is_empty() and library.current_name.is_empty()
+	checks.fresh = game.model.materials == 130 and game.model.ships.is_empty() and game.fleet.research.researched.is_empty() and library.current_name.is_empty()
 	checks.old_retained = FileAccess.file_exists(library.slot_path("First colony"))
 	store.advance(10.0)
 	checks.unnamed_autosave = FileAccess.file_exists(library.slot_path("Autosave")) and library.current_name.is_empty()

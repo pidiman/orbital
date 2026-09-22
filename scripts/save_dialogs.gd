@@ -138,6 +138,7 @@ func confirm(message: String, callback: Callable) -> void:
 func show_new() -> void:
 	confirm("Start a new game? Unsaved progress will be lost.", func() -> void:
 		var station := StationModel.new()
+		station.apply_starting_resources()
 		var fleet := preload("res://scripts/mining_fleet.gd").new(station)
 		var rules: Dictionary = game.preferences.floating_defaults.duplicate(true)
 		game.preferences.apply_tuning(rules)

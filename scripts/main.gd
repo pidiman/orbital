@@ -37,6 +37,7 @@ var colony_level: int = 1
 
 func _ready() -> void:
 	model = StationModel.new()
+	model.apply_starting_resources()
 	fleet = Fleet.new(model)
 	model.ticked.connect(fleet.tick)
 	preferences = preload("res://scripts/client_preferences.gd").new()

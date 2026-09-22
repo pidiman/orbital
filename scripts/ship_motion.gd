@@ -14,6 +14,12 @@ func _ready() -> void:
 	process_priority = 10 # After model clock/field layout, before following camera.
 	get_viewport().size_changed.connect(reset)
 	game.model.module_removed.connect(_module_removed)
+	game.model.ship_built.connect(_ship_purchased)
+
+func _ship_purchased(id: int) -> void:
+	points[id] = game.asteroids.home_position(id)
+	origins[id] = points[id]
+	regions[id] = game.model.locations.ship_region(id)
 
 func reset() -> void:
 	points.clear()

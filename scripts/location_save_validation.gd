@@ -54,6 +54,8 @@ static func validate_graph(data: Dictionary, model: StationModel, region_data: D
 		var ship: Variant = data.ships[id]
 		if not id is int or not model.ships.has(id) or not ship is Dictionary or ship.get("id") != id or ship.get("kind") != model.ships[id] or not ship.get("station_id") is String or not data.stations.has(ship.station_id):
 			return "Invalid ship identity or owner station."
+		if ship.has("purchase_position") and (not ship.purchase_position is Vector2 or not ship.purchase_position.is_finite()):
+			return "Invalid ship purchase position."
 		if ship.get("owner") != data.stations[ship.station_id].owner or not ship.get("region") is String or not region_data.records.has(ship.region) or not region_data.records[ship.region].discovered or not ship.get("transit") is Dictionary:
 			return "Invalid physical ship location."
 		if ship.region != transport.locations.get(id, model.locations.station_region(primary)):

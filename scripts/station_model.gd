@@ -78,9 +78,9 @@ func recalculate() -> void:
 		capacity += int(definition.capacity)
 		power_output += int(definition.power_output)
 		power_use += int(definition.power_use)
-	if is_home:
-		for kind: String in ships.values():
-			power_use += int(ship_catalog[kind].power_use)
+	for ship: Dictionary in locations.ships.values():
+		if ship.station_id == base_id():
+			power_use += int(ship_catalog[ship.kind].power_use)
 	level = 1 + int((modules.size() - 1) / 4.0)
 
 func power_balance() -> int:
@@ -311,24 +311,46 @@ func upgrade_module(world_position: Vector2) -> String:
 	changed.emit()
 	return ""
 
+func apply_starting_resources() -> void:
+	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/new_game.json"))
+	materials = int(rules.materials_buffer)
+	for kind: String in rules.starter_modules: materials += int(catalog[kind].cost)
+
+func purchase_base() -> String:
+	if not station_id.is_empty(): return station_id
+	if region_context == null or region_context.current_region == locations.station_region(locations.primary_station()): return locations.primary_station()
+	return locations.outpost_at(region_context.current_region, locations.rules.primary_station.owner)
+
+func purchase_depot(base: String) -> String:
+	for id: String in locations.structures:
+		var structure: Dictionary = locations.structures[id]
+		if structure.station_id == base and catalog.get(structure.kind, {}).has("material_depot"): return id
+	return ""
+
 func ship_error(kind: String) -> String:
-	if not station_id.is_empty(): return "Ships are purchased at Home."
-	if not ship_catalog.has(kind):
-		return "Unknown ship type."
+	var base: String = purchase_base()
+	if base.is_empty() or purchase_depot(base).is_empty(): return "Build a Space Depot first."
+	if not ship_catalog.has(kind): return "Unknown ship type."
+	var local: StationModel = self if base == base_id() else scoped_station(base)
+	local.recalculate()
 	var definition: Dictionary = ship_catalog[kind]
-	if materials < int(definition.cost):
-		return "Need %d more Materials for this ship." % (int(definition.cost) - materials)
-	if power_balance() < int(definition.power_use):
+	if local.materials < int(definition.cost):
+		return "Need %d more Materials for this ship." % (int(definition.cost) - local.materials)
+	if local.power_balance() < int(definition.power_use):
 		return "Not enough power. Add or upgrade a Solar Panel."
 	return ""
 
 func buy_ship(kind: String) -> String:
 	var error: String = ship_error(kind)
-	if not error.is_empty():
-		return error
-	materials -= int(ship_catalog[kind].cost)
+	if not error.is_empty(): return error
+	var base: String = purchase_base()
+	var local: StationModel = self if base == base_id() else scoped_station(base)
+	local.materials -= int(ship_catalog[kind].cost)
+	# Canonical IDs remain global even when buying at an outpost.
+	for id: int in locations.ships: next_ship_id = maxi(next_ship_id, id)
 	next_ship_id += 1
-	locations.add_ship(next_ship_id, kind, locations.primary_station())
+	locations.add_ship(next_ship_id, kind, base)
+	locations.ships[next_ship_id]["purchase_position"] = locations.structures[purchase_depot(base)].position
 	recalculate()
 	ship_built.emit(next_ship_id)
 	changed.emit()
@@ -455,7 +477,12 @@ func scoped_station(id: String) -> StationModel:
 	scoped.research = research
 	scoped.region_context = region_context
 	scoped.recalculate()
-	scoped.changed.connect(func() -> void: changed.emit())
+	scoped.ship_built.connect(func(id: int) -> void:
+		next_ship_id = maxi(next_ship_id, id)
+		ship_built.emit(id))
+	scoped.changed.connect(func() -> void:
+		recalculate()
+		changed.emit())
 	return scoped
 
 func build_grid_dimensions() -> Vector2i:

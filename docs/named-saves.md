@@ -16,7 +16,7 @@ migration, and subsequent writes target its named slot, preserving the legacy fi
 
 New game requires confirmation and restores a freshly constructed starting state
 through the existing validated restore path. It retains the normal starting core,
-40 Materials, and no ships/research/outposts. Existing save files are untouched.
+Materials from `data/new_game.json` (currently 130), and no ships/research/outposts. Existing save files are untouched.
 The game starts unnamed. Loaded and new games run; cancelling dialogs restores
 the previous pause state. Space types normally inside dialogs rather than resuming.
 

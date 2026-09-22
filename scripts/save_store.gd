@@ -288,7 +288,7 @@ func restore(document: Variant) -> String:
 		return error
 	_apply_fields(candidate, station_data, STATION_FIELDS)
 	candidate.recalculate()
-	if candidate.power_output != int(station_data.power_output) or candidate.power_use != int(station_data.power_use) or candidate.capacity != int(station_data.capacity) or candidate.level != int(station_data.level):
+	if candidate.power_output != int(station_data.power_output) or candidate.capacity != int(station_data.capacity) or candidate.level != int(station_data.level):
 		return "Saved economy disagrees with installed module/ship definitions."
 	var trade_data: Dictionary = {}
 	var extension: Variant = migrated.get("extensions", {}).get("alien_trade", {})
@@ -427,6 +427,9 @@ func restore(document: Variant) -> String:
 	else:
 		candidate_supply.collection.migrate_job_locations()
 		candidate_fleet.transport.migrate_job_locations()
+	candidate.recalculate()
+	if candidate.power_use != int(station_data.power_use):
+		return "Saved power disagrees with station ship ownership."
 	error = LocationValidation.validate_gate_bindings(transport_data, candidate)
 	if not error.is_empty():
 		return error
