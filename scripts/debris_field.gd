@@ -33,6 +33,9 @@ func handle_click(point: Vector2) -> bool:
 			if supply.floating_rules.types[piece.resource].get("requires_mining", false):
 				get_parent().hud.message("A Xeno Miner is required to extract this node.")
 				return true
+			if supply.destination_for_region(supply.fleet.regions.current_region).is_empty():
+				get_parent().hud.message("No outpost to store materials in this region.", true)
+				return true
 			var collected: int = supply.salvage(int(piece.id), Callable(), -1, supply.fleet.regions.current_region)
 			if collected == 0:
 				full_storage.emit()

@@ -156,13 +156,29 @@ func salvage(debris_id: int, receiver: Callable = Callable(), limit: int = -1, r
 	var amount: int = int(piece.amount) if limit < 0 else mini(int(piece.amount), limit)
 	var received: int = 0
 	if receiver.is_valid(): received = int(receiver.call(amount))
-	elif resource == "xenocrystal": received = fleet.diplomacy.receive_goods(resource, amount)
-	else: received = model.locations.receive(model.locations.destination(model.locations.primary_station()), resource, amount)
+	else:
+		var destination_record: Dictionary = destination_for_region(region_id)
+		if destination_record.is_empty(): return 0
+		var deliver_amount: int = amount
+		if destination_record.station_id != model.locations.primary_station() and resource == "materials":
+			var local: StationModel = model.scoped_station(destination_record.station_id)
+			deliver_amount = mini(amount, maxi(0, local.capacity - local.materials))
+		if resource == "xenocrystal":
+			# Xenocrystals remain a non-click-collectible mining resource, but keep
+			# this routing correct for any future collectible configuration.
+			received = fleet.diplomacy.receive_goods(resource, deliver_amount) if region_id == fleet.regions.HOME else model.locations.receive(destination_record, resource, deliver_amount)
+		else: received = model.locations.receive(destination_record, resource, deliver_amount)
 	piece.amount -= received
 	if piece.amount == 0:
 		if debris.has(debris_id): debris.erase(debris_id)
 		if floating.has(region_id): floating[region_id].pieces.erase(debris_id)
 	return received
+
+func destination_for_region(region_id: String) -> Dictionary:
+	if region_id == fleet.regions.HOME:
+		return model.locations.destination(model.locations.primary_station())
+	var outpost: String = model.locations.outpost_at(region_id, model.locations.rules.primary_station.owner)
+	return {} if outpost.is_empty() else model.locations.destination(outpost)
 
 func content_region() -> String:
 	return str(model.locations.rules.collection.supply_region)
