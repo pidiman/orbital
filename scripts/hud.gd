@@ -65,6 +65,9 @@ var power_detail: Label
 var level_label: Label
 var count_label: Label
 var status_label: Label
+var fps_label: Label
+var fps_refresh_remaining: float = 0.0
+var fps_visibility_state: int = -1
 var goal_label: Label
 var goal_bar: ProgressBar
 var tabs: TabContainer
@@ -111,6 +114,19 @@ func _ready() -> void:
 	header.offset_bottom = 160
 	header.add_theme_stylebox_override("panel", _style(Color("111d2c"), Color("253647")))
 	root.add_child(header)
+	fps_label = _label(root, "FPS --", 11, MUTED)
+	fps_label.name = "FPSCounter"
+	fps_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	fps_label.offset_left = -82
+	fps_label.offset_right = -12
+	fps_label.offset_top = 104
+	fps_label.offset_bottom = 122
+	fps_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	fps_label.z_index = 100
+	fps_label.add_theme_color_override("font_outline_color", Color("09121c", 0.95))
+	fps_label.add_theme_constant_override("outline_size", 3)
+	fps_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	print("FPS counter initialized at %s; Show FPS=%s" % [str(fps_label.get_path()), str(get_parent().preferences.values.get("show_fps", true))])
 	var header_margin := MarginContainer.new()
 	for side: String in ["left", "right"]:
 		header_margin.add_theme_constant_override("margin_" + side, 24)
@@ -394,6 +410,16 @@ func show_salvage(amount: int, point: Vector2, resource: String = "materials") -
 
 func _process(delta: float) -> void:
 	status_label.tooltip_text = status_label.text
+	fps_refresh_remaining -= delta
+	if fps_refresh_remaining <= 0.0:
+		fps_refresh_remaining = 0.25
+		fps_label.text = "FPS %d" % Engine.get_frames_per_second()
+	if is_instance_valid(fps_label):
+		var show_fps: bool = bool(get_parent().preferences.values.get("show_fps", true))
+		fps_label.visible = show_fps
+		if fps_visibility_state != int(show_fps):
+			fps_visibility_state = int(show_fps)
+			print("FPS counter visibility set to %s (Show FPS preference)" % str(show_fps))
 	if is_instance_valid(zoom_label):
 		zoom_label.text = ("%.2f" % get_parent().ship_camera.zoom.x).trim_suffix("0") + "x"
 	if is_instance_valid(grid_controls):
@@ -1000,6 +1026,12 @@ func _layout_menus() -> void:
 	if is_instance_valid(compact_resources):
 		compact_resources.position = Vector2(viewport_size.x - 336, 12)
 		compact_resources.size = Vector2(320, 24)
+	if is_instance_valid(fps_label):
+		fps_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		fps_label.offset_left = -82
+		fps_label.offset_right = -12
+		fps_label.offset_top = 104
+		fps_label.offset_bottom = 122
 	resource_status.position = Vector2(24, 39)
 	resource_status.size = Vector2(viewport_size.x - 48, 16)
 	var tray_top: float = 61.0
