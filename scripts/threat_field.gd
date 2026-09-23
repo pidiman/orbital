@@ -144,8 +144,21 @@ func _closest_threat(origin: Vector2, range: float) -> int:
 	return selected
 
 func _fire(structure_id: String, origin: Vector2, target_id: int, definition: Dictionary) -> void:
+	if not threats.has(target_id): return
+	var speed: float = maxf(1.0, float(definition.get("projectile_speed", 330.0)))
 	var direction: Vector2 = (threats[target_id].position - origin).normalized()
-	projectiles.append({"position": origin, "velocity": direction * float(definition.get("projectile_speed", 330.0)), "target_id": target_id, "turret_id": structure_id})
+	var distance: float = origin.distance_to(threats[target_id].position)
+	# The locked target ID is authoritative. The projectile remains visible in
+	# flight, then applies its hit when this travel time elapses; it does not
+	# depend on a physics overlap with a moving asteroid.
+	projectiles.append({
+		"position": origin,
+		"velocity": direction * speed,
+		"speed": speed,
+		"time_remaining": maxf(0.05, distance / speed),
+		"target_id": target_id,
+		"turret_id": structure_id
+	})
 
 func _turret_stats(station: StationModel, point: Vector2) -> Dictionary:
 	# Tier upgrade dictionaries intentionally contain only changed fields. Merge
@@ -162,12 +175,19 @@ func _update_projectiles(delta: float) -> void:
 		var target_id: int = int(projectile.target_id)
 		if target_id < 0 or not threats.has(target_id): continue
 		var target: Vector2 = threats[target_id].position
-		var step: Vector2 = projectile.velocity * delta
-		if projectile.position.distance_to(target) <= step.length():
+		var direction: Vector2 = (target - projectile.position).normalized()
+		var speed: float = maxf(1.0, float(projectile.get("speed", 330.0)))
+		projectile.velocity = direction * speed
+		projectile.position += projectile.velocity * delta
+		projectile.time_remaining = float(projectile.get("time_remaining", 0.0)) - delta
+		# Arrival is time-based and tied to the locked target ID. If another
+		# turret destroyed it or it left the map, the guard above discards this
+		# projectile without applying damage.
+		if float(projectile.time_remaining) <= 0.0:
+			projectile.position = target
 			threats[target_id].health -= 1
 			if threats[target_id].health <= 0: _destroy(target_id)
 			continue
-		projectile.position += step
 		remaining.append(projectile)
 	projectiles = remaining
 
