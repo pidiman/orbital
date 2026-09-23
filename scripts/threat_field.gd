@@ -118,15 +118,15 @@ func _update_turrets(delta: float) -> void:
 		var structure_id: String = station.structure_id_at(point)
 		live[structure_id] = true
 		var origin: Vector2 = game.board.world_to_screen(point)
-		var definition: Dictionary = station.definition_at(point).defense_turret
-		var target_id: int = _closest_threat(origin, float(definition.range))
+		var definition: Dictionary = _turret_stats(station, point)
+		var target_id: int = _closest_threat(origin, float(definition.get("range", 220.0)))
 		var desired: float = -PI / 2.0
 		if target_id != -1: desired = (threats[target_id].position - origin).angle()
 		turret_angles[structure_id] = rotate_toward(float(turret_angles.get(structure_id, desired)), desired, 3.8 * delta)
 		var cooldown: float = maxf(0.0, float(turret_cooldowns.get(structure_id, 0.0)) - delta)
 		if target_id != -1 and cooldown <= 0.0:
 			_fire(structure_id, origin, target_id, definition)
-			cooldown = float(definition.fire_seconds)
+			cooldown = float(definition.get("fire_seconds", 1.0))
 		turret_cooldowns[structure_id] = cooldown
 	for id: Variant in turret_angles.keys():
 		if not live.has(id):
@@ -145,7 +145,16 @@ func _closest_threat(origin: Vector2, range: float) -> int:
 
 func _fire(structure_id: String, origin: Vector2, target_id: int, definition: Dictionary) -> void:
 	var direction: Vector2 = (threats[target_id].position - origin).normalized()
-	projectiles.append({"position": origin, "velocity": direction * float(definition.projectile_speed), "target_id": target_id, "turret_id": structure_id})
+	projectiles.append({"position": origin, "velocity": direction * float(definition.get("projectile_speed", 330.0)), "target_id": target_id, "turret_id": structure_id})
+
+func _turret_stats(station: StationModel, point: Vector2) -> Dictionary:
+	# Tier upgrade dictionaries intentionally contain only changed fields. Merge
+	# them over the base definition so unchanged stats remain available at T2+.
+	var base: Dictionary = station.catalog.get("defense_turret", {}).get("defense_turret", {}).duplicate(true)
+	var current: Dictionary = station.definition_at(point).get("defense_turret", {})
+	for key: String in current:
+		base[key] = current[key]
+	return base
 
 func _update_projectiles(delta: float) -> void:
 	var remaining: Array[Dictionary] = []
@@ -180,8 +189,8 @@ func _draw() -> void:
 	if not game.board.visible: return
 	if game.board.inspected_position != Vector2.INF and station.modules.has(game.board.inspected_position) and station.modules[game.board.inspected_position] == "defense_turret":
 		var point: Vector2 = game.board.world_to_screen(game.board.inspected_position)
-		var definition: Dictionary = station.definition_at(game.board.inspected_position).defense_turret
-		draw_circle(point, float(definition.range), Color(0.94, 0.45, 0.32, 0.08), false, 1.5, true)
+		var definition: Dictionary = _turret_stats(station, game.board.inspected_position)
+		draw_circle(point, float(definition.get("range", 220.0)), Color(0.94, 0.45, 0.32, 0.08), false, 1.5, true)
 	for point: Vector2 in station.modules:
 		if station.modules[point] != "defense_turret" or not station.is_module_active(point): continue
 		var id: String = station.structure_id_at(point)
