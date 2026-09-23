@@ -93,6 +93,7 @@ var floating: Array[Dictionary] = []
 var compact_resources: HBoxContainer
 var resource_bar: PanelContainer
 var resource_status: HFlowContainer
+var panel_fit_pending: bool = false
 var panel: PanelContainer
 var root: Control
 const INK := Color("dfebf2")
@@ -215,7 +216,9 @@ func _ready() -> void:
 	margin.add_child(column)
 	tabs = TabContainer.new()
 	tabs.name = "BuildTabs"
-	tabs.custom_minimum_size = Vector2(272, 340)
+	# Let the panel derive its height from content; _layout_menus() applies the
+	# viewport cap only when a catalog is genuinely long.
+	tabs.custom_minimum_size = Vector2(272, 0)
 	tabs.add_theme_stylebox_override("panel", _style(Color("111c2b"), Color("111c2b")))
 	tabs.add_theme_stylebox_override("tab_selected", _style(Color("25404b"), CYAN))
 	tabs.add_theme_stylebox_override("tab_unselected", _style(Color("162636"), Color("314454")))
@@ -231,7 +234,8 @@ func _ready() -> void:
 	column.add_child(tabs)
 	var module_scroll := ScrollContainer.new()
 	module_scroll.name = "Modules"
-	module_scroll.custom_minimum_size.y = 340
+	module_scroll.custom_minimum_size.y = 0
+	module_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	module_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	tabs.add_child(module_scroll)
 	var module_page := VBoxContainer.new()
@@ -654,6 +658,10 @@ func _refresh_ships() -> void:
 				ship_upgrade_buttons[ship_id].tooltip_text = "Next: %s" % _ship_tier_effect(preview)
 
 	_refresh_tray()
+	# Command labels and buttons can change the selected-ship panel's natural
+	# height, so update its layout after refreshing the contents.
+	if is_instance_valid(ship_context) and ship_context.visible:
+		_layout_menus()
 
 func _merge_ship_stats_for_preview(target: Dictionary, patch: Dictionary) -> void:
 	for key: String in patch:
@@ -738,12 +746,15 @@ func _trade_completed(contact_id: String, offer_id: String) -> void:
 func _build_upgrade_page() -> void:
 	var page := VBoxContainer.new()
 	page.name = "Upgrade"
+	page.custom_minimum_size.x = 272
 	page.add_theme_constant_override("separation", 12)
 	tabs.add_child(page)
 	upgrade_title = _label(page, "", 20, CYAN)
 	upgrade_stats = _label(page, "", 14, INK)
+	upgrade_stats.custom_minimum_size.x = 272
 	upgrade_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	upgrade_detail = _label(page, "", 13, MUTED)
+	upgrade_detail.custom_minimum_size.x = 272
 	upgrade_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	refinery_selector = OptionButton.new()
 	refinery_selector.custom_minimum_size.y = 44
@@ -784,6 +795,7 @@ func inspect_module(world_position: Vector2) -> void:
 	activate_panel(panel, "Build")
 	tabs.current_tab = 2
 	_refresh_upgrade()
+	_request_panel_fit()
 
 func deselect_module() -> void:
 	selected_position = Vector2.INF
@@ -864,6 +876,7 @@ func _refresh_upgrade() -> void:
 		upgrade_detail.text = "Maxed · Maximum tier reached."
 		upgrade_button.text = "Maximum tier"
 		upgrade_button.disabled = true
+		_layout_menus()
 		return
 	upgrade_detail.text = "Next: %s for %s" % [next.description, build_model.upgrade_cost_text(next.cost)]
 	if definition.has("conversion"):
@@ -874,6 +887,7 @@ func _refresh_upgrade() -> void:
 	upgrade_button.disabled = not error.is_empty()
 	upgrade_button.tooltip_text = error
 	if not error.is_empty(): upgrade_detail.text += "\n\n" + error
+	_layout_menus()
 
 func _upgrade_selected() -> void:
 	var error: String = build_model.upgrade_module(selected_position)
@@ -1065,13 +1079,21 @@ func _wrap_panel(target: PanelContainer, title: String) -> void:
 		view.close_button = close
 	var scroll := ScrollContainer.new()
 	scroll.name = "Content"
+	# The viewport must expand to the measured panel height; collapsing this
+	# container also collapses all detail controls inside it.
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size.y = 0
 	frame.add_child(scroll)
 	var body := VBoxContainer.new()
 	body.name = "Body"
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(body)
 	for child: Node in children: child.reparent(body)
+	# ScrollContainer does not automatically contribute its child's minimum
+	# height when its own minimum is zero. Seed it from the populated body so
+	# the wrapper can measure real detail content instead of only the heading.
+	scroll.custom_minimum_size.y = body.get_combined_minimum_size().y
 	target.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	target.custom_minimum_size = Vector2.ZERO
 	var panel_style := target.get_theme_stylebox("panel").duplicate()
@@ -1116,11 +1138,43 @@ func _layout_menus() -> void:
 	region_navigation.location_label.position = Vector2(24, 113)
 	region_navigation.location_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	orbit_label.hide() # Replaced by the always-visible location indicator and Regions details.
+	var max_panel_height: float = maxf(180.0, minf(viewport_size.y - top - 52.0, viewport_size.y * 0.72))
 	for target: PanelContainer in managed_panels:
+		_sync_scroll_minimums(target)
+		if target == panel and is_instance_valid(tabs):
+			var current_page: Control = tabs.get_current_tab_control()
+			if is_instance_valid(current_page):
+				tabs.custom_minimum_size.y = current_page.get_combined_minimum_size().y
+		var content: Node = target.get_node_or_null("MenuFrame/Content")
+		if is_instance_valid(content):
+			var body: Node = content.get_node_or_null("Body")
+			if is_instance_valid(body):
+				content.custom_minimum_size.y = body.get_combined_minimum_size().y
 		var width: float = minf(380 if target == panel or target == ship_context or target == settings_panel or target == menu_panel else 820, viewport_size.x - 56)
 		target.position = Vector2(viewport_size.x - width - 28, top)
-		var height: float = maxf(100, viewport_size.y - top - 100)
-		target.size = Vector2(width, minf(height, 280) if target == menu_panel else (minf(height, 360) if target == ship_context else height))
+		var natural_height: float = target.get_combined_minimum_size().y
+		var height: float = clampf(natural_height, 56.0, max_panel_height)
+		target.size = Vector2(width, height)
+
+func _sync_scroll_minimums(node: Node) -> void:
+	for child: Node in node.get_children():
+		_sync_scroll_minimums(child)
+	if node is ScrollContainer and node.get_child_count() > 0:
+		var content_node: Node = node.get_child(0)
+		if content_node is Control:
+			node.custom_minimum_size.y = (content_node as Control).get_combined_minimum_size().y
+
+func _request_panel_fit() -> void:
+	if panel_fit_pending:
+		return
+	panel_fit_pending = true
+	call_deferred("_fit_panels_after_layout")
+
+func _fit_panels_after_layout() -> void:
+	# Let Containers process the new tab/content minimums before measuring them.
+	await get_tree().process_frame
+	panel_fit_pending = false
+	_layout_menus()
 
 func close_panels() -> void:
 	if is_instance_valid(dev_panel): dev_panel.hide()
@@ -1138,6 +1192,7 @@ func activate_panel(target: PanelContainer, menu: String) -> void:
 	target.show()
 	_touch_targets(target)
 	_layout_menus()
+	_request_panel_fit()
 
 func open_menu(menu: String) -> void:
 	if active_menu == menu and managed_panels.any(func(target: PanelContainer) -> bool: return target.visible):
@@ -1147,6 +1202,7 @@ func open_menu(menu: String) -> void:
 		"Build", "Ships":
 			activate_panel(panel, menu)
 			tabs.current_tab = 0 if menu == "Build" else 1
+			_request_panel_fit()
 		"Menu": activate_panel(menu_panel, "Menu")
 		"Settings": activate_panel(settings_panel, "Menu")
 		"Research": research_panel.open_panel()

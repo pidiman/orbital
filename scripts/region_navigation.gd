@@ -41,7 +41,7 @@ func _ready() -> void:
 		region_buttons[region_id] = button
 	panel = PanelContainer.new()
 	panel.position = Vector2(40, 160)
-	panel.custom_minimum_size = Vector2(750, 470)
+	panel.custom_minimum_size = Vector2(750, 0)
 	panel.add_theme_stylebox_override("panel", hud._style(Color("101e2d"), hud.CYAN))
 	add_child(panel)
 	var margin := MarginContainer.new()

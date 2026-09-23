@@ -17,7 +17,7 @@ var ship_signature: String = ""
 func _ready() -> void:
 	name = "AlienContacts"
 	position = Vector2(40, 156)
-	custom_minimum_size = Vector2(750, 480)
+	custom_minimum_size = Vector2(750, 0)
 	add_theme_stylebox_override("panel", hud._style(Color("101e2d"), Color("9f8bb8")))
 	var margin := MarginContainer.new()
 	for side: String in ["left", "right", "top", "bottom"]:

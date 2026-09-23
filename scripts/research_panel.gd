@@ -9,7 +9,7 @@ var close_button: Button
 func _ready() -> void:
 	name = "Research"
 	position = Vector2(40, 156)
-	custom_minimum_size = Vector2(750, 570)
+	custom_minimum_size = Vector2(750, 0)
 	add_theme_stylebox_override("panel", hud._style(Color("101e2d"), Color("8bcdf1")))
 	var margin := MarginContainer.new()
 	for side: String in ["left", "right", "top", "bottom"]:
