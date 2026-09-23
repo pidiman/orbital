@@ -1048,7 +1048,7 @@ func _layout_menus() -> void:
 	var top: float = 137.0
 	if is_instance_valid(ship_tray):
 		ship_tray.position = Vector2(24, tray_top)
-		ship_tray.size = Vector2(viewport_size.x - 48, 42)
+		ship_tray.size = Vector2(viewport_size.x - 48, 32)
 		station_view_button.position = Vector2(viewport_size.x - 150, 104)
 		station_view_button.size = Vector2(126, 32)
 		station_view_button.add_theme_font_size_override("font_size", 12)
@@ -1117,9 +1117,9 @@ func _setup_ship_tray() -> void:
 	root.add_child(ship_tray)
 	tray_rows = HBoxContainer.new()
 	tray_rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tray_rows.add_theme_constant_override("separation", 8)
+	tray_rows.add_theme_constant_override("separation", 4)
 	ship_tray.add_child(tray_rows)
-	empty_tray = _label(tray_rows, "No ships yet. Open Ships to buy your first ship.", 14, MUTED)
+	empty_tray = _label(tray_rows, "No ships yet. Open Ships to buy your first ship.", 12, MUTED)
 	empty_tray.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ship_context = PanelContainer.new()
 	ship_context.name = "SelectedShipCommands"
