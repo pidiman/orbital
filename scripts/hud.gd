@@ -1130,12 +1130,15 @@ func _refresh_tray() -> void:
 			var repair_job: Dictionary = fleet.repairs.jobs[id]
 			status = "Repairing · waiting" if bool(repair_job.get("waiting", false)) else ("Repairing" if str(repair_job.phase) == "repairing" else "Repair transit")
 		var tile = ship_tiles[id]
+		var ship_region: String = fleet.transport.location(id)
+		tile.region_id = ship_region
+		tile.planet = fleet.regions.planets.get(fleet.regions.catalog.get(ship_region, {}).get("planet", "earth"), {})
 		tile.status = status
 		tile.status_color = GOLD if status.to_lower().contains("wait") or status.to_lower().contains("full") else (CYAN if fleet.unit_busy(id) else MUTED)
 		tile.selected_ship = id == selected_ship_id
 		tile.add_theme_stylebox_override("normal", _style(Color("111e29"), CYAN if tile.selected_ship else tile.status_color.darkened(0.2), 12))
 		tile.add_theme_stylebox_override("hover", _style(Color("1c303b"), CYAN if tile.selected_ship else tile.status_color, 12))
-		tile.tooltip_text = "%s #%d · %s · %s" % [definition.name, id, fleet.regions.catalog[fleet.transport.location(id)].name, status]
+		tile.tooltip_text = "%s #%d · %s · %s" % [definition.name, id, fleet.regions.catalog[ship_region].name, status]
 		tile.queue_redraw()
 		if id == selected_ship_id:
 			context_title.text = "%s #%d" % [definition.name, id]
