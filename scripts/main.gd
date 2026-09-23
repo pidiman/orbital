@@ -79,7 +79,7 @@ func _ready() -> void:
 	add_child(region_view)
 	board = Board.new()
 	board.name = "StationBoard"
-	board.model = model
+	board.bind_model(model)
 	add_child(board)
 	debris = Debris.new()
 	debris.name = "DebrisField"
@@ -189,7 +189,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		hud.choose("")
 
 func _select_tool(kind: String) -> void:
-	board.selected = kind
+	board.set_selected_tool(kind)
 	asteroids.selected_ship = -1
 
 func _process(delta: float) -> void:
@@ -209,7 +209,7 @@ func _restore_presentation() -> void:
 	# Replace the old scoped outpost model before any HUD/view refresh can use it.
 	_update_region_view()
 	hud.hauling_assignment = -1
-	board.selected = ""
+	board.set_selected_tool("")
 	board.inspected_position = Vector2.INF
 	board.pulses.clear()
 	board.connector_masks_dirty = true
@@ -242,15 +242,15 @@ func _update_region_view() -> void:
 	region_view.visible = not home
 	region_view.queue_redraw()
 	var outpost: String = model.locations.outpost_at(fleet.regions.current_region, model.locations.rules.primary_station.owner)
-	board.model = model if outpost.is_empty() else model.scoped_station(outpost)
+	board.bind_model(model if outpost.is_empty() else model.scoped_station(outpost))
 	board.connector_masks_dirty = true
 	board.grid_radius = (board.model.build_grid_dimensions() - Vector2i.ONE) / 2
-	board.placement_cache_key = ""
+	board.invalidate_placement_cache()
 	board.visible = home or not outpost.is_empty()
 	board.set_process_unhandled_input(board.visible)
 	debris.visible = true
 	debris.set_process_unhandled_input(true)
-	board.selected = ""
+	board.set_selected_tool("")
 	board.inspected_position = Vector2.INF
 	asteroids.selected_ship = -1
 	asteroids.rocks.clear()

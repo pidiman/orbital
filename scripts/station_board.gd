@@ -15,21 +15,31 @@ var hover_cell: Vector2i = Vector2i(99, 99)
 var pulses: Array[Dictionary] = []
 var placement_cache: Array[Vector2i] = []
 var placement_cache_key: String = ""
-var placement_cache_target_key: String = ""
-var placement_scan: Array[Vector2i] = []
-var placement_scan_index: int = 0
+var placement_source_key: String = ""
+var placement_rebuild_cells: Array[Vector2i] = []
+var placement_rebuild_index: int = 0
+var placement_rebuild_key: String = ""
+var placement_rebuild_pending: bool = false
+const PLACEMENT_SCAN_BUDGET: int = 32
 var connector_masks: Dictionary = {}
 var connector_module_masks: Dictionary = {}
 var connector_edges: Array[Array] = []
 var connector_masks_dirty: bool = true
 
 func _ready() -> void:
-	model.changed.connect(_invalidate_placement_cache)
-	model.module_built.connect(_on_built)
-	model.module_built.connect(_connector_structure_changed)
-	model.module_removed.connect(_connector_structure_changed)
+	_bind_model_signals()
 	get_viewport().size_changed.connect(_layout)
 	_layout()
+
+func _bind_model_signals() -> void:
+	if not is_instance_valid(model):
+		return
+	if not model.module_built.is_connected(_on_built):
+		model.module_built.connect(_on_built)
+	if not model.module_built.is_connected(_connector_structure_changed):
+		model.module_built.connect(_connector_structure_changed)
+	if not model.module_removed.is_connected(_connector_structure_changed):
+		model.module_removed.connect(_connector_structure_changed)
 
 func _layout() -> void:
 	var area: Vector2 = get_viewport_rect().size
@@ -52,18 +62,30 @@ func _process(delta: float) -> void:
 	var pulse_count: int = pulses.size()
 	pulses = pulses.filter(func(p: Dictionary) -> bool: return p.time < 0.65)
 	needs_redraw = needs_redraw or pulse_count > 0 or not pulses.is_empty()
-	if not selected.is_empty() and selected != "__demolish__":
-		# Build the valid-cell preview incrementally. A full 17×17 sweep invokes
-		# placement validation hundreds of times and used to block the first frame
-		# after every placement.
-		if _update_placement_cache(32): needs_redraw = true
+	if placement_rebuild_pending:
+		# Placement validation can be expensive on the larger 33×33 grid. Keep
+		# the rebuild event-driven, but spread the checks over several frames so
+		# placing a module never blocks the simulation in one frame.
+		if _advance_placement_cache(PLACEMENT_SCAN_BUDGET):
+			needs_redraw = true
 	if needs_redraw: queue_redraw()
+
+func set_selected_tool(kind: String) -> void:
+	if selected == kind:
+		return
+	selected = kind
+	_invalidate_placement_cache(false, "module type")
+
+func invalidate_placement_cache() -> void:
+	_invalidate_placement_cache(true, "region/grid")
 
 func _on_built(world_position: Vector2, _kind: String) -> void:
 	pulses.append({"position": world_position, "time": 0.0})
+	_invalidate_placement_cache(false, "module built")
 
 func _connector_structure_changed(_position: Vector2, _kind: String = "") -> void:
 	connector_masks_dirty = true
+	_invalidate_placement_cache(false, "module removed/changed")
 	queue_redraw()
 
 func handle_click(point: Vector2) -> bool:
@@ -257,32 +279,56 @@ func module_facing(world_position: Vector2) -> float:
 		else: vertical = true
 	return PI / 2.0 if vertical and not horizontal else 0.0
 
-func _invalidate_placement_cache() -> void:
+func bind_model(next_model: StationModel) -> void:
+	if is_instance_valid(model):
+		if model.module_built.is_connected(_on_built): model.module_built.disconnect(_on_built)
+		if model.module_built.is_connected(_connector_structure_changed): model.module_built.disconnect(_connector_structure_changed)
+		if model.module_removed.is_connected(_connector_structure_changed): model.module_removed.disconnect(_connector_structure_changed)
+	model = next_model
+	_bind_model_signals()
+	_invalidate_placement_cache(true, "region/model")
+
+func _placement_source_key() -> String:
+	return model.station_id + str(model.modules) + selected + str(snap_spacing) + str(snap_enabled)
+
+func _invalidate_placement_cache(force: bool = false, _reason: String = "unknown") -> void:
+	var key: String = _placement_source_key()
+	if not force and key == placement_source_key:
+		return
+	placement_source_key = key
 	placement_cache_key = ""
-	placement_cache_target_key = ""
-	placement_scan.clear()
-	placement_scan_index = 0
+	placement_cache.clear()
+	placement_rebuild_cells.clear()
+	placement_rebuild_index = 0
+	placement_rebuild_pending = false
+	if not selected.is_empty() and selected != "__demolish__":
+		_begin_placement_cache_rebuild(key)
 	queue_redraw()
 
-func _update_placement_cache(budget: int = 32) -> bool:
-	var key: String = model.station_id + str(model.modules) + str(model.materials) + selected + str(snap_spacing) + str(snap_enabled)
-	if key == placement_cache_key: return false
-	if key != placement_cache_target_key:
-		placement_cache_target_key = key
-		placement_scan.clear()
-		for x in range(-grid_radius.x, grid_radius.x + 1):
-			for y in range(-grid_radius.y, grid_radius.y + 1):
-				placement_scan.append(Vector2i(x, y))
-		placement_scan_index = 0
+func _begin_placement_cache_rebuild(key: String = "") -> void:
+	if selected.is_empty() or selected == "__demolish__":
 		placement_cache.clear()
+		placement_cache_key = key
+		return
+	var resolved_key: String = key if not key.is_empty() else _placement_source_key()
+	placement_rebuild_cells.clear()
+	for x in range(-grid_radius.x, grid_radius.x + 1):
+		for y in range(-grid_radius.y, grid_radius.y + 1):
+			placement_rebuild_cells.append(Vector2i(x, y))
+	placement_rebuild_index = 0
+	placement_rebuild_key = resolved_key
+	placement_rebuild_pending = true
+
+func _advance_placement_cache(budget: int) -> bool:
 	var processed: int = 0
-	while placement_scan_index < placement_scan.size() and processed < budget:
-		var cell: Vector2i = placement_scan[placement_scan_index]
+	while placement_rebuild_index < placement_rebuild_cells.size() and processed < budget:
+		var cell: Vector2i = placement_rebuild_cells[placement_rebuild_index]
 		if model.placement_error(cell_to_world(cell) + snap_offset(), selected).is_empty():
 			placement_cache.append(cell)
-		placement_scan_index += 1
+		placement_rebuild_index += 1
 		processed += 1
-	if placement_scan_index >= placement_scan.size():
-		placement_cache_key = key
-		return false
-	return true
+	if placement_rebuild_index >= placement_rebuild_cells.size():
+		placement_rebuild_pending = false
+		placement_cache_key = placement_rebuild_key
+		placement_rebuild_cells.clear()
+	return processed > 0
