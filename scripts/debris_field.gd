@@ -37,7 +37,14 @@ func _sync_view() -> void:
 		var source: Dictionary = available[debris_id]
 		if supply.mining_target(supply.fleet.regions.current_region, debris_id) != -1: continue
 		var point := Vector2(source.position.x * (area.x - 380.0), 145.0 + source.position.y * (area.y - 255.0))
-		pieces.append({"visual_variant": _variant(source, debris_id), "resource": source.get("resource", "materials"), "amount": source.amount, "id": debris_id, "point": point, "angle": fmod(debris_id * 2.399, TAU) + supply.elapsed * 0.2})
+		# Keep labels legible even when a saved/legacy pool contains pickups
+		# closer than the current spawn separation. Offset only the presentation;
+		# pickup positions and hit areas remain unchanged.
+		var label_offset := Vector2(-30, 39)
+		for previous: Dictionary in pieces:
+			if point.distance_to(Vector2(previous.point)) < 78.0:
+				label_offset.y += 16.0
+		pieces.append({"visual_variant": _variant(source, debris_id), "resource": source.get("resource", "materials"), "amount": source.amount, "id": debris_id, "point": point, "angle": fmod(debris_id * 2.399, TAU) + supply.elapsed * 0.2, "label_offset": label_offset})
 	debris_count = pieces.size()
 
 func handle_click(point: Vector2) -> bool:
@@ -79,7 +86,7 @@ func _draw() -> void:
 			draw_polyline(polygon, tint, 1.5, true)
 			draw_line(Vector2(-3, -5), Vector2(4, 3), Color("c9aa78"), 2)
 		draw_set_transform(Vector2.ZERO)
-		draw_string(ThemeDB.fallback_font, piece.point + Vector2(-30, 39), "%s · %d" % [str(piece.resource).capitalize(), piece.amount], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, tint)
+		draw_string(ThemeDB.fallback_font, piece.point + Vector2(piece.get("label_offset", Vector2(-30, 39))), "%s · %d" % [str(piece.resource).capitalize(), piece.amount], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, tint)
 
 func _variant(source: Dictionary, id: int) -> String:
 	var variants: Array = supply.floating_rules.types[source.get("resource", "materials")].get("visual_variants", [])

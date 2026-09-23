@@ -33,10 +33,17 @@ func _process(_delta: float) -> void:
 		needs_redraw = true
 	# Ship sprites and mining beams move continuously; static asteroid/content
 	# geometry only needs the presentation revision invalidation above.
-	for unit: Variant in get_parent().ship_motion.points:
-		if get_parent().ship_motion.is_moving(unit):
+	for unit: Variant in get_parent().ship_motion.visual_active:
+		if get_parent().ship_motion.is_visual_active(unit):
 			needs_redraw = true
 			break
+	# Beam visibility is an explicit extraction/repair state, independent of
+	# whether the ship has stopped moving at its visual offset.
+	if not needs_redraw:
+		for unit: Variant in get_parent().ship_motion.beam_active:
+			if get_parent().ship_motion.is_beam_active(unit):
+				needs_redraw = true
+				break
 	if needs_redraw:
 		queue_redraw()
 

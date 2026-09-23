@@ -126,15 +126,27 @@ func _spawn_position(random: RandomNumberGenerator, region_id: String) -> Vector
 	var min_radius: float = maxf(0.0, float(zone.get("min_radius", 0.18)))
 	var max_radius: float = maxf(min_radius, float(zone.get("max_radius", 0.4)))
 	var edge_margin: float = clampf(float(zones.get("edge_margin", 0.04)), 0.0, 0.45)
+	var minimum_separation: float = maxf(0.0, float(floating_rules.get("min_spawn_separation", 0.0)))
+	var fallback := center.clamp(Vector2(edge_margin, edge_margin), Vector2(1.0 - edge_margin, 1.0 - edge_margin))
+	var best_clearance: float = -1.0
 	for _attempt in range(32):
 		var angle: float = random.randf_range(0.0, TAU)
 		# sqrt produces an even spread over the annulus area, avoiding a ring.
 		var radius: float = sqrt(random.randf_range(min_radius * min_radius, max_radius * max_radius))
 		var candidate := center + Vector2.from_angle(angle) * radius
 		if candidate.x >= edge_margin and candidate.x <= 1.0 - edge_margin and candidate.y >= edge_margin and candidate.y <= 1.0 - edge_margin:
-			return candidate
+			var nearest: float = INF
+			for piece: Dictionary in floating.get(region_id, {}).get("pieces", {}).values():
+				nearest = minf(nearest, candidate.distance_to(Vector2(piece.position)))
+			if nearest >= minimum_separation:
+				return candidate
+			# If the zone is crowded, retain the best candidate rather than
+			# falling back to the station center and stacking labels.
+			if nearest > best_clearance:
+				best_clearance = nearest
+				fallback = candidate
 	# The fallback is still in-bounds if a future zone is tuned too close to an edge.
-	return center.clamp(Vector2(edge_margin, edge_margin), Vector2(1.0 - edge_margin, 1.0 - edge_margin))
+	return fallback
 
 func ensure_floating_region(region_id: String) -> void:
 	if floating.has(region_id) or not fleet.regions.is_discovered(region_id): return

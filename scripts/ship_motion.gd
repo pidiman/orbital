@@ -8,6 +8,10 @@ var angles: Dictionary = {}
 var origins: Dictionary = {}
 var missions: Dictionary = {}
 var mining_states: Dictionary = {}
+var visual_targets: Dictionary = {}
+var visual_moving: Dictionary = {}
+var visual_active: Dictionary = {}
+var beam_active: Dictionary = {}
 var regions: Dictionary = {}
 var ship_kinds: Dictionary = {}
 var mining_jobs: Dictionary = {}
@@ -41,6 +45,10 @@ func reset() -> void:
 	origins.clear()
 	missions.clear()
 	mining_states.clear()
+	visual_targets.clear()
+	visual_moving.clear()
+	visual_active.clear()
+	beam_active.clear()
 	regions.clear()
 	units.clear()
 	alive_units.clear()
@@ -55,10 +63,16 @@ func _module_removed(point: Vector2) -> void:
 	origins.erase(point)
 	missions.erase(point)
 	mining_states.erase(point)
+	visual_targets.erase(point)
+	visual_moving.erase(point)
+	visual_active.erase(point)
+	beam_active.erase(point)
 	regions.erase(point)
 
 func _module_built(_point: Vector2, _kind: String) -> void:
 	units_dirty = true
+	# Dock/build changes can move a parked ship's resolved visual target.
+	visual_targets.clear()
 
 func _ship_removed(ship_id: int) -> void:
 	units_dirty = true
@@ -68,6 +82,10 @@ func _ship_removed(ship_id: int) -> void:
 	origins.erase(ship_id)
 	missions.erase(ship_id)
 	mining_states.erase(ship_id)
+	visual_targets.erase(ship_id)
+	visual_moving.erase(ship_id)
+	visual_active.erase(ship_id)
+	beam_active.erase(ship_id)
 	regions.erase(ship_id)
 
 func _jobs_changed() -> void:
@@ -123,16 +141,31 @@ func advance_visual(delta: float) -> void:
 			missions.erase(unit)
 		regions[unit] = region
 		var mission: String = mission_key(unit)
-		if missions.get(unit, "") != mission:
+		var mission_changed: bool = missions.get(unit, "") != mission
+		if mission_changed:
 			origins[unit] = position_for(unit)
 			missions[unit] = mission
 			if mining_jobs.has(unit): _set_mining_state(unit, "FLYING_TO")
-		var target: Vector2 = target_for(unit)
+		# Targets for parked/idle ships are stable. Reuse the last resolved target
+		# instead of traversing every job registry and rebuilding screen positions
+		# on every rendered frame. Active missions still resolve their target each
+		# tick so movement and beams remain responsive.
+		var target: Vector2
+		if mission_changed or not visual_targets.has(unit) or not mission.is_empty():
+			target = target_for(unit)
+			visual_targets[unit] = target
+		else:
+			target = Vector2(visual_targets[unit])
 		_update_mining_state(unit, target)
+		var distance_to_target: float = Vector2(points.get(unit, origins.get(unit, target))).distance_to(target)
+		var repairing: bool = fleet.repairs != null and fleet.repairs.jobs.has(unit) and str(fleet.repairs.jobs[unit].get("phase", "")) == "repairing"
+		beam_active[unit] = mining_state(unit) == "EXTRACTING" or repairing
+		visual_moving[unit] = not mission.is_empty() and distance_to_target > float(settings.facing_arrival_distance)
+		visual_active[unit] = bool(visual_moving[unit]) or bool(beam_active[unit])
 		# Idle ships at their resolved destination have no visual state to update.
 		# They are still present in the cached unit list and redraw when selection
 		# or camera state changes, but avoid repeated math and dictionary writes.
-		if mission.is_empty() and points.has(unit) and Vector2(points[unit]).distance_to(target) <= float(settings.facing_arrival_distance) and absf(float(angles.get(unit, 0.0)) - deg_to_rad(float(settings.idle_angle_degrees))) < 0.0001:
+		if not visual_active[unit] and points.has(unit) and Vector2(points[unit]).distance_to(target) <= float(settings.facing_arrival_distance):
 			continue
 		var direction: Vector2 = target - Vector2(points.get(unit, origins.get(unit, game.asteroids.home_position(unit))))
 		var busy: bool = not mission.is_empty()
@@ -167,6 +200,10 @@ func advance_visual(delta: float) -> void:
 			missions.erase(unit)
 			mining_states.erase(unit)
 			regions.erase(unit)
+			visual_targets.erase(unit)
+			visual_moving.erase(unit)
+			visual_active.erase(unit)
+			beam_active.erase(unit)
 
 func _update_mining_state(unit: Variant, target: Vector2) -> void:
 	var next_state: String = "IDLE"
@@ -186,14 +223,21 @@ func _set_mining_state(unit: Variant, next_state: String) -> void:
 	if mining_states.get(unit, "") == next_state: return
 	mining_states[unit] = next_state
 	print("Ship %s: state changed to %s -> beam %s" % [str(unit), next_state, "ON" if next_state == "EXTRACTING" else "OFF"])
+	# Stationary extraction is intentionally outside the movement fast path.
+	# Invalidate the asteroid view explicitly when the beam state changes.
+	if is_instance_valid(game) and is_instance_valid(game.asteroids): game.asteroids.queue_redraw()
 
 func mining_state(unit: Variant) -> String:
 	return str(mining_states.get(unit, "IDLE"))
 
 func is_moving(unit: Variant) -> bool:
-	if not points.has(unit) or mission_key(unit).is_empty(): return false
-	if mining_state(unit) == "EXTRACTING": return false
-	return Vector2(points[unit]).distance_to(target_for(unit)) > float(settings.get("facing_arrival_distance", 1.0))
+	return bool(visual_moving.get(unit, false))
+
+func is_visual_active(unit: Variant) -> bool:
+	return bool(visual_active.get(unit, false))
+
+func is_beam_active(unit: Variant) -> bool:
+	return bool(beam_active.get(unit, false))
 
 func draw_exhaust(canvas: CanvasItem, unit: Variant, center: Vector2, kind: String, scale_factor: float, facing: float, accent: Color) -> void:
 	if not is_moving(unit): return
