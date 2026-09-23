@@ -890,23 +890,34 @@ func _setup_menus() -> void:
 	root.add_child(menu_scroll)
 	menu_scroll.add_child(toolbar)
 	toolbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for caption: String in ["Build", "Ships", "Research", "Gate/Travel", "Outposts/Regions", "Trade/Contacts", "Menu"]:
+	var menu_labels: Dictionary = {"Build": "Build", "Ships": "Ships", "Research": "Research", "Gate/Travel": "Gate", "Outposts/Regions": "Outposts", "Trade/Contacts": "Trade", "Menu": "Menu"}
+	for caption: String in menu_labels:
 		var button := Button.new()
-		button.text = caption
-		button.custom_minimum_size.y = 28
+		button.text = str(menu_labels[caption])
+		button.custom_minimum_size = Vector2(0, 28)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.add_theme_font_size_override("font_size", 11)
-		button.add_theme_stylebox_override("normal", _style(Color("172738"), Color("304557")))
-		button.add_theme_stylebox_override("hover", _style(Color("25404b"), CYAN))
+		button.add_theme_font_size_override("font_size", 10)
+		var menu_style := _style(Color("172738"), Color("304557"), 5)
+		menu_style.content_margin_left = 3
+		menu_style.content_margin_right = 3
+		menu_style.content_margin_top = 2
+		menu_style.content_margin_bottom = 2
+		button.add_theme_stylebox_override("normal", menu_style)
+		var menu_hover := _style(Color("25404b"), CYAN, 5)
+		menu_hover.content_margin_left = 3
+		menu_hover.content_margin_right = 3
+		menu_hover.content_margin_top = 2
+		menu_hover.content_margin_bottom = 2
+		button.add_theme_stylebox_override("hover", menu_hover)
 		button.pressed.connect(func() -> void: open_menu(caption))
 		toolbar.add_child(button)
 		menu_buttons[caption] = button
 		if caption == "Build":
 			demolish_top_button = Button.new()
 			demolish_top_button.text = "Demolish"
-			demolish_top_button.custom_minimum_size.y = 28
+			demolish_top_button.custom_minimum_size = Vector2(0, 28)
 			demolish_top_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			demolish_top_button.add_theme_font_size_override("font_size", 11)
+			demolish_top_button.add_theme_font_size_override("font_size", 10)
 			demolish_top_button.tooltip_text = "Toggle demolish mode, then click one of your placed modules."
 			demolish_top_button.pressed.connect(toggle_demolish_mode)
 			toolbar.add_child(demolish_top_button)
@@ -980,14 +991,15 @@ func _touch_targets(node: Node) -> void:
 func _layout_menus() -> void:
 	if not is_instance_valid(toolbar): return
 	var viewport_size := get_viewport().get_visible_rect().size
-	toolbar.columns = 7
-	menu_scroll.position = Vector2(150, 8)
-	menu_scroll.size = Vector2(maxf(160, viewport_size.x - 510), 28)
+	toolbar.columns = 8
+	toolbar.add_theme_constant_override("h_separation", 2)
+	menu_scroll.position = Vector2(140, 8)
+	menu_scroll.size = Vector2(maxf(160, viewport_size.x - 486), 28)
 	toolbar.custom_minimum_size.y = 28
 	title_label.position = Vector2(22, 13)
 	if is_instance_valid(compact_resources):
-		compact_resources.position = Vector2(viewport_size.x - 346, 12)
-		compact_resources.size = Vector2(330, 24)
+		compact_resources.position = Vector2(viewport_size.x - 336, 12)
+		compact_resources.size = Vector2(320, 24)
 	resource_status.position = Vector2(24, 39)
 	resource_status.size = Vector2(viewport_size.x - 48, 16)
 	var tray_top: float = 61.0
