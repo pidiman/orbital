@@ -13,6 +13,8 @@ var spawn_remaining: float = 45.0
 var active: bool = true
 var region_id: String = ""
 var rng := RandomNumberGenerator.new()
+const TURRET_TURN_SPEED: float = 3.8
+const TURRET_NEUTRAL_ANGLE: float = 0.0
 
 func _ready() -> void:
 	process_priority = 8
@@ -120,9 +122,11 @@ func _update_turrets(delta: float) -> void:
 		var origin: Vector2 = game.board.world_to_screen(point)
 		var definition: Dictionary = _turret_stats(station, point)
 		var target_id: int = _closest_threat(origin, float(definition.get("range", 220.0)))
-		var desired: float = -PI / 2.0
-		if target_id != -1: desired = (threats[target_id].position - origin).angle()
-		turret_angles[structure_id] = rotate_toward(float(turret_angles.get(structure_id, desired)), desired, 3.8 * delta)
+		# The barrel is drawn along local up (Vector2(0, -25)), so compensate
+		# by PI/2 when converting the target direction into its visual rotation.
+		var desired: float = TURRET_NEUTRAL_ANGLE
+		if target_id != -1: desired = (threats[target_id].position - origin).angle() + PI / 2.0
+		turret_angles[structure_id] = rotate_toward(float(turret_angles.get(structure_id, desired)), desired, TURRET_TURN_SPEED * delta)
 		var cooldown: float = maxf(0.0, float(turret_cooldowns.get(structure_id, 0.0)) - delta)
 		if target_id != -1 and cooldown <= 0.0:
 			_fire(structure_id, origin, target_id, definition)
@@ -215,7 +219,7 @@ func _draw() -> void:
 		if station.modules[point] != "defense_turret" or not station.is_module_active(point): continue
 		var id: String = station.structure_id_at(point)
 		var origin: Vector2 = game.board.world_to_screen(point)
-		draw_set_transform(origin, float(turret_angles.get(id, -PI / 2.0)))
+		draw_set_transform(origin, float(turret_angles.get(id, TURRET_NEUTRAL_ANGLE)))
 		draw_line(Vector2(0, 0), Vector2(0, -25), Color("ef8b67"), 5.0, true)
 		draw_circle(Vector2(0, -25), 3.0, Color("ffb478"))
 		draw_set_transform(Vector2.ZERO)
