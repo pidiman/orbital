@@ -27,6 +27,7 @@ var enabled: bool = true
 var autosave_blocked: bool = false
 var dirty: bool = false
 var autosave_elapsed: float = 0.0
+var autosave_debounce: float = 0.0
 var last_error: String = ""
 var preserved: Dictionary = {}
 var decode_error: String = ""
@@ -64,12 +65,16 @@ func _init(station: StationModel, mining: Fleet, region_supply: Supply) -> void:
 
 func request_autosave() -> void:
 	dirty = true
+	# Defer disk I/O until the placement/action frame has rendered. Multiple
+	# model signals from one action share this short debounce window.
+	autosave_debounce = maxf(autosave_debounce, 0.25)
 
 func advance(delta: float) -> void:
 	if not enabled or autosave_blocked:
 		return
 	autosave_elapsed += delta
-	if dirty or autosave_elapsed >= 10.0:
+	autosave_debounce = maxf(0.0, autosave_debounce - delta)
+	if (dirty and autosave_debounce <= 0.0) or autosave_elapsed >= 10.0:
 		save_game()
 
 func snapshot() -> Dictionary:
@@ -610,6 +615,7 @@ func restore(document: Variant) -> String:
 	preserved = migrated.duplicate(true)
 	dirty = false
 	autosave_elapsed = 0.0
+	autosave_debounce = 0.0
 	restored.emit()
 	model.changed.emit()
 	fleet.changed.emit()

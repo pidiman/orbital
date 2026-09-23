@@ -100,8 +100,6 @@ func _ready() -> void:
 	target_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(target_rows)
 	hud._label(column, "Mining requires a local outpost and Miner. Hauling to Home is not available yet.", 12, hud.MUTED)
-	fleet.changed.connect(refresh)
-	fleet.model.changed.connect(refresh)
 	refresh()
 	# Keep location persistent; region shortcuts belong inside the Regions menu.
 	location_label.reparent(hud.root)

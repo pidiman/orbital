@@ -8,6 +8,7 @@ var labs: Dictionary:
 	set(value): model.import_capability_states("research", value)
 var model_ref: WeakRef
 var trade_ref: WeakRef
+var lab_sync_key: String = ""
 var model: StationModel:
 	get: return model_ref.get_ref()
 var trade: RefCounted:
@@ -23,6 +24,9 @@ func _init(station: StationModel, diplomacy: RefCounted) -> void:
 	sync_labs()
 
 func sync_labs() -> void:
+	var key: String = str(model.modules)
+	if key == lab_sync_key: return
+	lab_sync_key = key
 	model.capability_states("research", {"completed": 0})
 
 func unlocked(category: String, item: String) -> bool:

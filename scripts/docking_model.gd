@@ -5,6 +5,7 @@ const FIELDS: Array[String] = ["ships", "usage"]
 var ships: Dictionary = {}
 var usage: Dictionary = {}
 var suspended: bool = false
+var reconcile_key: String = ""
 var fleet_ref: WeakRef
 var fleet: RefCounted:
 	get: return fleet_ref.get_ref()
@@ -30,6 +31,11 @@ func compatible(id: int, dock_id: String, available: Dictionary) -> bool:
 
 func reconcile() -> void:
 	if suspended: return
+	# Model and fleet both emit changed for one simulation tick. Avoid running
+	# the full parking/capacity scan twice when the relevant state is identical.
+	var current_key: String = str(fleet.model.modules) + str(fleet.model.ships) + str(fleet.jobs) + str(fleet.transport.jobs) + str(fleet.collection.jobs) + str(fleet.cargo.routes) + str(fleet.repairs.jobs)
+	if current_key == reconcile_key: return
+	reconcile_key = current_key
 	var available: Dictionary = docks()
 	var next_ships: Dictionary = {}
 	var next_usage: Dictionary = {}

@@ -10,6 +10,7 @@ var depots: Dictionary:
 var model: StationModel
 var fleet_ref: WeakRef
 var supply_ref: WeakRef
+var depot_sync_key: String = ""
 var fleet: RefCounted:
 	get: return fleet_ref.get_ref()
 var supply: RefCounted:
@@ -23,6 +24,9 @@ func _init(station: StationModel, ships: RefCounted, stock: RefCounted) -> void:
 	sync_depots()
 
 func sync_depots() -> void:
+	var key: String = str(model.modules)
+	if key == depot_sync_key: return
+	depot_sync_key = key
 	model.capability_states("material_depot", {"delivered": 0})
 
 static func depot_position(point: Vector2) -> Vector2:

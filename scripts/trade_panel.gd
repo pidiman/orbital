@@ -59,8 +59,6 @@ func _ready() -> void:
 	history_label = hud._label(column, "", 13, hud.MUTED)
 	history_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hud._label(column, "Cargo paid at launch. Decommissioning returns cargo. Standing caps at 100.", 12, hud.MUTED)
-	fleet.changed.connect(refresh)
-	fleet.model.changed.connect(refresh)
 	refresh()
 	hide()
 

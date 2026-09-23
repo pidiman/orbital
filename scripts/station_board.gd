@@ -15,6 +15,9 @@ var hover_cell: Vector2i = Vector2i(99, 99)
 var pulses: Array[Dictionary] = []
 var placement_cache: Array[Vector2i] = []
 var placement_cache_key: String = ""
+var placement_cache_target_key: String = ""
+var placement_scan: Array[Vector2i] = []
+var placement_scan_index: int = 0
 var connector_masks: Dictionary = {}
 var connector_module_masks: Dictionary = {}
 var connector_edges: Array[Array] = []
@@ -49,6 +52,11 @@ func _process(delta: float) -> void:
 	var pulse_count: int = pulses.size()
 	pulses = pulses.filter(func(p: Dictionary) -> bool: return p.time < 0.65)
 	needs_redraw = needs_redraw or pulse_count > 0 or not pulses.is_empty()
+	if not selected.is_empty() and selected != "__demolish__":
+		# Build the valid-cell preview incrementally. A full 17×17 sweep invokes
+		# placement validation hundreds of times and used to block the first frame
+		# after every placement.
+		if _update_placement_cache(32): needs_redraw = true
 	if needs_redraw: queue_redraw()
 
 func _on_built(world_position: Vector2, _kind: String) -> void:
@@ -88,7 +96,6 @@ func _draw() -> void:
 		for y in range(model.build_grid_dimensions().y + 1):
 			var offset: float = -edge.y + y * cell_size
 			draw_line(center + Vector2(-edge.x, offset), center + Vector2(edge.x, offset), grid_color, 1)
-		_update_placement_cache()
 		for cell: Vector2i in placement_cache:
 			draw_rect(Rect2(cell_position(cell) - Vector2.ONE * (cell_size / 2 - 3), Vector2.ONE * (cell_size - 6)), Color(0.3, 0.83, 0.73, 0.07))
 	if connector_masks_dirty:
@@ -252,15 +259,30 @@ func module_facing(world_position: Vector2) -> float:
 
 func _invalidate_placement_cache() -> void:
 	placement_cache_key = ""
+	placement_cache_target_key = ""
+	placement_scan.clear()
+	placement_scan_index = 0
 	queue_redraw()
 
-func _update_placement_cache() -> void:
+func _update_placement_cache(budget: int = 32) -> bool:
 	var key: String = model.station_id + str(model.modules) + str(model.materials) + selected + str(snap_spacing) + str(snap_enabled)
-	if key == placement_cache_key: return
-	placement_cache_key = key
-	placement_cache.clear()
-	for x in range(-grid_radius.x, grid_radius.x + 1):
-		for y in range(-grid_radius.y, grid_radius.y + 1):
-			var cell := Vector2i(x, y)
-			if model.placement_error(cell_to_world(cell) + snap_offset(), selected).is_empty():
-				placement_cache.append(cell)
+	if key == placement_cache_key: return false
+	if key != placement_cache_target_key:
+		placement_cache_target_key = key
+		placement_scan.clear()
+		for x in range(-grid_radius.x, grid_radius.x + 1):
+			for y in range(-grid_radius.y, grid_radius.y + 1):
+				placement_scan.append(Vector2i(x, y))
+		placement_scan_index = 0
+		placement_cache.clear()
+	var processed: int = 0
+	while placement_scan_index < placement_scan.size() and processed < budget:
+		var cell: Vector2i = placement_scan[placement_scan_index]
+		if model.placement_error(cell_to_world(cell) + snap_offset(), selected).is_empty():
+			placement_cache.append(cell)
+		placement_scan_index += 1
+		processed += 1
+	if placement_scan_index >= placement_scan.size():
+		placement_cache_key = key
+		return false
+	return true

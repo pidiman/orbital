@@ -8,6 +8,7 @@ signal notice(message: String)
 const FIELDS: Array[String] = ["jobs"]
 var fleet_ref: WeakRef
 var jobs: Dictionary = {}
+var assignment_dirty: bool = true
 var fleet: RefCounted:
 	get: return fleet_ref.get_ref()
 var model: StationModel:
@@ -15,9 +16,22 @@ var model: StationModel:
 
 func _init(owner_fleet: RefCounted) -> void:
 	fleet_ref = weakref(owner_fleet)
+	owner_fleet.model.module_damaged.connect(func(_position: Vector2) -> void: assignment_dirty = true)
+	owner_fleet.model.module_hp_changed.connect(func(_position: Vector2) -> void: assignment_dirty = true)
+	owner_fleet.model.module_removed.connect(func(_position: Vector2) -> void: assignment_dirty = true)
 
 func advance(delta: float) -> void:
-	_assign_idle_ships()
+	var has_repair_ship: bool = false
+	for ship_id: int in model.ships:
+		if model.ship_catalog[model.ships[ship_id]].has("repair"):
+			has_repair_ship = true
+			break
+	if not has_repair_ship and jobs.is_empty(): return
+	if assignment_dirty:
+		_assign_idle_ships()
+		assignment_dirty = false
+	elif jobs.is_empty():
+		return
 	for ship_id: int in jobs.keys():
 		if not model.ships.has(ship_id):
 			jobs.erase(ship_id)
@@ -66,11 +80,22 @@ func advance(delta: float) -> void:
 func _assign_idle_ships() -> void:
 	var claimed: Dictionary = {}
 	for job: Dictionary in jobs.values(): claimed[job.target] = true
+	# Scan module health once per simulation tick, then let each Repair Ship
+	# choose from that small candidate set. The old path rescanned every module
+	# once per repair ship even when nothing was damaged.
+	var damaged_by_region: Dictionary = {}
+	for id: String in model.locations.structures:
+		var structure: Dictionary = model.locations.structures[id]
+		var scope: StationModel = model if structure.station_id == model.locations.primary_station() else model.scoped_station(structure.station_id)
+		if scope.module_hp(structure.position) < scope.module_max_hp(structure.position):
+			if not damaged_by_region.has(structure.region): damaged_by_region[structure.region] = []
+			damaged_by_region[structure.region].append(id)
+	if damaged_by_region.is_empty(): return
 	for ship_id: int in model.ships:
 		var definition: Dictionary = model.ship_catalog[model.ships[ship_id]]
 		if not definition.has("repair") or jobs.has(ship_id) or fleet.unit_busy(ship_id): continue
 		var region: String = model.locations.ship_region(ship_id)
-		var target: String = _nearest_damaged(region, claimed, ship_id)
+		var target: String = _nearest_damaged(region, claimed, ship_id, damaged_by_region.get(region, []))
 		if target.is_empty(): continue
 		var structure: Dictionary = model.locations.structures[target]
 		var capability: Dictionary = definition.repair
@@ -79,13 +104,13 @@ func _assign_idle_ships() -> void:
 		claimed[target] = true
 		changed.emit()
 
-func _nearest_damaged(region: String, claimed: Dictionary, ship_id: int) -> String:
+func _nearest_damaged(region: String, claimed: Dictionary, ship_id: int, candidates: Array = []) -> String:
 	var best: String = ""
 	var distance: float = INF
 	var ship_record: Dictionary = model.locations.ships.get(ship_id, {})
 	var origin: Vector2 = Vector2.ZERO
 	if ship_record.has("purchase_position"): origin = ship_record.purchase_position
-	for id: String in model.locations.structures:
+	for id: String in candidates:
 		var structure: Dictionary = model.locations.structures[id]
 		if structure.region != region or structure.owner != model.locations.rules.primary_station.owner or claimed.has(id): continue
 		var scope: StationModel = model if structure.station_id == model.locations.primary_station() else model.scoped_station(structure.station_id)

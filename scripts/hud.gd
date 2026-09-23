@@ -87,6 +87,7 @@ var selected_position: Vector2 = Vector2(99, 99)
 var tool_buttons: Dictionary = {}
 var selected: String = ""
 var status_time: float = 0.0
+var refresh_pending: bool = false
 var floating: Array[Dictionary] = []
 var compact_resources: HBoxContainer
 var resource_bar: PanelContainer
@@ -316,8 +317,11 @@ func _ready() -> void:
 		root.add_child(dev_panel)
 	fleet.transport.arrived.connect(func(ship_id: int, region_id: String) -> void: message("Ship #%d arrived at %s. Use Ships commands for local operations." % [ship_id, fleet.regions.catalog[region_id].name]))
 	fleet.diplomacy.mission_completed.connect(_trade_completed)
-	model.changed.connect(refresh)
-	fleet.changed.connect(refresh)
+	# Coalesce the many model/fleet signals emitted by one simulation tick. The
+	# previous direct connections refreshed the entire HUD synchronously for each
+	# signal, creating periodic frame-time spikes.
+	model.changed.connect(_queue_refresh)
+	fleet.changed.connect(_queue_refresh)
 	model.level_reached.connect(_level_up)
 	refresh()
 	message("Welcome, commander. Click amber debris to collect materials.", false, 7.0)
@@ -390,7 +394,14 @@ func refresh() -> void:
 	goal_bar.value = mini(model.modules.size(), 9)
 	_refresh_ships()
 	_refresh_upgrade()
+	if is_instance_valid(gate_panel) and gate_panel.visible: gate_panel.refresh()
+	if is_instance_valid(research_panel) and research_panel.visible: research_panel.refresh()
+	if is_instance_valid(trade_panel) and trade_panel.visible: trade_panel.refresh()
+	if is_instance_valid(region_navigation) and region_navigation.visible: region_navigation.refresh()
 	goal_label.text = "Build %d more modules to establish your colony." % (9 - model.modules.size()) if model.modules.size() < 9 else "Colony established. Keep growing."
+
+func _queue_refresh() -> void:
+	refresh_pending = true
 
 func message(text: String, error: bool = false, duration: float = 4.0) -> void:
 	status_label.text = text
@@ -409,6 +420,9 @@ func show_salvage(amount: int, point: Vector2, resource: String = "materials") -
 	floating.append({"label": label, "time": 0.0, "duration": 1.2})
 
 func _process(delta: float) -> void:
+	if refresh_pending:
+		refresh_pending = false
+		refresh()
 	status_label.tooltip_text = status_label.text
 	fps_refresh_remaining -= delta
 	if fps_refresh_remaining <= 0.0:
@@ -843,16 +857,12 @@ func reset_after_load() -> void:
 	command_buttons.clear()
 	capability_buttons.clear()
 	sell_buttons.clear()
-	fleet.changed.disconnect(trade_panel.refresh)
-	model.changed.disconnect(trade_panel.refresh)
 	root.remove_child(trade_panel)
 	trade_panel.queue_free()
 	trade_panel = TradePanel.new()
 	trade_panel.hud = self
 	trade_panel.fleet = fleet
 	root.add_child(trade_panel)
-	fleet.changed.disconnect(region_navigation.refresh)
-	model.changed.disconnect(region_navigation.refresh)
 	region_navigation.location_label.queue_free()
 	root.remove_child(region_navigation)
 	region_navigation.queue_free()

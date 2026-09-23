@@ -9,6 +9,7 @@ var locations: Dictionary:
 	get: return fleet.model.locations.legacy_locations()
 	set(value): fleet.model.locations.import_locations(value)
 var jobs: Dictionary = {}
+var gate_sync_key: String = ""
 var fleet_ref: WeakRef
 var fleet: RefCounted:
 	get: return fleet_ref.get_ref()
@@ -21,6 +22,9 @@ func _init(ships: RefCounted) -> void:
 	sync_gates()
 
 func sync_gates() -> void:
+	var key: String = str(fleet.model.modules)
+	if key == gate_sync_key: return
+	gate_sync_key = key
 	fleet.model.capability_states("teleport", {"jumps": 0})
 
 func location(ship_id: int) -> String:

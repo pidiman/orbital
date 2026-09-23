@@ -44,8 +44,6 @@ func _ready() -> void:
 			hud.message("%s researched. Module unlocked permanently." % definition.name if error.is_empty() else error, not error.is_empty())
 			refresh())
 		research_buttons[id] = button
-	fleet.changed.connect(refresh)
-	fleet.model.changed.connect(refresh)
 	refresh()
 	hide()
 

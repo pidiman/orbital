@@ -136,6 +136,7 @@ func _unload(id: int, route: Dictionary) -> bool:
 	return true
 
 func tick() -> void:
+	if routes.is_empty(): return
 	for id: int in routes.keys():
 		if not fleet.model.ships.has(id): routes.erase(id); continue
 		var route: Dictionary = routes[id]
