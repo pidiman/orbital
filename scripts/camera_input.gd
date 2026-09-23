@@ -68,6 +68,9 @@ func _click(point: Vector2) -> void:
 	if game.debris.handle_click(point): return
 	if game.board.handle_click(point): return
 	# Empty map clicks clear both view selections without touching model state.
+	# Close the actual panel containers first; clearing selected_ship_id alone
+	# refreshes their contents but leaves the Ship commands window visible.
+	game.hud.close_panels()
 	game.hud.deselect_ship()
 	game.hud.deselect_module()
 
