@@ -149,6 +149,29 @@ func _spawn_asteroid(initial: bool = false) -> void:
 	home_asteroids[next_home_id] = {"position": Vector2(float(definition.initial_x) if initial else float(definition.entry_x), 0.0 if next_home_id % 2 == 1 else 1.0), "speed": rng.randf_range(definition.speed_min, definition.speed_max)}
 	fleet.register_asteroid(next_home_id, int(definition.minerals))
 
+func spawn_loot(region_id: String, position: Vector2, resource: String, amount: int) -> int:
+	# Threat rewards enter the same floating-resource pool used by salvage and
+	# Material Ships; only the source event is different.
+	if not floating_rules.types.has(resource) or amount < 1 or not fleet.regions.is_discovered(region_id): return -1
+	ensure_floating_region(region_id)
+	next_debris_id += 1
+	var definition: Dictionary = floating_rules.types[resource]
+	floating[region_id].pieces[next_debris_id] = {
+		"position": position.clamp(Vector2(0.01, 0.01), Vector2(0.99, 0.99)),
+		"velocity": Vector2.ZERO,
+		"resource": resource,
+		"amount": amount,
+		"remaining": float(definition.get("lifetime_seconds", floating_rules.lifetime_seconds))
+	}
+	var variants: Array = definition.get("visual_variants", [])
+	if not variants.is_empty():
+		var visual_random := RandomNumberGenerator.new()
+		visual_random.seed = int(fleet.regions.records[region_id].seed) ^ next_debris_id
+		floating[region_id].pieces[next_debris_id]["visual_variant"] = variants[visual_random.randi_range(0, variants.size() - 1)]
+	presentation_revision += 1
+	sync_mining_nodes()
+	return next_debris_id
+
 func salvage(debris_id: int, receiver: Callable = Callable(), limit: int = -1, region_id: String = "home") -> int:
 	var available: Dictionary = debris_in(region_id)
 	if not available.has(debris_id): return 0

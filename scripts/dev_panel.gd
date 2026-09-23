@@ -34,6 +34,14 @@ func _ready() -> void:
 	scroll.add_child(body)
 	var note: Label = hud._label(body, "Development tools. Grants target the viewed station and are included in ordinary saves. Materials respect storage capacity.", 13, hud.MUTED)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var threat_toggle := CheckButton.new()
+	threat_toggle.text = "Asteroid threats"
+	threat_toggle.button_pressed = hud.get_parent().threat_field.active
+	threat_toggle.custom_minimum_size.y = 44
+	threat_toggle.toggled.connect(func(value: bool) -> void: hud.get_parent().threat_field.set_threats_enabled(value))
+	body.add_child(threat_toggle)
+	var spawn_button: Button = _button(body, "Spawn asteroid now")
+	spawn_button.pressed.connect(func() -> void: hud.get_parent().threat_field.spawn_now())
 	for resource: String in ["materials", "minerals", "tech", "xenocrystal"]:
 		var amount: int = 10 if resource in ["tech", "xenocrystal"] else 100
 		var name: String = "Xenocrystals" if resource == "xenocrystal" else resource.capitalize()

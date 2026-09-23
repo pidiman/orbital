@@ -40,6 +40,14 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 				canvas.draw_line(Vector2(x, -20 + offset), Vector2(x + 18, -20 + offset), Color(0.35, 0.7, 0.74, opacity * 0.6), 1)
 			canvas.draw_line(Vector2(x + 9, -20), Vector2(x + 9, 20), cyan * Color(1, 1, 1, 0.5), 1)
 		canvas.draw_rect(Rect2(-4, -12, 8, 24), ink)
+	elif kind == "defense_turret":
+		# The base is drawn with the module; ThreatField overlays the rotating barrel.
+		var steel := Color("334858", opacity)
+		var accent := Color("ef8b67", opacity)
+		canvas.draw_circle(Vector2.ZERO, 18, Color("172733", opacity))
+		canvas.draw_circle(Vector2.ZERO, 18, steel, false, 2.0, true)
+		canvas.draw_circle(Vector2.ZERO, 9, Color("263b4a", opacity))
+		canvas.draw_circle(Vector2.ZERO, 6, accent, false, 2.0, true)
 	elif kind == "storage":
 		canvas.draw_rect(Rect2(-21, -18, 42, 36), Color(0.23, 0.24, 0.27, opacity))
 		canvas.draw_rect(Rect2(-21, -18, 42, 36), gold, false, 2)

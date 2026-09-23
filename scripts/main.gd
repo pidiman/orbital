@@ -17,10 +17,12 @@ const Board = preload("res://scripts/station_board.gd")
 const Debris = preload("res://scripts/debris_field.gd")
 const Clock = preload("res://scripts/resource_clock.gd")
 const Asteroids = preload("res://scripts/asteroid_field.gd")
+const Threats = preload("res://scripts/threat_field.gd")
 const Fleet = preload("res://scripts/mining_fleet.gd")
 const HUD = preload("res://scripts/hud.gd")
 var fleet: Fleet
 var asteroids: Node2D
+var threat_field: Node2D
 var mineral_count: int = 0
 var model: StationModel
 var board: Node2D
@@ -89,6 +91,10 @@ func _ready() -> void:
 	asteroids.fleet = fleet
 	asteroids.board = board
 	add_child(asteroids)
+	threat_field = Threats.new()
+	threat_field.name = "ThreatField"
+	threat_field.game = self
+	add_child(threat_field)
 	var collectors := preload("res://scripts/material_ship_view.gd").new()
 	collectors.name = "MaterialShips"
 	collectors.supply = supply
@@ -200,6 +206,7 @@ func _restore_presentation() -> void:
 	board.inspected_position = Vector2.INF
 	board.pulses.clear()
 	board.connector_masks_dirty = true
+	if is_instance_valid(threat_field): threat_field.reset_transient()
 	asteroids.selected_ship = -1
 	asteroids.rocks.clear()
 	asteroids._sync_view()

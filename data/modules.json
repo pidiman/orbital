@@ -97,6 +97,27 @@
       }
     ]
   },
+  "defense_turret": {
+    "name": "Defense Turret",
+    "cost": 60,
+    "power_use": 2,
+    "power_output": 0,
+    "capacity": 0,
+    "color": "ef8b67",
+    "description": "Tracks incoming asteroids and fires defensive bolts.",
+    "effect": "220 range · 1 shot/s · 2 power",
+    "defense_turret": {
+      "range": 220.0,
+      "fire_seconds": 1.0,
+      "projectile_speed": 330.0
+    },
+    "art": "defense_turret",
+    "upgrades": [
+      {"cost": {"materials": 45}, "stats": {"defense_turret": {"range": 285.0, "fire_seconds": 0.8}}, "description": "Range 220 → 285 · faster firing"},
+      {"cost": {"materials": 75}, "stats": {"defense_turret": {"range": 350.0, "fire_seconds": 0.6}}, "description": "Range 350 · rapid firing"},
+      {"cost": {"materials": 115}, "stats": {"defense_turret": {"range": 430.0, "fire_seconds": 0.45}}, "description": "Range 430 · high-rate firing"}
+    ]
+  },
   "storage": {
     "name": "Storage",
     "cost": 25,

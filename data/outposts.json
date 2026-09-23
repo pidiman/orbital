@@ -21,6 +21,7 @@
     },
     "buildable_modules": [
       "solar",
+      "defense_turret",
       "storage",
       "space_dock",
       "teleport_gate",

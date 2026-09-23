@@ -15,6 +15,12 @@
       "label": "Show Fit grid & zoom controls",
       "type": "bool",
       "default": true
+    },
+    {
+      "id": "show_ship_trajectories",
+      "label": "Show ship trajectories",
+      "type": "bool",
+      "default": false
     }
   ],
   "keyboard_zoom_rate": 1.5,

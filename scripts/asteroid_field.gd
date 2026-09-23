@@ -121,7 +121,8 @@ func _draw() -> void:
 			continue
 		var start: Vector2 = get_parent().ship_motion.origins.get(unit, home_position(unit))
 		var target: Vector2 = rocks[job.target].point
-		draw_dashed_line(start, target, Color(0.72, 0.62, 0.96, 0.4), 1.5, 7.0)
+		if get_parent().preferences.values.show_ship_trajectories:
+			draw_dashed_line(start, target, Color(0.72, 0.62, 0.96, 0.4), 1.5, 7.0)
 		var progress: float = 1.0 - float(job.remaining) / float(job.duration)
 		var ship_point: Vector2 = ship_position(unit)
 		var mining_art: String = "mining_ship"
