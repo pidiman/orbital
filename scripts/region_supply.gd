@@ -100,14 +100,13 @@ func _spawn_debris(_initial: bool = false, region_id: String = "home") -> void:
 			resource = kind
 			break
 	var definition: Dictionary = floating_rules.types[resource]
-	# Logical coordinates retain the existing collection projection/flight units.
-	var extent: Vector2 = Vector2(StationGeometry.grid_dimensions) * StationGeometry.MODULE_SIZE * 0.5 / Vector2(900, 605)
-	var center := Vector2(0.5, 0.5)
-	if region_id != fleet.regions.HOME:
-		extent = Vector2(0.7, 0.5)
-		center = Vector2(0.7, 0.5)
+	# Draw a uniform annulus around the local station/outpost. Sampling area
+	# rather than a rectangle keeps pickups scattered and keeps their minimum
+	# distance from the station predictable. Rejection keeps every point inside
+	# the playable logical map, including the off-center outpost projection.
+	var position: Vector2 = _spawn_position(random, region_id)
 	next_debris_id += 1
-	floating[region_id].pieces[next_debris_id] = {"position": center + Vector2(random.randf_range(-extent.x, extent.x), random.randf_range(-extent.y, extent.y)), "velocity": Vector2.ZERO, "resource": resource, "amount": random.randi_range(int(definition.amount_min), int(definition.amount_max)), "remaining": float(definition.get("lifetime_seconds", floating_rules.lifetime_seconds))}
+	floating[region_id].pieces[next_debris_id] = {"position": position, "velocity": Vector2.ZERO, "resource": resource, "amount": random.randi_range(int(definition.amount_min), int(definition.amount_max)), "remaining": float(definition.get("lifetime_seconds", floating_rules.lifetime_seconds))}
 	var variants: Array = definition.get("visual_variants", [])
 	if not variants.is_empty():
 		# Fork the per-region seeded stream: visual rolls never shift economy draws.
@@ -117,6 +116,25 @@ func _spawn_debris(_initial: bool = false, region_id: String = "home") -> void:
 		floating[region_id].pieces[next_debris_id]["visual_variant"] = variants[visual_random.randi_range(0, variants.size() - 1)]
 	record.rng_state = str(random.state)
 	sync_mining_nodes()
+
+func _spawn_position(random: RandomNumberGenerator, region_id: String) -> Vector2:
+	var zones: Dictionary = floating_rules.get("spawn_zone", {})
+	var zone_name: String = "home" if region_id == fleet.regions.HOME else "outpost"
+	var zone: Dictionary = zones.get(zone_name, {})
+	var center_values: Array = zone.get("center", [0.5, 0.5])
+	var center := Vector2(float(center_values[0]), float(center_values[1]))
+	var min_radius: float = maxf(0.0, float(zone.get("min_radius", 0.18)))
+	var max_radius: float = maxf(min_radius, float(zone.get("max_radius", 0.4)))
+	var edge_margin: float = clampf(float(zones.get("edge_margin", 0.04)), 0.0, 0.45)
+	for _attempt in range(32):
+		var angle: float = random.randf_range(0.0, TAU)
+		# sqrt produces an even spread over the annulus area, avoiding a ring.
+		var radius: float = sqrt(random.randf_range(min_radius * min_radius, max_radius * max_radius))
+		var candidate := center + Vector2.from_angle(angle) * radius
+		if candidate.x >= edge_margin and candidate.x <= 1.0 - edge_margin and candidate.y >= edge_margin and candidate.y <= 1.0 - edge_margin:
+			return candidate
+	# The fallback is still in-bounds if a future zone is tuned too close to an edge.
+	return center.clamp(Vector2(edge_margin, edge_margin), Vector2(1.0 - edge_margin, 1.0 - edge_margin))
 
 func ensure_floating_region(region_id: String) -> void:
 	if floating.has(region_id) or not fleet.regions.is_discovered(region_id): return
