@@ -1306,7 +1306,11 @@ func pointer_over_ui(point: Vector2) -> bool:
 	for control: Control in controls:
 		if control.is_visible_in_tree() and control.get_global_rect().has_point(point): return true
 	var hovered := get_viewport().gui_get_hovered_control()
-	return is_instance_valid(hovered) and hovered != root and hovered.mouse_filter != Control.MOUSE_FILTER_IGNORE
+	# gui_get_hovered_control() can remain on the last panel control while the
+	# pointer has moved onto the map. Only block world input when its bounds
+	# actually contain this click; otherwise empty-map clicks can close a ship
+	# panel and clear its selection as intended.
+	return is_instance_valid(hovered) and hovered != root and hovered.mouse_filter != Control.MOUSE_FILTER_IGNORE and hovered.get_global_rect().has_point(point)
 
 func _setup_menu() -> void:
 	menu_panel = PanelContainer.new()
