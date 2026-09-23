@@ -33,6 +33,7 @@ var grid_controls_panel: PanelContainer
 var grid_controls: HBoxContainer
 var grid_buttons: Dictionary = {}
 var menu_buttons: Dictionary = {}
+var demolish_top_button: Button
 var menu_panel: PanelContainer
 var settings_button: Button
 var footer_balance: Control
@@ -228,12 +229,6 @@ func _ready() -> void:
 		button.name = kind.capitalize() + "Button"
 		button.pressed.connect(func() -> void: choose(kind))
 		tool_buttons[kind] = button
-	var demolish_tool := Button.new()
-	demolish_tool.text = "Demolish mode"
-	demolish_tool.custom_minimum_size.y = 34
-	demolish_tool.tooltip_text = "Toggle this mode, then click one of your placed modules to demolish it."
-	demolish_tool.pressed.connect(func() -> void: choose("__demolish__"))
-	module_page.add_child(demolish_tool)
 	_build_ships_page()
 	_build_upgrade_page()
 	research_button = Button.new()
@@ -338,12 +333,22 @@ func choose(kind: String) -> void:
 	for id: String in tool_buttons:
 		tool_buttons[id].add_theme_stylebox_override("normal", _style(Color("1f3a3c") if id == selected else Color("172738"), CYAN if id == selected else Color("304557")))
 	tool_selected.emit(kind)
+	_refresh_demolish_button()
 	if kind == "__demolish__":
 		message("Demolish mode active. Click a placed module to remove it.", true)
 	elif kind.is_empty():
 		message("Click labeled floating resources to collect; violet asteroids dispatch a Miner.")
 	else:
 		message("%s selected. Click a green cell beside the station." % model.catalog[kind].name)
+
+func toggle_demolish_mode() -> void:
+	choose("" if selected == "__demolish__" else "__demolish__")
+
+func _refresh_demolish_button() -> void:
+	if not is_instance_valid(demolish_top_button): return
+	var active: bool = selected == "__demolish__"
+	demolish_top_button.add_theme_stylebox_override("normal", _style(Color("25404b") if active else Color("172738"), CYAN if active else Color("304557")))
+	demolish_top_button.add_theme_stylebox_override("hover", _style(Color("315463") if active else Color("25404b"), CYAN))
 
 func refresh() -> void:
 	build_model.recalculate()
@@ -875,7 +880,7 @@ func _setup_menus() -> void:
 		label.mouse_filter = Control.MOUSE_FILTER_STOP
 	resource_bar.hide()
 	toolbar = GridContainer.new()
-	toolbar.columns = 7
+	toolbar.columns = 8
 	toolbar.add_theme_constant_override("h_separation", 3)
 	toolbar.add_theme_constant_override("v_separation", 8)
 	menu_scroll = ScrollContainer.new()
@@ -894,6 +899,16 @@ func _setup_menus() -> void:
 		button.pressed.connect(func() -> void: open_menu(caption))
 		toolbar.add_child(button)
 		menu_buttons[caption] = button
+		if caption == "Build":
+			demolish_top_button = Button.new()
+			demolish_top_button.text = "Demolish"
+			demolish_top_button.custom_minimum_size.y = 28
+			demolish_top_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			demolish_top_button.add_theme_font_size_override("font_size", 11)
+			demolish_top_button.tooltip_text = "Toggle demolish mode, then click one of your placed modules."
+			demolish_top_button.pressed.connect(toggle_demolish_mode)
+			toolbar.add_child(demolish_top_button)
+			_refresh_demolish_button()
 	research_button.get_parent().remove_child(research_button)
 	research_button.queue_free()
 	research_button = menu_buttons["Research"]
