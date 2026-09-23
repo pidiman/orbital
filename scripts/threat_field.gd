@@ -9,7 +9,9 @@ var missiles: Array[Dictionary] = []
 var bursts: Array[Dictionary] = []
 var turret_angles: Dictionary = {}
 var turret_cooldowns: Dictionary = {}
+var silo_angles: Dictionary = {}
 var silo_cooldowns: Dictionary = {}
+var silo_tube_indices: Dictionary = {}
 var next_id: int = 1
 var spawn_remaining: float = 45.0
 var active: bool = true
@@ -32,7 +34,9 @@ func _set_region() -> void:
 	bursts.clear()
 	turret_angles.clear()
 	turret_cooldowns.clear()
+	silo_angles.clear()
 	silo_cooldowns.clear()
+	silo_tube_indices.clear()
 	var record: Dictionary = game.fleet.regions.records.get(region_id, {})
 	rng.seed = int(record.get("seed", 1)) ^ 0x5EED7
 	spawn_remaining = _next_spawn_delay()
@@ -48,7 +52,9 @@ func reset_transient() -> void:
 	bursts.clear()
 	turret_angles.clear()
 	turret_cooldowns.clear()
+	silo_angles.clear()
 	silo_cooldowns.clear()
+	silo_tube_indices.clear()
 	spawn_remaining = _next_spawn_delay()
 
 func spawn_now() -> void:
@@ -173,13 +179,25 @@ func _update_silos(delta: float) -> void:
 		var origin: Vector2 = game.board.world_to_screen(point)
 		var definition: Dictionary = _silo_stats(station, point)
 		var target_id: int = _closest_threat(origin, float(definition.get("range", 260.0)))
+		var current_angle: float = float(silo_angles.get(structure_id, TURRET_NEUTRAL_ANGLE))
+		if target_id != -1:
+			var desired: float = (threats[target_id].position - origin).angle() + PI / 2.0
+			current_angle = rotate_toward(current_angle, desired, TURRET_TURN_SPEED * delta)
+		else:
+			var scan_speed: float = float(rules.get("turret", {}).get("idle_scan_speed", 0.32))
+			current_angle = fmod(current_angle + scan_speed * delta, TAU)
+		silo_angles[structure_id] = current_angle
 		var cooldown: float = maxf(0.0, float(silo_cooldowns.get(structure_id, 0.0)) - delta)
 		if target_id != -1 and cooldown <= 0.0:
-			_fire_missile(structure_id, origin, target_id, definition)
+			_fire_missile(structure_id, origin, target_id, definition, int(silo_tube_indices.get(structure_id, 0)))
+			silo_tube_indices[structure_id] = (int(silo_tube_indices.get(structure_id, 0)) + 1) % 3
 			cooldown = float(definition.get("fire_seconds", 4.0))
 		silo_cooldowns[structure_id] = cooldown
 	for id: Variant in silo_cooldowns.keys():
-		if not live.has(id): silo_cooldowns.erase(id)
+		if not live.has(id):
+			silo_cooldowns.erase(id)
+			silo_angles.erase(id)
+			silo_tube_indices.erase(id)
 
 func _fire(structure_id: String, origin: Vector2, target_id: int, definition: Dictionary) -> void:
 	if not threats.has(target_id): return
@@ -217,11 +235,13 @@ func _silo_stats(station: StationModel, point: Vector2) -> Dictionary:
 		base[key] = current[key]
 	return base
 
-func _fire_missile(structure_id: String, origin: Vector2, target_id: int, definition: Dictionary) -> void:
+func _fire_missile(structure_id: String, origin: Vector2, target_id: int, definition: Dictionary, tube_index: int) -> void:
 	if not threats.has(target_id): return
 	var speed: float = maxf(1.0, float(definition.get("projectile_speed", 150.0)))
-	var muzzle: Vector2 = origin + Vector2(0, -22)
-	var direction: Vector2 = (threats[target_id].position - muzzle).normalized()
+	var launcher_angle: float = float(silo_angles.get(structure_id, TURRET_NEUTRAL_ANGLE))
+	var tube_offset: float = float(tube_index - 1) * 10.0
+	var direction: Vector2 = Vector2(0.0, -1.0).rotated(launcher_angle).normalized()
+	var muzzle: Vector2 = origin + Vector2(tube_offset, -22.0).rotated(launcher_angle)
 	var distance: float = muzzle.distance_to(threats[target_id].position)
 	missiles.append({
 		"position": muzzle,
@@ -304,6 +324,19 @@ func _draw() -> void:
 		draw_set_transform(origin, float(turret_angles.get(id, TURRET_NEUTRAL_ANGLE)))
 		draw_line(Vector2.ZERO, Vector2(0, -barrel_length), Color("ef8b67"), 5.0, true)
 		draw_circle(Vector2(0, -barrel_length), 3.0, Color("ffb478"))
+		draw_set_transform(Vector2.ZERO)
+	for point: Vector2 in station.modules:
+		if station.modules[point] != "missile_silo" or not station.is_module_active(point): continue
+		var id: String = station.structure_id_at(point)
+		var origin: Vector2 = game.board.world_to_screen(point)
+		var barrel_length: float = 22.0
+		draw_set_transform(origin, float(silo_angles.get(id, TURRET_NEUTRAL_ANGLE)))
+		# Rotating upper rack: all three tubes track as one launcher.
+		draw_circle(Vector2.ZERO, 14.0, Color("263b4a"))
+		draw_circle(Vector2.ZERO, 14.0, Color("d97863"), false, 1.8, true)
+		for x in [-10.0, 0.0, 10.0]:
+			draw_line(Vector2(x, 3), Vector2(x, -barrel_length), Color("586a76"), 5.0, true)
+			draw_circle(Vector2(x, -barrel_length), 3.0, Color("e9a070"))
 		draw_set_transform(Vector2.ZERO)
 	for projectile: Dictionary in projectiles:
 		var direction: Vector2 = projectile.velocity.normalized()
