@@ -1,0 +1,21 @@
+{
+  "default_max_hp": 12,
+  "tier_hp_bonus": 4,
+  "modules": {
+    "habitat": 24,
+    "teleport_gate": 20,
+    "missile_silo": 18,
+    "defense_turret": 16,
+    "refinery": 16,
+    "research_lab": 16,
+    "space_depot": 14,
+    "space_dock": 14,
+    "storage": 14,
+    "solar": 12,
+    "connector_tube": 8
+  },
+  "repair": {
+    "materials_per_hp": 3,
+    "seconds_per_hp": 0.8
+  }
+}

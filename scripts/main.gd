@@ -134,6 +134,7 @@ func _ready() -> void:
 	hud.ship_assignment_requested.connect(func(ship_id: int) -> void: asteroids.selected_ship = ship_id)
 	board.module_selected.connect(hud.inspect_module)
 	board.requested_build.connect(_build)
+	board.requested_demolish.connect(_demolish_at)
 	debris.salvaged.connect(hud.show_salvage)
 	debris.full_storage.connect(func() -> void: hud.message("Storage full. Build a module or add Storage capacity.", true))
 	asteroids.notice.connect(hud.message)
@@ -170,6 +171,11 @@ func _build(world_position: Vector2) -> void:
 		hud.message(error, true)
 	elif previous_level == model.level:
 		hud.message("%s connected. Your station is growing." % model.catalog[board.selected].name)
+
+func _demolish_at(world_position: Vector2) -> void:
+	var refund: int = board.model.module_refund(world_position)
+	var error: String = board.model.demolish_module(world_position)
+	hud.message("Module demolished · +%d Materials." % refund if error.is_empty() else error, not error.is_empty())
 
 func _sync_readouts() -> void:
 	module_count = model.modules.size()

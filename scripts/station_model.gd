@@ -11,6 +11,7 @@ signal changed
 signal ship_built(ship_id: int)
 signal module_upgraded(world_position: Vector2)
 signal module_damaged(world_position: Vector2)
+signal module_hp_changed(world_position: Vector2)
 signal ticked
 signal refined(amount: int)
 signal module_built(world_position: Vector2, kind: String)
@@ -20,6 +21,7 @@ signal level_reached(level: int)
 var research: RefCounted
 var region_context: RefCounted
 var decommission_rules: Dictionary = {}
+var durability_rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/module_durability.json"))
 var catalog: Dictionary = {}
 var ship_catalog: Dictionary = {}
 var ships: Dictionary:
@@ -72,6 +74,8 @@ func _init() -> void:
 
 func recalculate() -> void:
 	_refresh_connectivity()
+	for world_position: Vector2 in modules:
+		_ensure_module_hp(world_position)
 	var is_home: bool = station_id.is_empty() or station_id == locations.primary_station()
 	var station: Dictionary = locations.stations.get(station_id, {})
 	var outpost: Dictionary = {} if is_home else locations.outpost_catalog.get(str(station.get("kind", "")), {})
@@ -464,25 +468,65 @@ func is_module_active(world_position: Vector2) -> bool:
 	return bool(connected_modules.get(world_position, false)) and not is_module_damaged(world_position)
 
 func is_module_damaged(world_position: Vector2) -> bool:
-	return modules.has(world_position) and bool(structure_state(world_position).get("damaged", false))
+	return modules.has(world_position) and module_hp(world_position) <= 0
 
-func damage_module(world_position: Vector2) -> bool:
-	if not modules.has(world_position) or is_module_damaged(world_position): return false
-	structure_state(world_position)["damaged"] = true
+func module_max_hp(world_position: Vector2) -> int:
+	if not modules.has(world_position): return 0
+	var kind: String = modules[world_position]
+	var base: int = int(durability_rules.get("modules", {}).get(kind, durability_rules.get("default_max_hp", 12)))
+	return base + maxi(0, tier_at(world_position) - 1) * int(durability_rules.get("tier_hp_bonus", 4))
+
+func module_hp(world_position: Vector2) -> int:
+	if not modules.has(world_position): return 0
+	_ensure_module_hp(world_position)
+	return clampi(int(structure_state(world_position).get("hp", module_max_hp(world_position))), 0, module_max_hp(world_position))
+
+func _ensure_module_hp(world_position: Vector2) -> void:
+	if not modules.has(world_position): return
+	var state: Dictionary = structure_state(world_position)
+	var maximum: int = module_max_hp(world_position)
+	if not state.has("hp"):
+		# HP was introduced after the earlier binary damaged flag. Legacy
+		# structures have no durable HP value, so they migrate as healthy at
+		# their current type/tier maximum; only canonical saves preserve HP.
+		state["hp"] = maximum
+	state["hp"] = clampi(int(state.hp), 0, maximum)
+	state.erase("damaged")
+
+func damage_module(world_position: Vector2, amount: int = 1) -> bool:
+	if not modules.has(world_position) or amount <= 0: return false
+	_ensure_module_hp(world_position)
+	var state: Dictionary = structure_state(world_position)
+	var before: int = int(state.hp)
+	state.hp = maxi(0, before - amount)
+	if before == int(state.hp): return false
 	recalculate()
-	module_damaged.emit(world_position)
+	module_hp_changed.emit(world_position)
+	if before > 0 and int(state.hp) == 0: module_damaged.emit(world_position)
 	var root_model: Variant = locations.model_ref.get_ref() if locations.model_ref != null else null
 	if root_model != null and root_model != self:
-		root_model.module_damaged.emit(world_position)
+		root_model.module_hp_changed.emit(world_position)
+		if before > 0 and int(state.hp) == 0: root_model.module_damaged.emit(world_position)
+		root_model.changed.emit()
 	changed.emit()
 	return true
 
-func repair_module(world_position: Vector2) -> bool:
-	if not modules.has(world_position) or not is_module_damaged(world_position): return false
-	structure_state(world_position)["damaged"] = false
+func repair_module(world_position: Vector2, amount: int = 1) -> int:
+	if not modules.has(world_position) or amount <= 0: return 0
+	_ensure_module_hp(world_position)
+	var state: Dictionary = structure_state(world_position)
+	var before: int = int(state.hp)
+	state.hp = mini(module_max_hp(world_position), before + amount)
+	var restored: int = int(state.hp) - before
+	if restored <= 0: return 0
 	recalculate()
+	module_hp_changed.emit(world_position)
 	changed.emit()
-	return true
+	var root_model: Variant = locations.model_ref.get_ref() if locations.model_ref != null else null
+	if root_model != null and root_model != self:
+		root_model.module_hp_changed.emit(world_position)
+		root_model.changed.emit()
+	return restored
 
 func is_structure_active(structure_id: String) -> bool:
 	if not locations.structures.has(structure_id): return false

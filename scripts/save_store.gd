@@ -51,6 +51,7 @@ func _init(station: StationModel, mining: Fleet, region_supply: Supply) -> void:
 	model.module_removed.connect(request_autosave.unbind(1))
 	model.module_upgraded.connect(request_autosave.unbind(1))
 	model.module_damaged.connect(request_autosave.unbind(1))
+	model.module_hp_changed.connect(request_autosave.unbind(1))
 	model.ship_built.connect(request_autosave.unbind(1))
 	model.ship_removed.connect(request_autosave.unbind(1))
 	fleet.dispatched.connect(request_autosave.unbind(2))

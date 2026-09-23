@@ -1,6 +1,7 @@
 extends Node2D
 const Geometry = preload("res://scripts/station_geometry.gd")
 signal requested_build(world_position: Vector2)
+signal requested_demolish(world_position: Vector2)
 signal module_selected(world_position: Vector2)
 var model: StationModel
 var selected: String = ""
@@ -59,7 +60,12 @@ func _connector_structure_changed(_position: Vector2, _kind: String = "") -> voi
 func handle_click(point: Vector2) -> bool:
 	if not visible: return false
 	var world_point: Vector2 = get_canvas_transform().affine_inverse() * point
-	if not selected.is_empty():
+	if selected == "__demolish__":
+		var demolition_target: Vector2 = module_at_screen(world_point)
+		if demolition_target != Vector2.INF:
+			requested_demolish.emit(demolition_target)
+		return true
+	if not selected.is_empty() and selected != "__demolish__":
 		requested_build.emit(placement_position(world_point))
 		return true
 	if module_at_screen(world_point) != Vector2.INF:
@@ -118,6 +124,13 @@ func _draw() -> void:
 			draw_circle(inactive_point, 7, Color("6b7780", 0.9))
 			draw_line(inactive_point - Vector2(3, 3), inactive_point + Vector2(3, 3), Color("e88982"), 2)
 			draw_line(inactive_point + Vector2(-3, 3), inactive_point + Vector2(3, -3), Color("e88982"), 2)
+		if inspected_position == world_position:
+			var hp: int = model.module_hp(world_position)
+			var maximum_hp: int = model.module_max_hp(world_position)
+			var hp_point: Vector2 = world_to_screen(world_position) + Vector2(-25, 32)
+			draw_rect(Rect2(hp_point, Vector2(50, 4)), Color("263848"))
+			draw_rect(Rect2(hp_point, Vector2(50.0 * float(hp) / float(maximum_hp), 4)), Color("8ee6ad") if hp > 0 else Color("e88982"))
+			draw_string(ThemeDB.fallback_font, hp_point + Vector2(0, 16), "HP %d/%d" % [hp, maximum_hp], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("d6e5ec"))
 	for world_position: Vector2 in model.modules:
 		if model.catalog[model.modules[world_position]].has("upgrades"):
 			var point: Vector2 = world_to_screen(world_position) + Vector2(12, -19)
@@ -125,7 +138,7 @@ func _draw() -> void:
 			draw_string(ThemeDB.fallback_font, point, "T%d" % model.tier_at(world_position), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("7ce8ce") if model.tier_at(world_position) > 1 else Color("a2b5c3"))
 	if model.modules.has(inspected_position):
 		draw_rect(screen_footprint(inspected_position, model.modules[inspected_position]), Color("88d9c6"), false, 1.5)
-	if not selected.is_empty() and absi(hover_cell.x) <= grid_radius.x and absi(hover_cell.y) <= grid_radius.y:
+	if not selected.is_empty() and selected != "__demolish__" and absi(hover_cell.x) <= grid_radius.x and absi(hover_cell.y) <= grid_radius.y:
 		var valid: bool = model.placement_error(placement_position(get_global_mouse_position()), selected).is_empty()
 		var color := Color("75e1c5") if valid else Color("ee8c86")
 		var rect := screen_footprint(placement_position(get_global_mouse_position()), selected)

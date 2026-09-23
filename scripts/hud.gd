@@ -228,6 +228,12 @@ func _ready() -> void:
 		button.name = kind.capitalize() + "Button"
 		button.pressed.connect(func() -> void: choose(kind))
 		tool_buttons[kind] = button
+	var demolish_tool := Button.new()
+	demolish_tool.text = "Demolish mode"
+	demolish_tool.custom_minimum_size.y = 34
+	demolish_tool.tooltip_text = "Toggle this mode, then click one of your placed modules to demolish it."
+	demolish_tool.pressed.connect(func() -> void: choose("__demolish__"))
+	module_page.add_child(demolish_tool)
 	_build_ships_page()
 	_build_upgrade_page()
 	research_button = Button.new()
@@ -332,7 +338,12 @@ func choose(kind: String) -> void:
 	for id: String in tool_buttons:
 		tool_buttons[id].add_theme_stylebox_override("normal", _style(Color("1f3a3c") if id == selected else Color("172738"), CYAN if id == selected else Color("304557")))
 	tool_selected.emit(kind)
-	message("Click labeled floating resources to collect; violet asteroids dispatch a Miner." if kind.is_empty() else "%s selected. Click a green cell beside the station." % model.catalog[kind].name)
+	if kind == "__demolish__":
+		message("Demolish mode active. Click a placed module to remove it.", true)
+	elif kind.is_empty():
+		message("Click labeled floating resources to collect; violet asteroids dispatch a Miner.")
+	else:
+		message("%s selected. Click a green cell beside the station." % model.catalog[kind].name)
 
 func refresh() -> void:
 	build_model.recalculate()
@@ -533,6 +544,9 @@ func _refresh_ships() -> void:
 			status = "Trading · %ds" % fleet.diplomacy.jobs[ship_id].remaining
 		elif fleet.cargo.routes.has(ship_id):
 			status = str(fleet.cargo.routes[ship_id].status)
+		elif fleet.repairs.jobs.has(ship_id):
+			var repair_job: Dictionary = fleet.repairs.jobs[ship_id]
+			status = "Repairing · waiting" if bool(repair_job.get("waiting", false)) else ("Repairing" if str(repair_job.phase) == "repairing" else "Repair transit")
 		for capability: String in capability_buttons[ship_id]:
 			var button: Button = capability_buttons[ship_id][capability]
 			button.text = "%s #%d · %s" % [definition.name, ship_id, status if not status.is_empty() else str(definition[capability].get("assignment_label", SHIP_ACTIONS[capability]))]
@@ -708,7 +722,10 @@ func _refresh_upgrade() -> void:
 	upgrade_title.hide() # The inspect header carries the module name and tier.
 	if tabs.current_tab == 2 and panel.has_node("MenuFrame"):
 		panel.get_node("MenuFrame").get_child(0).get_child(0).text = "%s · Tier %d" % [definition.name, build_model.tier_at(selected_position)]
-	upgrade_stats.text = "Generates %d Power · uses %d\nMaterial capacity bonus: %d" % [definition.power_output, definition.power_use, definition.capacity]
+	var current_hp: int = build_model.module_hp(selected_position)
+	var maximum_hp: int = build_model.module_max_hp(selected_position)
+	var hp_status: String = "Damaged" if current_hp <= 0 else ("Operational" if current_hp == maximum_hp else "Operational · damaged")
+	upgrade_stats.text = "HP: %d / %d · %s\nGenerates %d Power · uses %d\nMaterial capacity bonus: %d" % [current_hp, maximum_hp, hp_status, definition.power_output, definition.power_use, definition.capacity]
 	if definition.has("docking"):
 		var dock_id: String = build_model.structure_id_at(selected_position)
 		upgrade_stats.text += "\nParking: %d / %d ships" % [fleet.docking.usage.get(dock_id, {}).size(), int(definition.docking.capacity)]
@@ -1077,6 +1094,9 @@ func _refresh_tray() -> void:
 		if fleet.hauling.jobs.has(id): status = str(fleet.hauling.jobs[id].status)
 		if fleet.collection.jobs.has(id): status = str(fleet.collection.jobs[id].status)
 		if fleet.transport.jobs.has(id): status = "In transit"
+		if fleet.repairs.jobs.has(id):
+			var repair_job: Dictionary = fleet.repairs.jobs[id]
+			status = "Repairing · waiting" if bool(repair_job.get("waiting", false)) else ("Repairing" if str(repair_job.phase) == "repairing" else "Repair transit")
 		var tile = ship_tiles[id]
 		tile.status = status
 		tile.status_color = GOLD if status.to_lower().contains("wait") or status.to_lower().contains("full") else (CYAN if fleet.unit_busy(id) else MUTED)

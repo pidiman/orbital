@@ -124,11 +124,11 @@ func _impact(id: int) -> void:
 		var threat: Dictionary = threats[id]
 		var definition: Dictionary = rules.sizes[threat.size]
 		if rng.randf() <= float(definition.get("impact_damage_chance", 1.0)):
-			_damage_nearest_module(threat.position)
+			_damage_nearest_module(threat.position, int(definition.get("impact_damage", 1)))
 		bursts.append({"position": threats[id].position, "time": 0.0, "color": Color("67727e")})
 		threats.erase(id)
 
-func _damage_nearest_module(position: Vector2) -> void:
+func _damage_nearest_module(position: Vector2, amount: int) -> void:
 	if not game.board.visible: return
 	var station: StationModel = game.board.model
 	var nearest: Vector2 = Vector2.INF
@@ -138,7 +138,7 @@ func _damage_nearest_module(position: Vector2) -> void:
 		if candidate < distance:
 			distance = candidate
 			nearest = point
-	if nearest != Vector2.INF and station.damage_module(nearest):
+	if nearest != Vector2.INF and station.damage_module(nearest, amount):
 		game.hud.message("Asteroid impact damaged %s." % station.catalog[station.modules[nearest]].name, true)
 
 func _update_turrets(delta: float) -> void:

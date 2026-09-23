@@ -28,7 +28,7 @@ func advance(delta: float) -> void:
 			continue
 		var structure: Dictionary = model.locations.structures[job.target]
 		var scope: StationModel = model if structure.station_id == model.locations.primary_station() else model.scoped_station(structure.station_id)
-		if not scope.is_module_damaged(structure.position):
+		if scope.module_hp(structure.position) >= scope.module_max_hp(structure.position):
 			jobs.erase(ship_id)
 			continue
 		if str(job.region) != model.locations.ship_region(ship_id):
@@ -38,21 +38,27 @@ func advance(delta: float) -> void:
 			job.travel_remaining = float(job.travel_remaining) - delta
 			if float(job.travel_remaining) > 0.0: continue
 			job.phase = "repairing"
-		if not bool(job.get("cost_paid", false)):
-			var cost: int = int(job.cost)
-			if scope.materials < cost:
+		job.progress = float(job.get("progress", 0.0)) + delta
+		var repair_defaults: Dictionary = model.durability_rules.get("repair", {})
+		var seconds_per_hp: float = maxf(0.1, float(job.get("seconds_per_hp", repair_defaults.get("seconds_per_hp", 0.8))))
+		var repaired: bool = false
+		while float(job.progress) >= seconds_per_hp and scope.module_hp(structure.position) < scope.module_max_hp(structure.position):
+			var cost_per_hp: int = maxi(1, int(job.get("materials_per_hp", repair_defaults.get("materials_per_hp", 3))))
+			if scope.materials < cost_per_hp:
 				if not bool(job.get("waiting", false)):
 					job.waiting = true
 					notice.emit("Repair Ship waiting — insufficient Materials")
+				# Do not bank elapsed repair time while waiting for input.
+				job.progress = minf(float(job.progress), seconds_per_hp)
 				changed.emit()
-				continue
-			scope.materials -= cost
-			job.cost_paid = true
+				break
+			scope.materials -= cost_per_hp
+			scope.repair_module(structure.position, 1)
+			job.progress = float(job.progress) - seconds_per_hp
 			job.waiting = false
-			changed.emit()
-		job.remaining = float(job.remaining) - delta
-		if float(job.remaining) <= 0.0:
-			scope.repair_module(structure.position)
+			repaired = true
+		if repaired: changed.emit()
+		if scope.module_hp(structure.position) >= scope.module_max_hp(structure.position):
 			jobs.erase(ship_id)
 			changed.emit()
 	changed.emit()
@@ -67,10 +73,9 @@ func _assign_idle_ships() -> void:
 		var target: String = _nearest_damaged(region, claimed, ship_id)
 		if target.is_empty(): continue
 		var structure: Dictionary = model.locations.structures[target]
-		var tier: int = int(structure.state.get("tier", 1))
 		var capability: Dictionary = definition.repair
-		var cost: int = int(capability.get("materials_base", 15)) + maxi(0, tier - 1) * int(capability.get("materials_per_tier", 10))
-		jobs[ship_id] = {"target": target, "region": region, "phase": "travel", "travel_remaining": float(capability.get("travel_seconds", 2)), "remaining": float(capability.get("seconds", 5)) + float(tier - 1), "duration": float(capability.get("seconds", 5)) + float(tier - 1), "cost": cost, "cost_paid": false, "waiting": false}
+		var repair_defaults: Dictionary = model.durability_rules.get("repair", {})
+		jobs[ship_id] = {"target": target, "region": region, "phase": "travel", "travel_remaining": float(capability.get("travel_seconds", 2)), "progress": 0.0, "seconds_per_hp": float(capability.get("seconds_per_hp", repair_defaults.get("seconds_per_hp", 0.8))), "materials_per_hp": int(capability.get("materials_per_hp", repair_defaults.get("materials_per_hp", 3))), "waiting": false}
 		claimed[target] = true
 		changed.emit()
 
@@ -84,8 +89,11 @@ func _nearest_damaged(region: String, claimed: Dictionary, ship_id: int) -> Stri
 		var structure: Dictionary = model.locations.structures[id]
 		if structure.region != region or structure.owner != model.locations.rules.primary_station.owner or claimed.has(id): continue
 		var scope: StationModel = model if structure.station_id == model.locations.primary_station() else model.scoped_station(structure.station_id)
-		if not scope.is_module_damaged(structure.position): continue
-		var candidate: float = origin.distance_squared_to(structure.position)
+		var hp: int = scope.module_hp(structure.position)
+		var maximum: int = scope.module_max_hp(structure.position)
+		if hp >= maximum: continue
+		# Prioritize the lowest HP percentage, then the nearest module.
+		var candidate: float = float(hp) / float(maximum) * 100000.0 + origin.distance_squared_to(structure.position)
 		if candidate < distance:
 			distance = candidate
 			best = id
