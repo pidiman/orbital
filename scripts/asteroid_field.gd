@@ -98,6 +98,7 @@ func _draw() -> void:
 		if fleet.transport.jobs.has(ship_id):
 			var point: Vector2 = ship_position(ship_id)
 			var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
+			get_parent().ship_motion.draw_exhaust(self, ship_id, point, definition.get("art", "scout"), _ship_scale(definition), get_parent().ship_motion.angle_for(ship_id), Color(definition.get("color", "8bcdf1")))
 			ModuleArt.draw_module(self, point, definition.get("art", "scout"), _ship_scale(definition), 0.5, get_parent().ship_motion.angle_for(ship_id))
 			draw_string(font, point + Vector2(-30, 40), "In transit", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ORE)
 			continue
@@ -106,6 +107,7 @@ func _draw() -> void:
 		var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
 		if not fleet.jobs.has(ship_id):
 			var point: Vector2 = ship_position(ship_id)
+			get_parent().ship_motion.draw_exhaust(self, ship_id, point, definition.get("art", "scout"), _ship_scale(definition), get_parent().ship_motion.angle_for(ship_id), Color(definition.get("color", "8bcdf1")))
 			ModuleArt.draw_module(self, point, definition.get("art", "scout"), _ship_scale(definition), 1.0, get_parent().ship_motion.angle_for(ship_id))
 			var text: String = "%s #%d" % [definition.name, ship_id]
 			if fleet.regions.survey_jobs.has(ship_id):
@@ -127,6 +129,8 @@ func _draw() -> void:
 		var ship_point: Vector2 = ship_position(unit)
 		var mining_art: String = "mining_ship"
 		if unit is int and fleet.model.ships.has(unit): mining_art = fleet.model.ship_catalog[fleet.model.ships[unit]].get("art", "mining_ship")
+		var mining_definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[unit]] if unit is int and fleet.model.ships.has(unit) else {"color": "e8ad5b"}
+		get_parent().ship_motion.draw_exhaust(self, unit, ship_point, mining_art, 0.55, get_parent().ship_motion.angle_for(unit), Color(mining_definition.get("color", "e8ad5b")))
 		ModuleArt.draw_module(self, ship_point, mining_art, 0.55, 1.0, get_parent().ship_motion.angle_for(unit))
 		# Beam visibility is state-gated: only the stationary extraction phase emits it.
 		if get_parent().ship_motion.mining_state(unit) == "EXTRACTING":

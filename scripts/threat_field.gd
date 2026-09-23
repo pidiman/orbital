@@ -124,9 +124,16 @@ func _update_turrets(delta: float) -> void:
 		var target_id: int = _closest_threat(origin, float(definition.get("range", 220.0)))
 		# The barrel is drawn along local up (Vector2(0, -25)), so compensate
 		# by PI/2 when converting the target direction into its visual rotation.
-		var desired: float = TURRET_NEUTRAL_ANGLE
-		if target_id != -1: desired = (threats[target_id].position - origin).angle() + PI / 2.0
-		turret_angles[structure_id] = rotate_toward(float(turret_angles.get(structure_id, desired)), desired, TURRET_TURN_SPEED * delta)
+		var current_angle: float = float(turret_angles.get(structure_id, TURRET_NEUTRAL_ANGLE))
+		if target_id != -1:
+			var desired: float = (threats[target_id].position - origin).angle() + PI / 2.0
+			current_angle = rotate_toward(current_angle, desired, TURRET_TURN_SPEED * delta)
+		else:
+			# A slow continuous scan keeps idle turrets visually active. It is
+			# presentation-only and immediately gives way to target tracking.
+			var scan_speed: float = float(rules.get("turret", {}).get("idle_scan_speed", 0.32))
+			current_angle = fmod(current_angle + scan_speed * delta, TAU)
+		turret_angles[structure_id] = current_angle
 		var cooldown: float = maxf(0.0, float(turret_cooldowns.get(structure_id, 0.0)) - delta)
 		if target_id != -1 and cooldown <= 0.0:
 			_fire(structure_id, origin, target_id, definition)
@@ -150,13 +157,16 @@ func _closest_threat(origin: Vector2, range: float) -> int:
 func _fire(structure_id: String, origin: Vector2, target_id: int, definition: Dictionary) -> void:
 	if not threats.has(target_id): return
 	var speed: float = maxf(1.0, float(definition.get("projectile_speed", 330.0)))
-	var direction: Vector2 = (threats[target_id].position - origin).normalized()
-	var distance: float = origin.distance_to(threats[target_id].position)
+	var barrel_length: float = float(rules.get("turret", {}).get("barrel_length", 25.0))
+	var barrel_angle: float = float(turret_angles.get(structure_id, TURRET_NEUTRAL_ANGLE))
+	var direction: Vector2 = Vector2(0.0, -1.0).rotated(barrel_angle).normalized()
+	var muzzle: Vector2 = origin + direction * barrel_length
+	var distance: float = muzzle.distance_to(threats[target_id].position)
 	# The locked target ID is authoritative. The projectile remains visible in
 	# flight, then applies its hit when this travel time elapses; it does not
 	# depend on a physics overlap with a moving asteroid.
 	projectiles.append({
-		"position": origin,
+		"position": muzzle,
 		"velocity": direction * speed,
 		"speed": speed,
 		"time_remaining": maxf(0.05, distance / speed),
@@ -219,9 +229,10 @@ func _draw() -> void:
 		if station.modules[point] != "defense_turret" or not station.is_module_active(point): continue
 		var id: String = station.structure_id_at(point)
 		var origin: Vector2 = game.board.world_to_screen(point)
+		var barrel_length: float = float(rules.get("turret", {}).get("barrel_length", 25.0))
 		draw_set_transform(origin, float(turret_angles.get(id, TURRET_NEUTRAL_ANGLE)))
-		draw_line(Vector2(0, 0), Vector2(0, -25), Color("ef8b67"), 5.0, true)
-		draw_circle(Vector2(0, -25), 3.0, Color("ffb478"))
+		draw_line(Vector2.ZERO, Vector2(0, -barrel_length), Color("ef8b67"), 5.0, true)
+		draw_circle(Vector2(0, -barrel_length), 3.0, Color("ffb478"))
 		draw_set_transform(Vector2.ZERO)
 	for projectile: Dictionary in projectiles:
 		var direction: Vector2 = projectile.velocity.normalized()

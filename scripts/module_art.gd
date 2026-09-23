@@ -1,6 +1,33 @@
 class_name ModuleArt
 extends RefCounted
 
+static func draw_exhaust(canvas: CanvasItem, center: Vector2, kind: String, scale_factor: float, facing: float, accent: Color, config: Dictionary) -> void:
+	var base_length: float = float(config.get("length", 18.0))
+	var base_width: float = float(config.get("width", 5.0))
+	var base_opacity: float = float(config.get("opacity", 0.78))
+	var pulse_speed: float = float(config.get("pulse_speed", 8.0))
+	var pulse_amount: float = clampf(float(config.get("pulse_amount", 0.22)), 0.0, 0.8)
+	var phase: float = float(abs(kind.hash()) % 1000) * 0.01
+	var pulse: float = 1.0 + sin(Time.get_ticks_msec() * 0.001 * pulse_speed + phase) * pulse_amount
+	var length: float = base_length * pulse
+	var width: float = base_width * (0.9 + pulse * 0.1)
+	var hot := Color("fff1c2", base_opacity)
+	var core := accent
+	core.a = base_opacity
+	var outer := accent.darkened(0.2)
+	outer.a = base_opacity * 0.72
+	canvas.draw_set_transform(center, facing, Vector2.ONE * scale_factor)
+	# Ship art points up, so +Y is the rear. Layered tapered polygons create
+	# a small engine plume without adding particles or gameplay nodes.
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(-width, 15), Vector2(width, 15), Vector2(width * 0.55, 15 + length), Vector2(0, 15 + length * 1.12), Vector2(-width * 0.55, 15 + length)
+	]), outer)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		Vector2(-width * 0.48, 15), Vector2(width * 0.48, 15), Vector2(width * 0.22, 15 + length * 0.72), Vector2(0, 15 + length * 0.86), Vector2(-width * 0.22, 15 + length * 0.72)
+	]), core)
+	canvas.draw_line(Vector2(0, 15), Vector2(0, 15 + length * 0.56), hot, maxf(1.0, width * 0.35), true)
+
+
 static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale_factor: float = 1.0, opacity: float = 1.0, facing: float = 0.0, tier: int = 1, connector_mask: int = 0, module_mask: int = 0) -> void:
 	var ink := Color("c8dce7")
 	var cyan := Color("71d8d0")

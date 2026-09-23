@@ -21,5 +21,12 @@
   "turn_speed_degrees": 240.0,
   "idle_angle_degrees": 0.0,
   "facing_arrival_distance": 1.0,
-  "mining_stop_offset": 58.0
+  "mining_stop_offset": 58.0,
+  "exhaust": {
+    "length": 18.0,
+    "width": 5.0,
+    "opacity": 0.78,
+    "pulse_speed": 8.0,
+    "pulse_amount": 0.22
+  }
 }

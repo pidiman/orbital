@@ -1,5 +1,6 @@
 extends Node
 # View-only positions. Never advances jobs or writes model/save state.
+const ModuleArt = preload("res://scripts/module_art.gd")
 var game: Node2D
 var settings: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/ship_motion.json"))
 var points: Dictionary = {}
@@ -134,6 +135,15 @@ func _set_mining_state(unit: Variant, next_state: String) -> void:
 
 func mining_state(unit: Variant) -> String:
 	return str(mining_states.get(unit, "IDLE"))
+
+func is_moving(unit: Variant) -> bool:
+	if not points.has(unit) or mission_key(unit).is_empty(): return false
+	if mining_state(unit) == "EXTRACTING": return false
+	return Vector2(points[unit]).distance_to(target_for(unit)) > float(settings.get("facing_arrival_distance", 1.0))
+
+func draw_exhaust(canvas: CanvasItem, unit: Variant, center: Vector2, kind: String, scale_factor: float, facing: float, accent: Color) -> void:
+	if not is_moving(unit): return
+	ModuleArt.draw_exhaust(canvas, center, kind, scale_factor, facing, accent, settings.get("exhaust", {}))
 
 func mission_key(unit: Variant) -> String:
 	var fleet: RefCounted = game.fleet

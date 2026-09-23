@@ -9,6 +9,10 @@
     "edge_margin": 90.0,
     "impact_radius": 58.0
   },
+  "turret": {
+    "idle_scan_speed": 0.32,
+    "barrel_length": 25.0
+  },
   "sizes": {
     "small": {
       "radius": 11.0,
