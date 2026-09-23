@@ -68,7 +68,6 @@ var status_label: Label
 var fps_label: Label
 var fps_refresh_remaining: float = 0.0
 var fps_visibility_state: int = -1
-var goal_label: Label
 var goal_bar: ProgressBar
 var tabs: TabContainer
 var ship_buttons: Dictionary = {}
@@ -255,26 +254,20 @@ func _ready() -> void:
 	research_button.custom_minimum_size.y = 34
 	research_button.pressed.connect(func() -> void: research_panel.open_panel())
 	column.add_child(research_button)
-	var cancel := Button.new()
-	cancel.name = "CancelButton"
-	cancel.text = "Inspect / cancel command"
-	cancel.custom_minimum_size.y = 34
-	cancel.add_theme_stylebox_override("normal", _style(Color("111c2b"), Color("314254")))
-	cancel.add_theme_stylebox_override("hover", _style(Color("20374a"), CYAN))
-	cancel.pressed.connect(func() -> void: choose(""); close_panels())
-	column.add_child(cancel)
-	fleet_label = _label(resource_status, "", 12, Color("baa1f5"))
-	refinery_label = _label(resource_status, "", 12, GOLD)
-	level_label = _label(resource_status, "", 12, INK)
-	count_label = _label(column, "", 12, MUTED)
+	# Module inspection is entered through the existing map interaction; keep
+	# the popup focused on its details and actions.
+	fleet_label = _status_indicator(resource_status, 5, Color("baa1f5"))
+	refinery_label = _status_indicator(resource_status, 6, GOLD)
+	level_label = _status_indicator(resource_status, 7, INK)
+	count_label = _status_indicator(resource_status, 8, MUTED)
 	goal_bar = ProgressBar.new()
 	goal_bar.show_percentage = false
-	goal_bar.custom_minimum_size.y = 6
+	goal_bar.custom_minimum_size = Vector2(82, 6)
+	goal_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	goal_bar.tooltip_text = "Colony growth"
 	goal_bar.add_theme_stylebox_override("background", _style(Color("283848"), Color("283848"), 2))
 	goal_bar.add_theme_stylebox_override("fill", _style(CYAN, CYAN, 2))
-	column.add_child(goal_bar)
-	goal_label = _label(column, "", 13, CYAN)
-	goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	resource_status.add_child(goal_bar)
 	footer = PanelContainer.new()
 	footer.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	footer.offset_left = 28
@@ -337,6 +330,18 @@ func _label(parent: Node, text: String, font_size: int, color: Color) -> Label:
 	parent.add_child(label)
 	return label
 
+func _status_indicator(parent: Node, icon_kind: int, tint: Color) -> Label:
+	var group := HBoxContainer.new()
+	group.add_theme_constant_override("separation", 3)
+	group.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	parent.add_child(group)
+	var icon = preload("res://scripts/resource_icon.gd").new()
+	icon.kind = icon_kind
+	icon.tint = tint
+	group.add_child(icon)
+	var label := _label(group, "", 12, tint)
+	return label
+
 func _style(fill: Color, border: Color, radius: int = 8) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill
@@ -382,16 +387,16 @@ func refresh() -> void:
 	tech_label.text = "%s" % fleet.diplomacy.inventory.get("tech", 0)
 	xenocrystal_label.text = "%s" % (fleet.diplomacy.inventory.get("xenocrystal", 0) if build_model.station_id.is_empty() else model.locations.stations[build_model.station_id].inventory.get("xenocrystal", 0))
 	minerals_label.text = "%d" % build_model.minerals
-	fleet_label.text = "Miners %d idle / %d" % [fleet.idle_count(), fleet.mining_units().size()]
+	fleet_label.text = "%d/%d" % [fleet.idle_count(), fleet.mining_units().size()]
 	var refinery_count: int = model.module_count_with("conversion")
-	refinery_label.text = "Refineries %d · %s" % [refinery_count, _refinery_status()]
+	refinery_label.text = "%d %s" % [refinery_count, _refinery_status()]
 	materials_label.text = "%d" % build_model.materials
 	materials_label.tooltip_text = "Materials: %d / %d capacity" % [build_model.materials, build_model.capacity]
 	power_label.text = "%+d" % build_model.power_balance()
 	power_label.tooltip_text = "Power: %d generated / %d used" % [build_model.power_output, build_model.power_use]
 	power_detail.text = "%d generated  /  %d used" % [build_model.power_output, build_model.power_use]
-	level_label.text = "Lv %02d · %s" % [model.level, "Outpost" if model.level == 1 else ("Settlement" if model.level == 2 else "Colony")]
-	count_label.text = ("" if home else "HOME / ") + "%02d modules connected" % model.modules.size()
+	level_label.text = "Lv %02d" % model.level
+	count_label.text = "%02d" % model.modules.size()
 	goal_bar.max_value = 9
 	goal_bar.value = mini(model.modules.size(), 9)
 	_refresh_ships()
@@ -400,7 +405,6 @@ func refresh() -> void:
 	if is_instance_valid(research_panel) and research_panel.visible: research_panel.refresh()
 	if is_instance_valid(trade_panel) and trade_panel.visible: trade_panel.refresh()
 	if is_instance_valid(region_navigation) and region_navigation.visible: region_navigation.refresh()
-	goal_label.text = "Build %d more modules to establish your colony." % (9 - model.modules.size()) if model.modules.size() < 9 else "Colony established. Keep growing."
 
 func _queue_refresh() -> void:
 	refresh_pending = true
@@ -766,8 +770,6 @@ func _build_upgrade_page() -> void:
 	demolish_button.add_theme_font_size_override("font_size", 13)
 	demolish_button.pressed.connect(_demolish_selected)
 	page.add_child(demolish_button)
-	var hint := _label(page, "Inspect mode: click any station module to see its tier and available upgrade.", 12, MUTED)
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 func inspect_module(world_position: Vector2) -> void:
 	if hauling_assignment >= 0:
@@ -950,8 +952,12 @@ func _setup_menus() -> void:
 	title_label.add_theme_color_override("font_color", CYAN)
 	# Reuse the live readout labels; remove the tall label/value groups.
 	resource_status.reparent(root)
-	resource_status.add_theme_constant_override("h_separation", 20)
-	for label: Label in [fleet_label, refinery_label, level_label]: label.add_theme_font_size_override("font_size", 11)
+	resource_status.add_theme_constant_override("h_separation", 10)
+	for label: Label in [fleet_label, refinery_label, level_label, count_label]: label.add_theme_font_size_override("font_size", 11)
+	fleet_label.tooltip_text = "Miners idle / total"
+	refinery_label.tooltip_text = "Refineries and status"
+	level_label.tooltip_text = "Colony level"
+	count_label.tooltip_text = "Connected modules"
 	for child: Node in resource_bar.get_children(): child.hide()
 	compact_resources = HBoxContainer.new()
 	compact_resources.add_theme_constant_override("separation", 10)
@@ -1127,7 +1133,6 @@ func activate_panel(target: PanelContainer, menu: String) -> void:
 	close_panels()
 	choose("")
 	active_menu = menu
-	for readout: Control in [count_label, goal_bar, goal_label]: readout.visible = menu != "Ships"
 	if target == panel: target.get_node("MenuFrame").get_child(0).get_child(0).text = menu
 	if menu_buttons.has(menu): menu_buttons[menu].add_theme_stylebox_override("normal", _style(Color("25404b"), CYAN))
 	target.show()
