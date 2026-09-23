@@ -115,8 +115,9 @@ func _draw() -> void:
 		if fleet.transport.jobs.has(ship_id):
 			var point: Vector2 = ship_position(ship_id)
 			var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
+			var hauling_cargo: bool = _hauler_carrying(ship_id)
 			get_parent().ship_motion.draw_exhaust(self, ship_id, point, definition.get("art", "scout"), _ship_scale(definition), get_parent().ship_motion.angle_for(ship_id), Color(definition.get("color", "8bcdf1")))
-			ModuleArt.draw_module(self, point, definition.get("art", "scout"), _ship_scale(definition), 0.5, get_parent().ship_motion.angle_for(ship_id))
+			ModuleArt.draw_module(self, point, definition.get("art", "scout"), _ship_scale(definition), 0.5, get_parent().ship_motion.angle_for(ship_id), 1, 0, 0, hauling_cargo)
 			draw_string(font, point + Vector2(-30, 40), "In transit", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ORE)
 			continue
 		if fleet.collection != null and fleet.collection.jobs.has(ship_id):
@@ -124,8 +125,9 @@ func _draw() -> void:
 		var definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[ship_id]]
 		if not fleet.jobs.has(ship_id):
 			var point: Vector2 = ship_position(ship_id)
+			var hauling_cargo: bool = _hauler_carrying(ship_id)
 			get_parent().ship_motion.draw_exhaust(self, ship_id, point, definition.get("art", "scout"), _ship_scale(definition), get_parent().ship_motion.angle_for(ship_id), Color(definition.get("color", "8bcdf1")))
-			ModuleArt.draw_module(self, point, definition.get("art", "scout"), _ship_scale(definition), 1.0, get_parent().ship_motion.angle_for(ship_id))
+			ModuleArt.draw_module(self, point, definition.get("art", "scout"), _ship_scale(definition), 1.0, get_parent().ship_motion.angle_for(ship_id), 1, 0, 0, hauling_cargo)
 			if fleet.repairs != null and fleet.repairs.jobs.has(ship_id):
 				var repair_job: Dictionary = fleet.repairs.jobs[ship_id]
 				if fleet.model.locations.structures.has(repair_job.target) and repair_job.phase == "repairing":
@@ -216,6 +218,15 @@ func home_position(unit: Variant) -> Vector2:
 
 func _ship_scale(definition: Dictionary) -> float:
 	return 1.65 if definition.get("art", "") == "cargo_ship" else 0.55
+
+func _hauler_carrying(ship_id: int) -> bool:
+	if fleet.hauling == null or not fleet.hauling.jobs.has(ship_id):
+		return false
+	var cargo: Dictionary = fleet.hauling.jobs[ship_id].get("cargo", {})
+	for amount: Variant in cargo.values():
+		if int(amount) > 0:
+			return true
+	return false
 
 func _add_discovery_marker(asteroid_id: int) -> void:
 	if fleet.asteroids[asteroid_id].has("region_id"):

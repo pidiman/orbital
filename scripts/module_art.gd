@@ -28,7 +28,7 @@ static func draw_exhaust(canvas: CanvasItem, center: Vector2, kind: String, scal
 	canvas.draw_line(Vector2(0, 15), Vector2(0, 15 + length * 0.56), hot, maxf(1.0, width * 0.35), true)
 
 
-static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale_factor: float = 1.0, opacity: float = 1.0, facing: float = 0.0, tier: int = 1, connector_mask: int = 0, module_mask: int = 0) -> void:
+static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale_factor: float = 1.0, opacity: float = 1.0, facing: float = 0.0, tier: int = 1, connector_mask: int = 0, module_mask: int = 0, cargo_visible: bool = false) -> void:
 	var ink := Color("c8dce7")
 	var cyan := Color("71d8d0")
 	var gold := Color("e8ba76")
@@ -150,6 +150,34 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 		canvas.draw_circle(Vector2(5, 33), 4, Color("ff9be8", opacity * 0.8))
 		canvas.draw_line(Vector2(-5, 37), Vector2(-5, 46), Color("ffb4ee", opacity * 0.55), 3)
 		canvas.draw_line(Vector2(5, 37), Vector2(5, 46), Color("ffb4ee", opacity * 0.55), 3)
+	elif kind == "hauler":
+		# Industrial warehouse vehicle: compact steel body, forward pallet
+		# forks and small practical rear thrusters. The optional crate is a
+		# presentation cue derived from the existing hauling cargo state.
+		var steel := Color("697985", opacity)
+		var dark_steel := Color("273640", opacity)
+		var caution := Color("e3b34f", opacity)
+		var highlight := Color("f2ce72", opacity)
+		var body := PackedVector2Array([Vector2(0, -19), Vector2(9, -10), Vector2(10, 16), Vector2(6, 21), Vector2(-6, 21), Vector2(-10, 16), Vector2(-9, -10)])
+		canvas.draw_colored_polygon(body, steel)
+		canvas.draw_polyline(PackedVector2Array([Vector2(0, -19), Vector2(9, -10), Vector2(10, 16), Vector2(6, 21), Vector2(-6, 21), Vector2(-10, 16), Vector2(-9, -10), Vector2(0, -19)]), dark_steel, 2.0, true)
+		# Safety-yellow side stripe and compact operator/cargo body.
+		canvas.draw_line(Vector2(-8, 5), Vector2(8, 5), caution, 3.0, true)
+		canvas.draw_rect(Rect2(-6, -6, 12, 10), Color("314652", opacity))
+		canvas.draw_rect(Rect2(-6, -6, 12, 10), highlight, false, 1.0)
+		# Two narrow forks reach forward to a pallet, unlike the Material Ship scoop.
+		canvas.draw_line(Vector2(-6, -8), Vector2(-6, -27), caution, 2.5, true)
+		canvas.draw_line(Vector2(6, -8), Vector2(6, -27), caution, 2.5, true)
+		canvas.draw_line(Vector2(-7, -27), Vector2(7, -27), highlight, 2.0, true)
+		if cargo_visible:
+			canvas.draw_rect(Rect2(-8, -22, 16, 10), Color("b8773f", opacity))
+			canvas.draw_rect(Rect2(-8, -22, 16, 10), highlight, false, 1.2)
+			canvas.draw_line(Vector2(-5, -19), Vector2(5, -19), Color("f4d68a", opacity * 0.8), 1.0, true)
+		# Small rear thrusters: a working vehicle, not a combat plume.
+		canvas.draw_circle(Vector2(-5, 20), 2.8, caution)
+		canvas.draw_circle(Vector2(5, 20), 2.8, caution)
+		canvas.draw_line(Vector2(-5, 22), Vector2(-5, 26), Color("d8e5e8", opacity * 0.55), 1.5, true)
+		canvas.draw_line(Vector2(5, 22), Vector2(5, 26), Color("d8e5e8", opacity * 0.55), 1.5, true)
 	elif kind == "mining_ship" or kind == "xeno_mining_ship":
 		var premium: bool = kind == "xeno_mining_ship"
 		var accent := Color("62e4dc", opacity) if premium else Color("e8ad5b", opacity)
@@ -237,7 +265,7 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 		for x in [-9, 3]:
 			canvas.draw_rect(Rect2(x, -7, 6, 14), cyan)
 		canvas.draw_line(Vector2(-12, 16), Vector2(12, 16), ink * Color(1, 1, 1, 0.5), 2)
-	if kind != "mining_ship" and kind != "xeno_mining_ship" and kind != "connector_tube" and kind != "material_ship":
+	if kind != "mining_ship" and kind != "xeno_mining_ship" and kind != "connector_tube" and kind != "material_ship" and kind != "hauler":
 		for direction: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
 			canvas.draw_circle(direction * 25, 2.3, ink)
 	canvas.draw_set_transform(Vector2.ZERO)

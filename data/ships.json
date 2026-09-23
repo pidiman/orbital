@@ -119,7 +119,7 @@
       "travel_seconds": 3,
       "region": "home"
     },
-    "art": "trader"
+    "art": "hauler"
   },
   "cargo_ship": {
     "name": "Cargo Ship",
