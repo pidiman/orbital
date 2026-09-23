@@ -17,6 +17,8 @@ var spawn_remaining: float = 45.0
 var active: bool = true
 var region_id: String = ""
 var rng := RandomNumberGenerator.new()
+var defense_visual_active: bool = false
+var last_inspected_position: Vector2 = Vector2.INF
 const TURRET_TURN_SPEED: float = 3.8
 const TURRET_NEUTRAL_ANGLE: float = 0.0
 
@@ -73,14 +75,20 @@ func _process(delta: float) -> void:
 				_spawn_threat("")
 			spawn_remaining = _next_spawn_delay()
 	_move_threats(delta)
+	defense_visual_active = false
 	_update_turrets(delta)
 	_update_silos(delta)
 	_update_projectiles(delta)
 	_update_missiles(delta)
-	for burst: Dictionary in bursts:
-		burst.time += delta
-	bursts = bursts.filter(func(item: Dictionary) -> bool: return item.time < 0.45)
-	queue_redraw()
+	if not bursts.is_empty():
+		for burst: Dictionary in bursts:
+			burst.time += delta
+		bursts = bursts.filter(func(item: Dictionary) -> bool: return item.time < 0.45)
+	var inspected_position: Vector2 = game.board.inspected_position if game.board.visible else Vector2.INF
+	var inspection_changed: bool = inspected_position != last_inspected_position
+	last_inspected_position = inspected_position
+	if defense_visual_active or inspection_changed or not threats.is_empty() or not projectiles.is_empty() or not missiles.is_empty() or not bursts.is_empty():
+		queue_redraw()
 
 func _next_spawn_delay() -> float:
 	return rng.randf_range(float(rules.spawn.interval_min), float(rules.spawn.interval_max))
@@ -147,6 +155,7 @@ func _update_turrets(delta: float) -> void:
 	var live: Dictionary = {}
 	for point: Vector2 in station.modules:
 		if station.modules[point] != "defense_turret" or not station.is_module_active(point): continue
+		defense_visual_active = true
 		var structure_id: String = station.structure_id_at(point)
 		live[structure_id] = true
 		var origin: Vector2 = game.board.world_to_screen(point)
@@ -190,6 +199,7 @@ func _update_silos(delta: float) -> void:
 	var live: Dictionary = {}
 	for point: Vector2 in station.modules:
 		if station.modules[point] != "missile_silo" or not station.is_module_active(point): continue
+		defense_visual_active = true
 		var structure_id: String = station.structure_id_at(point)
 		live[structure_id] = true
 		var origin: Vector2 = game.board.world_to_screen(point)
@@ -217,6 +227,7 @@ func _update_silos(delta: float) -> void:
 
 func _fire(structure_id: String, origin: Vector2, target_id: int, definition: Dictionary) -> void:
 	if not threats.has(target_id): return
+	if projectiles.size() >= int(rules.spawn.get("max_active_projectiles", 64)): return
 	var speed: float = maxf(1.0, float(definition.get("projectile_speed", 330.0)))
 	var barrel_length: float = float(rules.get("turret", {}).get("barrel_length", 25.0))
 	var barrel_angle: float = float(turret_angles.get(structure_id, TURRET_NEUTRAL_ANGLE))
@@ -253,6 +264,7 @@ func _silo_stats(station: StationModel, point: Vector2) -> Dictionary:
 
 func _fire_missile(structure_id: String, origin: Vector2, target_id: int, definition: Dictionary, tube_index: int) -> void:
 	if not threats.has(target_id): return
+	if missiles.size() >= int(rules.spawn.get("max_active_missiles", 32)): return
 	var speed: float = maxf(1.0, float(definition.get("projectile_speed", 150.0)))
 	var launcher_angle: float = float(silo_angles.get(structure_id, TURRET_NEUTRAL_ANGLE))
 	var tube_offset: float = float(tube_index - 1) * 10.0
@@ -270,6 +282,7 @@ func _fire_missile(structure_id: String, origin: Vector2, target_id: int, defini
 	})
 
 func _update_projectiles(delta: float) -> void:
+	if projectiles.is_empty(): return
 	var remaining: Array[Dictionary] = []
 	for projectile: Dictionary in projectiles:
 		var target_id: int = int(projectile.target_id)
@@ -292,6 +305,7 @@ func _update_projectiles(delta: float) -> void:
 	projectiles = remaining
 
 func _update_missiles(delta: float) -> void:
+	if missiles.is_empty(): return
 	var remaining: Array[Dictionary] = []
 	for missile: Dictionary in missiles:
 		var target_id: int = int(missile.target_id)

@@ -4,6 +4,8 @@ var regions: Regions
 var fleet: MiningFleet
 var stars: Array[Vector2] = []
 var font: Font = ThemeDB.fallback_font
+var last_canvas_transform: Transform2D
+var has_canvas_transform: bool = false
 
 func _ready() -> void:
 	var rng := RandomNumberGenerator.new()
@@ -70,4 +72,12 @@ func _draw() -> void:
 		draw_string(font, point + Vector2(-75, 40), "%s · %d Minerals" % [outpost.name, station.inventory.minerals], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(outpost.color))
 
 func _process(_delta: float) -> void:
-	if visible: queue_redraw()
+	if not visible: return
+	# Region content is static between model/camera changes. CanvasItem drawing
+	# follows the camera without requiring a new draw list, so only invalidate
+	# when the camera transform actually changes.
+	var current_transform: Transform2D = get_canvas_transform()
+	if not has_canvas_transform or current_transform != last_canvas_transform:
+		last_canvas_transform = current_transform
+		has_canvas_transform = true
+		queue_redraw()

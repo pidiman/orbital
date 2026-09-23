@@ -3,9 +3,19 @@ extends Node2D
 # placement/salvage/mining. The tray and this adapter share HUD.select_ship().
 var game: Node2D
 const HIT_RADIUS: float = 22.0
+var last_selected_id: int = -2
+var last_selected_point: Vector2 = Vector2.INF
+var last_zoom: float = -1.0
 
 func _process(_delta: float) -> void:
-	queue_redraw()
+	var selected_id: int = game.hud.selected_ship_id
+	var selected_point: Vector2 = game.ship_camera.ship_point(selected_id) if game.model.ships.has(selected_id) else Vector2.INF
+	var zoom_value: float = game.ship_camera.zoom.x
+	if selected_id != last_selected_id or selected_point != last_selected_point or not is_equal_approx(zoom_value, last_zoom):
+		last_selected_id = selected_id
+		last_selected_point = selected_point
+		last_zoom = zoom_value
+		queue_redraw()
 
 func hits_at(screen_point: Vector2) -> Array[int]:
 	var hits: Array[int] = []

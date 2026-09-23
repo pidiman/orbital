@@ -9,15 +9,23 @@ var pieces: Array[Dictionary] = []
 var debris_count: int = 0
 var last_revision: int = -1
 var last_region: String = ""
+var last_mouse_position: Vector2 = Vector2.INF
 
 func _ready() -> void:
 	_sync_view()
 
 func _process(_delta: float) -> void:
 	var region: String = supply.fleet.regions.current_region
+	var needs_redraw: bool = false
 	if last_revision != supply.presentation_revision or last_region != region:
 		_sync_view()
-	queue_redraw()
+		needs_redraw = true
+	var mouse_position: Vector2 = get_global_mouse_position()
+	if mouse_position != last_mouse_position:
+		last_mouse_position = mouse_position
+		needs_redraw = true
+	if needs_redraw:
+		queue_redraw()
 
 func _sync_view() -> void:
 	last_revision = supply.presentation_revision

@@ -27,9 +27,18 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	var region: String = supply.fleet.regions.current_region
+	var needs_redraw: bool = false
 	if last_revision != supply.presentation_revision or last_region != region:
 		_sync_view()
-	queue_redraw()
+		needs_redraw = true
+	# Ship sprites and mining beams move continuously; static asteroid/content
+	# geometry only needs the presentation revision invalidation above.
+	for unit: Variant in get_parent().ship_motion.points:
+		if get_parent().ship_motion.is_moving(unit):
+			needs_redraw = true
+			break
+	if needs_redraw:
+		queue_redraw()
 
 func _sync_view() -> void:
 	last_revision = supply.presentation_revision

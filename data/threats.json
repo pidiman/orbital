@@ -6,6 +6,8 @@
     "wave_size_min": 2,
     "wave_size_max": 3,
     "max_active": 8,
+    "max_active_projectiles": 64,
+    "max_active_missiles": 32,
     "edge_margin": 90.0,
     "impact_radius": 58.0
   },

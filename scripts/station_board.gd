@@ -17,6 +17,7 @@ var placement_cache: Array[Vector2i] = []
 var placement_cache_key: String = ""
 var connector_masks: Dictionary = {}
 var connector_module_masks: Dictionary = {}
+var connector_edges: Array[Array] = []
 var connector_masks_dirty: bool = true
 
 func _ready() -> void:
@@ -90,23 +91,28 @@ func _draw() -> void:
 		_update_placement_cache()
 		for cell: Vector2i in placement_cache:
 			draw_rect(Rect2(cell_position(cell) - Vector2.ONE * (cell_size / 2 - 3), Vector2.ONE * (cell_size - 6)), Color(0.3, 0.83, 0.73, 0.07))
-	var positions: Array = model.modules.keys()
 	if connector_masks_dirty:
 		connector_masks.clear()
 		connector_module_masks.clear()
+		connector_edges.clear()
+		var tube_positions: Dictionary = {}
 		for tube_position: Vector2 in model.modules:
 			if model.modules[tube_position] == "connector_tube":
+				tube_positions[tube_position] = true
 				var mask: int = connector_neighbor_mask(tube_position, false)
 				connector_masks[tube_position] = mask
 				connector_module_masks[tube_position] = connector_module_mask(tube_position)
 				print("Tube tiling recalculated at %s: mask=%d -> %s" % [str(tube_position), mask, connector_variant(mask)])
+		# Tubes are 1x1 cells. Check each right/down neighbor once instead of
+		# comparing every module pair during every redraw.
+		for tube_position: Vector2 in tube_positions:
+			for offset: Vector2 in [Vector2.RIGHT * Geometry.MODULE_SIZE, Vector2.DOWN * Geometry.MODULE_SIZE]:
+				var neighbor: Vector2 = tube_position + offset
+				if tube_positions.has(neighbor):
+					connector_edges.append([tube_position, neighbor])
 		connector_masks_dirty = false
-	for index in range(positions.size()):
-		var world_position: Vector2 = positions[index]
-		for other_index in range(index + 1, positions.size()):
-			var other: Vector2 = positions[other_index]
-			if model.modules[world_position] == "connector_tube" and model.modules[other] == "connector_tube" and model.modules_connected(world_position, other):
-				draw_line(world_to_screen(world_position), world_to_screen(other), Color("627c8d"), 8)
+	for link: Array in connector_edges:
+		draw_line(world_to_screen(link[0]), world_to_screen(link[1]), Color("627c8d"), 8)
 	for world_position: Vector2 in model.modules:
 		var kind: String = model.modules[world_position]
 		var art: String = model.catalog[kind].get("art", kind)

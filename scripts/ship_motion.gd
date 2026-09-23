@@ -12,14 +12,24 @@ var regions: Dictionary = {}
 var ship_kinds: Dictionary = {}
 var mining_jobs: Dictionary = {}
 var viewed_region: String = ""
+var units: Array[Variant] = []
+var units_dirty: bool = true
+var jobs_dirty: bool = true
+var alive_units: Dictionary = {}
+var stale_units: Array[Variant] = []
 
 func _ready() -> void:
 	process_priority = 10 # After model clock/field layout, before following camera.
 	get_viewport().size_changed.connect(reset)
 	game.model.module_removed.connect(_module_removed)
+	game.model.module_built.connect(_module_built)
 	game.model.ship_built.connect(_ship_purchased)
+	game.model.ship_removed.connect(_ship_removed)
+	game.fleet.changed.connect(_jobs_changed)
 
 func _ship_purchased(id: int) -> void:
+	units_dirty = true
+	jobs_dirty = true
 	angles[id] = deg_to_rad(float(settings.idle_angle_degrees))
 	points[id] = game.asteroids.home_position(id)
 	origins[id] = points[id]
@@ -32,14 +42,47 @@ func reset() -> void:
 	missions.clear()
 	mining_states.clear()
 	regions.clear()
+	units.clear()
+	alive_units.clear()
+	stale_units.clear()
+	units_dirty = true
+	jobs_dirty = true
 
 func _module_removed(point: Vector2) -> void:
+	units_dirty = true
 	angles.erase(point)
 	points.erase(point)
 	origins.erase(point)
 	missions.erase(point)
 	mining_states.erase(point)
 	regions.erase(point)
+
+func _module_built(_point: Vector2, _kind: String) -> void:
+	units_dirty = true
+
+func _ship_removed(ship_id: int) -> void:
+	units_dirty = true
+	jobs_dirty = true
+	angles.erase(ship_id)
+	points.erase(ship_id)
+	origins.erase(ship_id)
+	missions.erase(ship_id)
+	mining_states.erase(ship_id)
+	regions.erase(ship_id)
+
+func _jobs_changed() -> void:
+	# MiningFleet.jobs is a compatibility getter that allocates a projection.
+	# Refresh it once per model change, never once per rendered frame.
+	jobs_dirty = true
+
+func _refresh_units() -> void:
+	units.clear()
+	for unit: Variant in game.model.ships:
+		units.append(unit)
+	for structure: Dictionary in game.model.locations.structures.values():
+		if structure.station_id == game.model.locations.primary_station() and game.model.catalog.get(structure.kind, {}).has("mining"):
+			units.append(structure.position)
+	units_dirty = false
 
 func speed_for(unit: Variant) -> float:
 	var kind: String = str(ship_kinds.get(unit, ""))
@@ -59,16 +102,18 @@ func advance_visual(delta: float) -> void:
 	if viewed_region != fleet.regions.current_region:
 		reset()
 		viewed_region = fleet.regions.current_region
-	# Copy legacy projections once per frame, not once per ship.
+	# Keep the canonical dictionaries by reference and rebuild the compatibility
+	# projection only when MiningFleet emits a change. The unit list is likewise
+	# invalidated only by ship/module topology changes.
 	ship_kinds = game.model.ships
-	mining_jobs = fleet.jobs
-	var units: Array = ship_kinds.keys()
-	for structure: Dictionary in game.model.locations.structures.values():
-		if structure.station_id == game.model.locations.primary_station() and game.model.catalog.get(structure.kind, {}).has("mining"):
-			units.append(structure.position)
-	var alive: Dictionary = {}
+	if jobs_dirty:
+		mining_jobs = fleet.jobs
+		jobs_dirty = false
+	if units_dirty:
+		_refresh_units()
+	alive_units.clear()
 	for unit: Variant in units:
-		alive[unit] = true
+		alive_units[unit] = true
 		var region: String = fleet.transport.location(unit) if unit is int else fleet.regions.HOME
 		if region != viewed_region: continue
 		if regions.get(unit, region) != region:
@@ -83,6 +128,12 @@ func advance_visual(delta: float) -> void:
 			missions[unit] = mission
 			if mining_jobs.has(unit): _set_mining_state(unit, "FLYING_TO")
 		var target: Vector2 = target_for(unit)
+		_update_mining_state(unit, target)
+		# Idle ships at their resolved destination have no visual state to update.
+		# They are still present in the cached unit list and redraw when selection
+		# or camera state changes, but avoid repeated math and dictionary writes.
+		if mission.is_empty() and points.has(unit) and Vector2(points[unit]).distance_to(target) <= float(settings.facing_arrival_distance) and absf(float(angles.get(unit, 0.0)) - deg_to_rad(float(settings.idle_angle_degrees))) < 0.0001:
+			continue
 		var direction: Vector2 = target - Vector2(points.get(unit, origins.get(unit, game.asteroids.home_position(unit))))
 		var busy: bool = not mission.is_empty()
 		var desired: float = angle_for(unit) if busy else deg_to_rad(float(settings.idle_angle_degrees))
@@ -104,9 +155,12 @@ func advance_visual(delta: float) -> void:
 			# quantized point in one frame and pausing until the next model tick.
 			var eased: float = distance * (1.0 - exp(-float(settings.follow_rate) * step))
 			points[unit] = Vector2(points[unit]).move_toward(target, minf(eased, speed_for(unit) * step))
-		_update_mining_state(unit, target)
-	for unit: Variant in points.keys():
-		if not alive.has(unit):
+	stale_units.clear()
+	for unit: Variant in points:
+		if not alive_units.has(unit):
+			stale_units.append(unit)
+	for unit: Variant in stale_units:
+		if not alive_units.has(unit):
 			angles.erase(unit)
 			points.erase(unit)
 			origins.erase(unit)
@@ -189,12 +243,16 @@ func target_for(unit: Variant) -> Vector2:
 		var approach: Vector2 = asteroid_point - origin
 		if approach.length() < 1.0: approach = Vector2.UP
 		return asteroid_point - approach.normalized() * float(settings.get("mining_stop_offset", 58.0))
-	for pair: Array in [[fleet.diplomacy.jobs, "trade"], [fleet.regions.survey_jobs, "regional_survey"]]:
-		if pair[0].has(unit):
-			if returning(pair[0][unit]): return origin
-			var marker: Array = settings.mission_markers[pair[1]]
-			var area: Vector2 = game.get_viewport_rect().size
-			# Cosmetic destinations: these jobs have no spatial destination model.
-			return Vector2(40, 290) + Vector2(marker[0], marker[1]) * Vector2(maxf(300, area.x - 480), maxf(180, area.y - 440))
+	if fleet.diplomacy.jobs.has(unit):
+		if returning(fleet.diplomacy.jobs[unit]): return origin
+		var trade_marker: Array = settings.mission_markers.trade
+		var trade_area: Vector2 = game.get_viewport_rect().size
+		# Cosmetic destinations: these jobs have no spatial destination model.
+		return Vector2(40, 290) + Vector2(trade_marker[0], trade_marker[1]) * Vector2(maxf(300, trade_area.x - 480), maxf(180, trade_area.y - 440))
+	if fleet.regions.survey_jobs.has(unit):
+		if returning(fleet.regions.survey_jobs[unit]): return origin
+		var survey_marker: Array = settings.mission_markers.regional_survey
+		var survey_area: Vector2 = game.get_viewport_rect().size
+		return Vector2(40, 290) + Vector2(survey_marker[0], survey_marker[1]) * Vector2(maxf(300, survey_area.x - 480), maxf(180, survey_area.y - 440))
 	if unit is int and fleet.docking.status(unit) == "parked": return game.asteroids.dock_point(unit)
 	return game.asteroids.home_position(unit)

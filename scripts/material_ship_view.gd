@@ -2,9 +2,16 @@ extends Node2D
 var supply: RefCounted
 var board: Node2D
 
+func _ready() -> void:
+	if supply != null:
+		supply.collection.changed.connect(queue_redraw)
+
 func _process(_delta: float) -> void:
 	visible = true
-	queue_redraw()
+	# Collection ships need continuous redraw while flying. When no collection
+	# job exists, the layer is static and is invalidated by the collection signal.
+	if supply != null and not supply.collection.jobs.is_empty():
+		queue_redraw()
 
 func _draw() -> void:
 	for ship_id: int in supply.collection.jobs:
