@@ -127,10 +127,11 @@ func _draw() -> void:
 		if inspected_position == world_position:
 			var hp: int = model.module_hp(world_position)
 			var maximum_hp: int = model.module_max_hp(world_position)
-			var hp_point: Vector2 = world_to_screen(world_position) + Vector2(-25, 32)
-			draw_rect(Rect2(hp_point, Vector2(50, 4)), Color("263848"))
-			draw_rect(Rect2(hp_point, Vector2(50.0 * float(hp) / float(maximum_hp), 4)), Color("8ee6ad") if hp > 0 else Color("e88982"))
-			draw_string(ThemeDB.fallback_font, hp_point + Vector2(0, 16), "HP %d/%d" % [hp, maximum_hp], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("d6e5ec"))
+			if hp < maximum_hp:
+				var hp_point: Vector2 = world_to_screen(world_position) + Vector2(-25, 32)
+				draw_rect(Rect2(hp_point, Vector2(50, 4)), Color("263848"))
+				draw_rect(Rect2(hp_point, Vector2(50.0 * float(hp) / float(maximum_hp), 4)), Color("8ee6ad") if hp > 0 else Color("e88982"))
+				draw_string(ThemeDB.fallback_font, hp_point + Vector2(0, 16), "HP %d/%d" % [hp, maximum_hp], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("d6e5ec"))
 	for world_position: Vector2 in model.modules:
 		if model.catalog[model.modules[world_position]].has("upgrades"):
 			var point: Vector2 = world_to_screen(world_position) + Vector2(12, -19)

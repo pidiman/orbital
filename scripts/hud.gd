@@ -724,8 +724,11 @@ func _refresh_upgrade() -> void:
 		panel.get_node("MenuFrame").get_child(0).get_child(0).text = "%s · Tier %d" % [definition.name, build_model.tier_at(selected_position)]
 	var current_hp: int = build_model.module_hp(selected_position)
 	var maximum_hp: int = build_model.module_max_hp(selected_position)
-	var hp_status: String = "Damaged" if current_hp <= 0 else ("Operational" if current_hp == maximum_hp else "Operational · damaged")
-	upgrade_stats.text = "HP: %d / %d · %s\nGenerates %d Power · uses %d\nMaterial capacity bonus: %d" % [current_hp, maximum_hp, hp_status, definition.power_output, definition.power_use, definition.capacity]
+	if current_hp < maximum_hp:
+		var hp_status: String = "Damaged" if current_hp <= 0 else "Operational · damaged"
+		upgrade_stats.text = "HP: %d / %d · %s\nGenerates %d Power · uses %d\nMaterial capacity bonus: %d" % [current_hp, maximum_hp, hp_status, definition.power_output, definition.power_use, definition.capacity]
+	else:
+		upgrade_stats.text = "Generates %d Power · uses %d\nMaterial capacity bonus: %d" % [definition.power_output, definition.power_use, definition.capacity]
 	if definition.has("docking"):
 		var dock_id: String = build_model.structure_id_at(selected_position)
 		upgrade_stats.text += "\nParking: %d / %d ships" % [fleet.docking.usage.get(dock_id, {}).size(), int(definition.docking.capacity)]

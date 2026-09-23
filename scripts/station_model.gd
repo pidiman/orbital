@@ -320,7 +320,11 @@ func upgrade_module(world_position: Vector2) -> String:
 			_:
 				if station_id.is_empty(): research.trade.inventory[resource] -= amount
 				else: locations.stations[station_id].inventory[resource] -= amount
-	structure_state(world_position)["tier"] = tier_at(world_position) + 1
+	var state: Dictionary = structure_state(world_position)
+	state["tier"] = tier_at(world_position) + 1
+	# Upgrading is also a full service action: heal the module using the new
+	# tier's maximum HP so no Repair Ship is required for the upgrade itself.
+	state["hp"] = module_max_hp(world_position)
 	recalculate()
 	module_upgraded.emit(world_position)
 	changed.emit()
