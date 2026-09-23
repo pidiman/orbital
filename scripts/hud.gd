@@ -680,6 +680,8 @@ func inspect_module(world_position: Vector2) -> void:
 		message("Hauler assigned; repeats trips from this Refinery." if error.is_empty() else error, not error.is_empty())
 		if error.is_empty(): hauling_assignment = -1
 		return
+	# Module selection replaces ship selection visually; jobs remain untouched.
+	deselect_ship()
 	choose("")
 	selected_position = world_position
 	activate_panel(panel, "Build")
@@ -1139,6 +1141,11 @@ func deselect_ship() -> void:
 func select_ship(id: int) -> void:
 	hauling_assignment = -1
 	if not model.ships.has(id): return
+	# Ship selection replaces module selection visually; the module itself is
+	# unaffected and any open detail panel is closed by activate_panel below.
+	selected_position = Vector2.INF
+	get_parent().board.inspected_position = Vector2.INF
+	get_parent().board.queue_redraw()
 	var region: String = fleet.transport.location(id)
 	var different_region: bool = region != fleet.regions.current_region
 	# Viewing a discovered region is the existing presentation-location command.

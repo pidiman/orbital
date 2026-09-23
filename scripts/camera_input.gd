@@ -67,7 +67,8 @@ func _click(point: Vector2) -> void:
 	if game.asteroids.handle_click(point): return
 	if game.debris.handle_click(point): return
 	if game.board.handle_click(point): return
-	# Empty map clicks clear an inspected module without touching its model state.
+	# Empty map clicks clear both view selections without touching model state.
+	game.hud.deselect_ship()
 	game.hud.deselect_module()
 
 func edge_direction(point: Vector2) -> Vector2:
