@@ -196,6 +196,15 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 		canvas.draw_circle(Vector2(5, 20), 3, amber)
 		canvas.draw_line(Vector2(-5, 22), Vector2(-5, 28), Color("f6d28d", opacity * 0.55), 2, true)
 		canvas.draw_line(Vector2(5, 22), Vector2(5, 28), Color("f6d28d", opacity * 0.55), 2, true)
+	elif kind == "repair_ship":
+		var green := Color("9af0b1", opacity)
+		var hull := Color("b8c9c2", opacity)
+		var ship := PackedVector2Array([Vector2(0, -22), Vector2(10, -8), Vector2(10, 16), Vector2(0, 22), Vector2(-10, 16), Vector2(-10, -8)])
+		canvas.draw_colored_polygon(ship, hull)
+		canvas.draw_polyline(PackedVector2Array([Vector2(0, -22), Vector2(10, -8), Vector2(10, 16), Vector2(0, 22), Vector2(-10, 16), Vector2(-10, -8), Vector2(0, -22)]), green, 2.0, true)
+		canvas.draw_circle(Vector2.ZERO, 7, Color("2c4b3e", opacity))
+		canvas.draw_line(Vector2(-5, 0), Vector2(5, 0), green, 2.0, true)
+		canvas.draw_line(Vector2(0, -5), Vector2(0, 5), green, 2.0, true)
 	elif kind == "trader":
 		var hull := PackedVector2Array([Vector2(0, -22), Vector2(13, -8), Vector2(13, 18), Vector2(-13, 18), Vector2(-13, -8)])
 		canvas.draw_colored_polygon(hull, ink)

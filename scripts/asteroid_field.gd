@@ -109,6 +109,14 @@ func _draw() -> void:
 			var point: Vector2 = ship_position(ship_id)
 			get_parent().ship_motion.draw_exhaust(self, ship_id, point, definition.get("art", "scout"), _ship_scale(definition), get_parent().ship_motion.angle_for(ship_id), Color(definition.get("color", "8bcdf1")))
 			ModuleArt.draw_module(self, point, definition.get("art", "scout"), _ship_scale(definition), 1.0, get_parent().ship_motion.angle_for(ship_id))
+			if fleet.repairs != null and fleet.repairs.jobs.has(ship_id):
+				var repair_job: Dictionary = fleet.repairs.jobs[ship_id]
+				if fleet.model.locations.structures.has(repair_job.target) and repair_job.phase == "repairing":
+					var repair_target: Vector2 = get_parent().board.world_to_screen(fleet.model.locations.structures[repair_job.target].position)
+					var repair_direction: Vector2 = repair_target - point
+					if repair_direction.length() > 1.0:
+						draw_line(point + repair_direction.normalized() * 9.0, repair_target, Color("9af0b1", 0.18), 7.0, true)
+						draw_line(point + repair_direction.normalized() * 9.0, repair_target, Color("c9ffd4"), 1.8, true)
 			var text: String = "%s #%d" % [definition.name, ship_id]
 			if fleet.regions.survey_jobs.has(ship_id):
 				text = "Scouting %ds" % fleet.regions.survey_jobs[ship_id].remaining

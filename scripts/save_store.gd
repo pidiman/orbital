@@ -12,6 +12,7 @@ const LocationValidation = preload("res://scripts/location_save_validation.gd")
 const Hauling = preload("res://scripts/refinery_hauling.gd")
 const Docking = preload("res://scripts/docking_model.gd")
 const Cargo = preload("res://scripts/cargo_shuttle.gd")
+const Repair = preload("res://scripts/repair_ship.gd")
 const VERSION: int = 2
 const DEFAULT_PATH: String = "user://orbital-save.json"
 const STATION_FIELDS: Array[String] = ["modules", "module_tiers", "ships", "next_ship_id", "materials", "minerals", "capacity", "power_output", "power_use", "level", "ticks", "tick_elapsed", "refinery_progress", "total_refined"]
@@ -41,6 +42,7 @@ func _init(station: StationModel, mining: Fleet, region_supply: Supply) -> void:
 	fleet.hauling.changed.connect(request_autosave)
 	fleet.docking.changed.connect(request_autosave)
 	fleet.cargo.changed.connect(request_autosave)
+	fleet.repairs.changed.connect(request_autosave)
 	fleet.outposts.changed.connect(request_autosave)
 	fleet.research.changed.connect(request_autosave)
 	fleet.transport.changed.connect(request_autosave)
@@ -48,6 +50,7 @@ func _init(station: StationModel, mining: Fleet, region_supply: Supply) -> void:
 	model.module_built.connect(request_autosave.unbind(2))
 	model.module_removed.connect(request_autosave.unbind(1))
 	model.module_upgraded.connect(request_autosave.unbind(1))
+	model.module_damaged.connect(request_autosave.unbind(1))
 	model.ship_built.connect(request_autosave.unbind(1))
 	model.ship_removed.connect(request_autosave.unbind(1))
 	fleet.dispatched.connect(request_autosave.unbind(2))
@@ -88,6 +91,8 @@ func snapshot() -> Dictionary:
 	document.extensions.docking["schema_version"] = 1
 	_merge_fields(document.extensions, "cargo_shuttle", fleet.cargo, Cargo.FIELDS)
 	document.extensions.cargo_shuttle["schema_version"] = 1
+	_merge_fields(document.extensions, "repair_ship", fleet.repairs, Repair.FIELDS)
+	document.extensions.repair_ship["schema_version"] = 1
 	_merge_fields(document.extensions, "research", fleet.research, Research.FIELDS)
 	document.extensions.research["schema_version"] = 1
 	_merge_fields(document.extensions, "gate_transport", fleet.transport, Transport.FIELDS)
@@ -478,6 +483,11 @@ func restore(document: Variant) -> String:
 	else:
 		candidate_supply.collection.migrate_job_locations()
 		candidate_fleet.transport.migrate_job_locations()
+	var repair_data: Dictionary = _extension_fields(migrated.extensions, "repair_ship", candidate_fleet.repairs, Repair.FIELDS)
+	if not decode_error.is_empty(): return decode_error
+	error = candidate_fleet.repairs.validate(repair_data)
+	if not error.is_empty(): return error
+	_apply_fields(candidate_fleet.repairs, repair_data, Repair.FIELDS)
 	for ship_id: int in trade_data.jobs:
 		var job: Dictionary = trade_data.jobs[ship_id]
 		if job.has("destination") and job.destination != candidate.locations.local_destination(ship_id): return "Invalid trade storage destination."
@@ -582,6 +592,7 @@ func restore(document: Variant) -> String:
 	fleet.mining_assignments = candidate_fleet.mining_assignments
 	fleet.hauling.jobs = candidate_fleet.hauling.jobs
 	fleet.cargo.routes = candidate_fleet.cargo.routes
+	fleet.repairs.jobs = candidate_fleet.repairs.jobs
 	fleet.docking.ships = candidate_fleet.docking.ships
 	fleet.docking.usage = candidate_fleet.docking.usage
 	fleet.docking.suspended = false

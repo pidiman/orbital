@@ -151,6 +151,7 @@ func mission_key(unit: Variant) -> String:
 	if fleet.transport.jobs.has(unit): return "gate:" + str(fleet.transport.jobs[unit].destination)
 	if fleet.cargo != null and fleet.cargo.routes.has(unit): return "cargo:" + str(fleet.cargo.routes[unit].phase) + ":" + str(fleet.cargo.routes[unit].destination)
 	if fleet.hauling.jobs.has(unit): return "hauling:" + str(fleet.hauling.jobs[unit].refinery_id)
+	if fleet.repairs != null and fleet.repairs.jobs.has(unit): return "repair:" + str(fleet.repairs.jobs[unit].target)
 	if fleet.collection.jobs.has(unit): return "collection"
 	if fleet.diplomacy.jobs.has(unit): return "trade:" + str(fleet.diplomacy.jobs[unit].id)
 	if fleet.regions.survey_jobs.has(unit): return "region:" + str(fleet.regions.survey_jobs[unit].region_id)
@@ -172,6 +173,13 @@ func target_for(unit: Variant) -> Vector2:
 		var target: Vector2 = Vector2.ZERO
 		if job.phase == "pickup" and fleet.model.locations.structures.has(job.refinery_id): target = fleet.model.locations.structures[job.refinery_id].position
 		return game.board.world_to_screen(target) + Vector2(0, 30)
+	if fleet.repairs != null and fleet.repairs.jobs.has(unit):
+		var repair_job: Dictionary = fleet.repairs.jobs[unit]
+		if fleet.model.locations.structures.has(repair_job.target):
+			var repair_structure: Dictionary = fleet.model.locations.structures[repair_job.target]
+			var approach: Vector2 = game.board.world_to_screen(repair_structure.position) - origin
+			if approach.length() < 1.0: approach = Vector2.UP
+			return game.board.world_to_screen(repair_structure.position) - approach.normalized() * float(fleet.model.ship_catalog[fleet.model.ships[unit]].repair.get("stop_offset", 58.0))
 	if fleet.collection.jobs.has(unit):
 		return game.get_node("MaterialShips").target_position(unit)
 	if mining_jobs.has(unit):

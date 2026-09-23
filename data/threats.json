@@ -20,6 +20,7 @@
       "health_max": 3,
       "speed_min": 48.0,
       "speed_max": 72.0,
+      "impact_damage_chance": 0.65,
       "loot_min": 5,
       "loot_max": 9,
       "xenocrystal_chance": 0.02
@@ -30,6 +31,7 @@
       "health_max": 7,
       "speed_min": 36.0,
       "speed_max": 58.0,
+      "impact_damage_chance": 0.85,
       "loot_min": 10,
       "loot_max": 18,
       "xenocrystal_chance": 0.04
@@ -40,6 +42,7 @@
       "health_max": 15,
       "speed_min": 25.0,
       "speed_max": 44.0,
+      "impact_damage_chance": 1.0,
       "loot_min": 18,
       "loot_max": 30,
       "xenocrystal_chance": 0.07

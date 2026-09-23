@@ -119,11 +119,27 @@ func _move_threats(delta: float) -> void:
 			threats.erase(id)
 
 func _impact(id: int) -> void:
-	# Phase B hook: an impact currently has no damage consequence. The threat
-	# keeps drifting so an undestroyed asteroid exits at the far edge naturally.
 	if threats.has(id) and not threats[id].impact_emitted:
 		threats[id].impact_emitted = true
+		var threat: Dictionary = threats[id]
+		var definition: Dictionary = rules.sizes[threat.size]
+		if rng.randf() <= float(definition.get("impact_damage_chance", 1.0)):
+			_damage_nearest_module(threat.position)
 		bursts.append({"position": threats[id].position, "time": 0.0, "color": Color("67727e")})
+		threats.erase(id)
+
+func _damage_nearest_module(position: Vector2) -> void:
+	if not game.board.visible: return
+	var station: StationModel = game.board.model
+	var nearest: Vector2 = Vector2.INF
+	var distance: float = INF
+	for point: Vector2 in station.modules:
+		var candidate: float = game.board.world_to_screen(point).distance_to(position)
+		if candidate < distance:
+			distance = candidate
+			nearest = point
+	if nearest != Vector2.INF and station.damage_module(nearest):
+		game.hud.message("Asteroid impact damaged %s." % station.catalog[station.modules[nearest]].name, true)
 
 func _update_turrets(delta: float) -> void:
 	if not game.board.visible: return

@@ -108,7 +108,12 @@ func _draw() -> void:
 		var module_mask: int = int(connector_module_masks.get(world_position, 0)) if kind == "connector_tube" else 0
 		var active: bool = model.is_module_active(world_position)
 		ModuleArt.draw_module(self, world_to_screen(world_position), art, cell_size / 58.0 * model.footprint_size(kind).x, 1.0 if active else 0.32, module_facing(world_position), model.tier_at(world_position), connector_mask, module_mask)
-		if not active:
+		if model.is_module_damaged(world_position):
+			var damaged_point: Vector2 = world_to_screen(world_position) + Vector2(0, -20)
+			draw_circle(damaged_point, 7, Color("8e5d4d", 0.95))
+			draw_line(damaged_point - Vector2(4, 4), damaged_point + Vector2(4, 4), Color("ffc06b"), 2)
+			draw_line(damaged_point + Vector2(-4, 4), damaged_point + Vector2(4, -4), Color("ffc06b"), 2)
+		elif not active:
 			var inactive_point: Vector2 = world_to_screen(world_position) + Vector2(0, -20)
 			draw_circle(inactive_point, 7, Color("6b7780", 0.9))
 			draw_line(inactive_point - Vector2(3, 3), inactive_point + Vector2(3, 3), Color("e88982"), 2)

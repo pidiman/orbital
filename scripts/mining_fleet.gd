@@ -19,6 +19,7 @@ var docking: RefCounted
 var hauling: RefCounted
 var collection: RefCounted
 var cargo: RefCounted
+var repairs: RefCounted
 var model: StationModel
 var asteroids: Dictionary = {}
 const RESOURCE_FIELDS: Array[String] = ["resource_targets"]
@@ -55,7 +56,9 @@ func _init(station: StationModel) -> void:
 	model.ship_removed.connect(cancel_unit)
 	hauling = preload("res://scripts/refinery_hauling.gd").new(self)
 	cargo = preload("res://scripts/cargo_shuttle.gd").new(self)
+	repairs = preload("res://scripts/repair_ship.gd").new(self)
 	docking = preload("res://scripts/docking_model.gd").new(self)
+	repairs.changed.connect(changed.emit)
 	cargo.changed.connect(func() -> void:
 		changed.emit()
 		model.changed.emit())
@@ -136,6 +139,7 @@ func dispatch(asteroid_id: int, selected_ship: int = -1) -> String:
 func tick() -> void:
 	hauling.tick()
 	cargo.tick()
+	repairs.advance(1.0)
 	transport.tick()
 	diplomacy.tick()
 	_tick_regions()
@@ -182,6 +186,8 @@ func cancel_unit(unit: Variant) -> void:
 			collection.cancel(unit)
 		if cargo != null:
 			cargo.cancel(unit)
+		if repairs != null:
+			repairs.cancel(unit)
 	changed.emit()
 
 # Logical marker coordinates, owned by the model so a checkpoint restores the same view.
@@ -190,7 +196,7 @@ static func discovery_position(asteroid_id: int) -> Vector2:
 	return slots[posmod(-asteroid_id - 1000, slots.size())]
 
 func unit_busy(unit: Variant) -> bool:
-	return (hauling != null and hauling.jobs.has(unit)) or cargo.routes.has(unit) or transport.jobs.has(unit) or (collection != null and collection.jobs.has(unit)) or jobs.has(unit) or diplomacy.jobs.has(unit) or regions.survey_jobs.has(unit)
+	return (hauling != null and hauling.jobs.has(unit)) or cargo.routes.has(unit) or repairs.jobs.has(unit) or transport.jobs.has(unit) or (collection != null and collection.jobs.has(unit)) or jobs.has(unit) or diplomacy.jobs.has(unit) or regions.survey_jobs.has(unit)
 
 func trade_error(ship_id: int, contact_id: String, offer_id: String) -> String:
 	if not transport.work_error(ship_id).is_empty():

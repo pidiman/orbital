@@ -56,6 +56,23 @@
     "art": "material_ship",
     "dock_type": "material_ship"
   },
+  "repair_ship": {
+    "name": "Repair Ship",
+    "cost": 75,
+    "power_use": 2,
+    "color": "9af0b1",
+    "description": "Automatically repairs damaged local station modules.",
+    "effect": "Automatic repairs · 2 power",
+    "repair": {
+      "travel_seconds": 2,
+      "seconds": 5,
+      "materials_base": 15,
+      "materials_per_tier": 10,
+      "stop_offset": 58
+    },
+    "art": "repair_ship",
+    "dock_type": "repair_ship"
+  },
   "jump_ship": {
     "name": "Jump Ship",
     "cost": 65,

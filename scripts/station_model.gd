@@ -10,6 +10,7 @@ signal ship_removed(ship_id: int)
 signal changed
 signal ship_built(ship_id: int)
 signal module_upgraded(world_position: Vector2)
+signal module_damaged(world_position: Vector2)
 signal ticked
 signal refined(amount: int)
 signal module_built(world_position: Vector2, kind: String)
@@ -460,7 +461,28 @@ func modules_connected(a: Vector2, b: Vector2) -> bool:
 	return false
 
 func is_module_active(world_position: Vector2) -> bool:
-	return bool(connected_modules.get(world_position, false))
+	return bool(connected_modules.get(world_position, false)) and not is_module_damaged(world_position)
+
+func is_module_damaged(world_position: Vector2) -> bool:
+	return modules.has(world_position) and bool(structure_state(world_position).get("damaged", false))
+
+func damage_module(world_position: Vector2) -> bool:
+	if not modules.has(world_position) or is_module_damaged(world_position): return false
+	structure_state(world_position)["damaged"] = true
+	recalculate()
+	module_damaged.emit(world_position)
+	var root_model: Variant = locations.model_ref.get_ref() if locations.model_ref != null else null
+	if root_model != null and root_model != self:
+		root_model.module_damaged.emit(world_position)
+	changed.emit()
+	return true
+
+func repair_module(world_position: Vector2) -> bool:
+	if not modules.has(world_position) or not is_module_damaged(world_position): return false
+	structure_state(world_position)["damaged"] = false
+	recalculate()
+	changed.emit()
+	return true
 
 func is_structure_active(structure_id: String) -> bool:
 	if not locations.structures.has(structure_id): return false
