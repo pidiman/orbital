@@ -54,6 +54,7 @@ func _init(station: StationModel, mining: Fleet, region_supply: Supply) -> void:
 	model.module_damaged.connect(request_autosave.unbind(1))
 	model.module_hp_changed.connect(request_autosave.unbind(1))
 	model.ship_built.connect(request_autosave.unbind(1))
+	model.ship_upgraded.connect(request_autosave.unbind(1))
 	model.ship_removed.connect(request_autosave.unbind(1))
 	fleet.dispatched.connect(request_autosave.unbind(2))
 	fleet.completed.connect(request_autosave.unbind(3))
@@ -439,6 +440,20 @@ func restore(document: Variant) -> String:
 		var location_data: Dictionary = _extension_fields(migrated.extensions, "world_locations", candidate.locations, Locations.FIELDS)
 		if not decode_error.is_empty():
 			return decode_error
+		# Ship tiers were added after the original v2 location extension. Legacy
+		# records default to T1; current records are checked against definitions.
+		for ship_id: Variant in location_data.ships:
+			if not location_data.ships[ship_id] is Dictionary:
+				return "Invalid ship identity or owner station."
+			var ship_record: Dictionary = location_data.ships[ship_id]
+			if not ship_record.has("tier"):
+				ship_record["tier"] = 1
+			elif not _integer(ship_record.tier, 1):
+				return "Invalid ship tier."
+			var ship_kind: String = str(ship_record.get("kind", ""))
+			var max_ship_tier: int = candidate.ship_catalog.get(ship_kind, {}).get("upgrades", []).size() + 1
+			if int(ship_record.tier) > max_ship_tier:
+				return "Save requires an unavailable ship tier."
 		error = LocationValidation.validate_graph(location_data, candidate, region_data, transport_data)
 		if not error.is_empty():
 			return error
@@ -826,7 +841,11 @@ func _validate_collection(data: Dictionary, station: Dictionary, mining: Diction
 			return "Invalid collection assignment."
 		if not regions.records.has(job.get("region")) or not _valid_vector(job.get("position")) or not _valid_vector(job.get("depot")):
 			return "Invalid regional collection position."
-		if not _integer(job.get("cargo"), 0) or job.cargo > int(definitions.ship_catalog[station.ships[ship_id]].collection.cargo_capacity) or not _integer(job.get("target"), -1):
+		var collection_definition: Dictionary = definitions.ship_catalog[station.ships[ship_id]]
+		var max_collection: int = int(collection_definition.collection.cargo_capacity)
+		for upgrade: Dictionary in collection_definition.get("upgrades", []):
+			max_collection = maxi(max_collection, int(upgrade.get("stats", {}).get("collection", {}).get("cargo_capacity", max_collection)))
+		if not _integer(job.get("cargo"), 0) or job.cargo > max_collection or not _integer(job.get("target"), -1):
 			return "Invalid collection cargo or target."
 		if not job.get("waiting") is bool or not job.get("status") is String:
 			return "Invalid collection waiting state."

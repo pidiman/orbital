@@ -86,7 +86,7 @@ func advance(delta: float) -> void:
 		if local_depots.is_empty():
 			_status(job, "Requires Space Depot", true)
 			continue
-		var capability: Dictionary = model.ship_catalog[model.ships[ship_id]].collection
+		var capability: Dictionary = model.ship_definition(ship_id).collection
 		var step: float = float(capability.speed) * delta
 		if not local_depots.has(job.depot):
 			job.depot = local_depots.keys()[0]
@@ -98,7 +98,7 @@ func advance(delta: float) -> void:
 			var destination: Vector2 = depot_position(job.depot)
 			job.position = job.position.move_toward(destination, step)
 			if job.position != destination:
-				_status(job, "Returning · 1 M")
+				_status(job, "Returning · %d M" % int(job.cargo))
 				continue
 			var local: StationModel = model.scoped_station(job.destination.station_id)
 			var received: int = model.locations.receive(job.destination, "materials", mini(int(job.cargo), maxi(0, local.capacity - local.materials)))
@@ -132,7 +132,7 @@ func advance(delta: float) -> void:
 		if job.position == target:
 			supply.salvage(int(job.target), _receive.bind(job), int(capability.cargo_capacity), job.region)
 			job.target = -1
-			_status(job, "Returning · 1 M")
+			_status(job, "Returning · %d M" % int(job.cargo))
 			changed.emit()
 
 func depots_in(region_id: String) -> Dictionary:

@@ -20,7 +20,7 @@ func assign(id: int, point: Vector2) -> String:
 	if destination.is_empty(): return "Found a local outpost before assigning hauling."
 	var local: StationModel = model.scoped_station(destination.station_id)
 	if not local.modules.has(point) or not local.definition_at(point).has("conversion"): return "Click a Refinery in this ship’s region."
-	var duration: int = int(model.ship_catalog[model.ships[id]].hauling.travel_seconds)
+	var duration: int = int(model.ship_definition(id).hauling.travel_seconds)
 	jobs[id] = {"refinery_id": local.structure_id_at(point), "region": model.locations.ship_region(id), "destination": destination, "phase": "pickup", "remaining": duration, "cargo": {}, "waiting": false, "status": "To refinery"}
 	changed.emit()
 	fleet.changed.emit()
@@ -66,7 +66,7 @@ func tick() -> void:
 	for id: int in jobs.keys():
 		var job: Dictionary = jobs[id]
 		var local: StationModel = model.scoped_station(job.destination.station_id)
-		var capability: Dictionary = model.ship_catalog[model.ships[id]].hauling
+		var capability: Dictionary = model.ship_definition(id).hauling
 		if job.remaining > 0:
 			job.remaining -= 1
 			if job.remaining > 0: continue
@@ -120,7 +120,7 @@ func validate(data: Dictionary) -> String:
 	for id: Variant in data.jobs:
 		var job: Variant = data.jobs[id]
 		if not id is int or not fleet.model.ships.has(id) or not fleet.model.ship_catalog[fleet.model.ships[id]].has("hauling") or fleet.unit_busy(id): return "Invalid Hauler assignment."
-		var capability: Dictionary = fleet.model.ship_catalog[fleet.model.ships[id]].hauling
+		var capability: Dictionary = fleet.model.ship_definition(id).hauling
 		if not job is Dictionary or not job.get("refinery_id") is String or fleet.model.locations.ship_region(id) != job.region or job.get("destination") != fleet.model.locations.local_destination(id): return "Invalid hauling location."
 		if not job.get("phase") in ["pickup", "delivery"] or not job.get("remaining") is int or job.remaining < 0 or job.remaining > int(capability.travel_seconds) or not job.get("waiting") is bool or not job.get("status") is String or not job.get("cargo") is Dictionary: return "Invalid hauling state."
 		if job.has("stop_after_delivery") and not job.stop_after_delivery is bool: return "Invalid hauling stop state."

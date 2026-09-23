@@ -38,7 +38,7 @@ func add_structure(station_id: String, kind: String, position: Vector2) -> Strin
 	return id
 
 func add_ship(ship_id: int, kind: String, station_id: String) -> void:
-	ships[ship_id] = {"id": ship_id, "kind": kind, "station_id": station_id, "owner": stations[station_id].owner, "region": stations[station_id].region, "transit": {}}
+	ships[ship_id] = {"id": ship_id, "kind": kind, "tier": 1, "station_id": station_id, "owner": stations[station_id].owner, "region": stations[station_id].region, "transit": {}}
 
 func ship_region(ship_id: int) -> String:
 	return str(ships.get(ship_id, {}).get("region", station_region(primary_station())))

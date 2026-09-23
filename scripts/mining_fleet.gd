@@ -82,7 +82,7 @@ func mining_units() -> Dictionary:
 		if definition.has("mining"):
 			units[world_position] = definition.mining
 	for ship_id: int in model.ships:
-		var definition: Dictionary = model.ship_catalog[model.ships[ship_id]]
+		var definition: Dictionary = model.ship_definition(ship_id)
 		if definition.has("mining") and mining_work_error(ship_id).is_empty():
 			units[ship_id] = definition.mining
 	return units
@@ -308,7 +308,7 @@ func target_resource(target: int) -> String:
 	return str(resource_targets.get(target, {}).get("resource", "minerals"))
 
 func mining_resource(unit: Variant) -> String:
-	var definition: Dictionary = model.ship_catalog[model.ships[unit]] if unit is int else model.definition_at(unit)
+	var definition: Dictionary = model.ship_definition(unit) if unit is int else model.definition_at(unit)
 	return str(definition.get("mining", {}).get("resource", "minerals"))
 
 func mining_route(actor: Dictionary, target: int, legacy: bool = false) -> Dictionary:

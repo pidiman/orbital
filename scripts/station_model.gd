@@ -9,6 +9,7 @@ signal module_removed(world_position: Vector2)
 signal ship_removed(ship_id: int)
 signal changed
 signal ship_built(ship_id: int)
+signal ship_upgraded(ship_id: int)
 signal module_upgraded(world_position: Vector2)
 signal module_damaged(world_position: Vector2)
 signal module_hp_changed(world_position: Vector2)
@@ -261,6 +262,53 @@ func definition_at(world_position: Vector2) -> Dictionary:
 func structure_definition(structure_id: String) -> Dictionary:
 	var structure: Dictionary = locations.structures[structure_id]
 	return definition_for(structure.kind, int(structure.state.get("tier", 1)))
+
+func ship_tier(ship_id: int) -> int:
+	return maxi(1, int(locations.ships.get(ship_id, {}).get("tier", 1)))
+
+func _merge_ship_stats(target: Dictionary, patch: Dictionary) -> void:
+	for key: String in patch:
+		if target.get(key) is Dictionary and patch[key] is Dictionary:
+			var nested: Dictionary = target[key]
+			_merge_ship_stats(nested, patch[key])
+		else:
+			target[key] = patch[key]
+
+func ship_definition(ship_id: int) -> Dictionary:
+	if not locations.ships.has(ship_id): return {}
+	var definition: Dictionary = ship_catalog.get(locations.ships[ship_id].kind, {}).duplicate(true)
+	var upgrades: Array = definition.get("upgrades", [])
+	for index in range(mini(ship_tier(ship_id) - 1, upgrades.size())):
+		_merge_ship_stats(definition, upgrades[index].get("stats", {}))
+	return definition
+
+func next_ship_upgrade(ship_id: int) -> Dictionary:
+	if not locations.ships.has(ship_id): return {}
+	var upgrades: Array = ship_catalog.get(locations.ships[ship_id].kind, {}).get("upgrades", [])
+	var index: int = ship_tier(ship_id) - 1
+	return upgrades[index] if index < upgrades.size() else {}
+
+func ship_upgrade_error(ship_id: int) -> String:
+	if not locations.ships.has(ship_id): return "Select an owned ship."
+	var upgrade: Dictionary = next_ship_upgrade(ship_id)
+	if upgrade.is_empty(): return "This ship has no further tier."
+	if region_context != null and locations.ship_region(ship_id) != region_context.current_region:
+		return "View this ship's current region before upgrading."
+	var local: StationModel = self if locations.ships[ship_id].station_id == base_id() else scoped_station(locations.ships[ship_id].station_id)
+	if local.materials < int(upgrade.get("cost", {}).get("materials", 0)):
+		return "Upgrade needs %d Materials." % int(upgrade.get("cost", {}).get("materials", 0))
+	return ""
+
+func upgrade_ship(ship_id: int) -> String:
+	var error: String = ship_upgrade_error(ship_id)
+	if not error.is_empty(): return error
+	var upgrade: Dictionary = next_ship_upgrade(ship_id)
+	var local: StationModel = self if locations.ships[ship_id].station_id == base_id() else scoped_station(locations.ships[ship_id].station_id)
+	local.materials -= int(upgrade.cost.materials)
+	locations.ships[ship_id].tier = ship_tier(ship_id) + 1
+	ship_upgraded.emit(ship_id)
+	changed.emit()
+	return ""
 
 func definition_for(kind: String, tier: int) -> Dictionary:
 	var definition: Dictionary = catalog.get(kind, locations.outpost_catalog.get(kind, {})).duplicate(true)

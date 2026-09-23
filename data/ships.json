@@ -13,7 +13,10 @@
       "resource": "minerals"
     },
     "art": "mining_ship",
-    "dock_type": "miner"
+    "dock_type": "miner",
+    "upgrades": [
+      {"cost": {"materials": 25}, "stats": {"mining": {"yield": 36}}, "description": "Mining yield: 18 → 36 minerals / cycle"}
+    ]
   },
   "scout": {
     "name": "Scout",
@@ -54,7 +57,10 @@
       "cargo_capacity": 1
     },
     "art": "material_ship",
-    "dock_type": "material_ship"
+    "dock_type": "material_ship",
+    "upgrades": [
+      {"cost": {"materials": 20}, "stats": {"collection": {"cargo_capacity": 2}}, "description": "Collection amount: 1 → 2 Materials / pickup"}
+    ]
   },
   "repair_ship": {
     "name": "Repair Ship",
@@ -105,7 +111,10 @@
       "target_label": "Xenocrystal node"
     },
     "art": "xeno_mining_ship",
-    "dock_type": "xeno_miner"
+    "dock_type": "xeno_miner",
+    "upgrades": [
+      {"cost": {"materials": 35}, "stats": {"mining": {"yield": 2}}, "description": "Xenocrystal yield: 1 → 2 / cycle"}
+    ]
   },
   "hauler": {
     "name": "Hauler",
@@ -119,7 +128,10 @@
       "travel_seconds": 3,
       "region": "home"
     },
-    "art": "hauler"
+    "art": "hauler",
+    "upgrades": [
+      {"cost": {"materials": 30}, "stats": {"hauling": {"batch_size": 10}}, "description": "Cargo capacity: 5 → 10 units / trip"}
+    ]
   },
   "cargo_ship": {
     "name": "Cargo Ship",

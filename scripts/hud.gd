@@ -75,6 +75,8 @@ var ship_buttons: Dictionary = {}
 var command_buttons: Dictionary = {}
 var sell_buttons: Dictionary = {}
 var ship_entries: Dictionary = {}
+var ship_tier_labels: Dictionary = {}
+var ship_upgrade_buttons: Dictionary = {}
 var demolish_button: Button
 var ship_rows: VBoxContainer
 var upgrade_title: Label
@@ -543,6 +545,8 @@ func _refresh_ships() -> void:
 			ship_entries.erase(removed_id)
 			command_buttons.erase(removed_id)
 			capability_buttons.erase(removed_id)
+			ship_tier_labels.erase(removed_id)
+			ship_upgrade_buttons.erase(removed_id)
 			sell_buttons.erase(removed_id)
 	for ship_id: int in model.ships:
 		var definition: Dictionary = model.ship_catalog[model.ships[ship_id]]
@@ -568,6 +572,18 @@ func _refresh_ships() -> void:
 					command_buttons[ship_id] = button
 			if capability_buttons[ship_id].is_empty():
 				_label(entry, "%s #%d · No commands" % [definition.name, ship_id], 12, MUTED)
+			if definition.has("upgrades"):
+				var tier_label := _label(entry, "", 12, MUTED)
+				tier_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				ship_tier_labels[ship_id] = tier_label
+				var tier_button := Button.new()
+				tier_button.custom_minimum_size.y = 42
+				tier_button.add_theme_font_size_override("font_size", 12)
+				tier_button.add_theme_stylebox_override("normal", _style(Color("172738"), Color("304557")))
+				tier_button.add_theme_stylebox_override("hover", _style(Color("20374a"), CYAN))
+				tier_button.pressed.connect(func() -> void: _upgrade_ship(ship_id))
+				entry.add_child(tier_button)
+				ship_upgrade_buttons[ship_id] = tier_button
 			var sell := Button.new()
 			sell.custom_minimum_size.y = 44
 			sell.add_theme_font_size_override("font_size", 12)
@@ -614,8 +630,47 @@ func _refresh_ships() -> void:
 				button.disabled = false
 			if capability != "founding": button.tooltip_text = work_error
 		sell_buttons[ship_id].text = "Decommission · +%d M" % model.ship_refund(ship_id)
+		if ship_tier_labels.has(ship_id):
+			var current_tier: int = model.ship_tier(ship_id)
+			var current_definition: Dictionary = model.ship_definition(ship_id)
+			var next: Dictionary = model.next_ship_upgrade(ship_id)
+			ship_tier_labels[ship_id].text = "Tier %d · %s" % [current_tier, _ship_tier_effect(current_definition)]
+			if next.is_empty():
+				ship_upgrade_buttons[ship_id].text = "Maximum ship tier"
+				ship_upgrade_buttons[ship_id].disabled = true
+				ship_upgrade_buttons[ship_id].tooltip_text = "This ship is fully upgraded."
+			else:
+				var preview: Dictionary = current_definition.duplicate(true)
+				_merge_ship_stats_for_preview(preview, next.get("stats", {}))
+				var upgrade_error: String = model.ship_upgrade_error(ship_id)
+				ship_tier_labels[ship_id].text += "\nNext: %s for %s" % [_ship_tier_effect(preview), model.upgrade_cost_text(next.cost)]
+				if not upgrade_error.is_empty(): ship_tier_labels[ship_id].text += "\n" + upgrade_error
+				ship_upgrade_buttons[ship_id].text = "Upgrade to T%d · %s" % [current_tier + 1, model.upgrade_cost_text(next.cost)]
+				ship_upgrade_buttons[ship_id].disabled = not upgrade_error.is_empty()
+				ship_upgrade_buttons[ship_id].tooltip_text = "Next: %s" % _ship_tier_effect(preview)
 
 	_refresh_tray()
+
+func _merge_ship_stats_for_preview(target: Dictionary, patch: Dictionary) -> void:
+	for key: String in patch:
+		if target.get(key) is Dictionary and patch[key] is Dictionary:
+			var nested: Dictionary = target[key]
+			_merge_ship_stats_for_preview(nested, patch[key])
+		else:
+			target[key] = patch[key]
+
+func _ship_tier_effect(definition: Dictionary) -> String:
+	if definition.has("collection"):
+		return "Collects %d Materials / pickup" % int(definition.collection.cargo_capacity)
+	if definition.has("mining"):
+		return "Mines %d %s / cycle" % [int(definition.mining.yield), str(definition.mining.get("resource", "minerals")).capitalize()]
+	if definition.has("hauling"):
+		return "Carries %d units / trip" % int(definition.hauling.batch_size)
+	return "No tier effect"
+
+func _upgrade_ship(ship_id: int) -> void:
+	var error: String = model.upgrade_ship(ship_id)
+	message("Ship upgraded to Tier %d." % model.ship_tier(ship_id) if error.is_empty() else error, not error.is_empty())
 
 func _command_ship(ship_id: int, capability: String = "") -> void:
 	choose("")
