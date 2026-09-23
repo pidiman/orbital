@@ -75,6 +75,17 @@ static func draw_module(canvas: CanvasItem, center: Vector2, kind: String, scale
 		canvas.draw_circle(Vector2.ZERO, 18, steel, false, 2.0, true)
 		canvas.draw_circle(Vector2.ZERO, 9, Color("263b4a", opacity))
 		canvas.draw_circle(Vector2.ZERO, 6, accent, false, 2.0, true)
+	elif kind == "missile_silo":
+		# Fixed launch rack: missiles steer after launch, so the silo remains
+		# visually distinct from the turret's rotating barrel.
+		var steel := Color("3d4b59", opacity)
+		var red := Color("d97863", opacity)
+		canvas.draw_rect(Rect2(-21, -20, 42, 40), Color("17232e", opacity))
+		canvas.draw_rect(Rect2(-21, -20, 42, 40), steel, false, 2.5)
+		for x in [-11, 0, 11]:
+			canvas.draw_rect(Rect2(x - 4, -13, 8, 24), Color("253746", opacity))
+			canvas.draw_circle(Vector2(x, -14), 3.5, red)
+		canvas.draw_line(Vector2(-14, 16), Vector2(14, 16), red, 2.0, true)
 	elif kind == "storage":
 		canvas.draw_rect(Rect2(-21, -18, 42, 36), Color(0.23, 0.24, 0.27, opacity))
 		canvas.draw_rect(Rect2(-21, -18, 42, 36), gold, false, 2)

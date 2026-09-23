@@ -118,6 +118,28 @@
       {"cost": {"materials": 115}, "stats": {"defense_turret": {"range": 430.0, "fire_seconds": 0.45}}, "description": "Range 430 · high-rate firing"}
     ]
   },
+  "missile_silo": {
+    "name": "Missile Silo",
+    "cost": 110,
+    "power_use": 4,
+    "power_output": 0,
+    "capacity": 0,
+    "color": "d97863",
+    "description": "Launches slow, heavy missiles at incoming asteroids.",
+    "effect": "260 range · 4 damage · 4.0s reload · 4 power",
+    "missile_silo": {
+      "range": 260.0,
+      "fire_seconds": 4.0,
+      "projectile_speed": 150.0,
+      "damage": 4
+    },
+    "art": "missile_silo",
+    "upgrades": [
+      {"cost": {"materials": 70}, "stats": {"missile_silo": {"range": 300.0, "fire_seconds": 3.5, "damage": 5}}, "description": "Range 300 · 5 damage · faster reload"},
+      {"cost": {"materials": 105}, "stats": {"missile_silo": {"range": 345.0, "fire_seconds": 3.0, "damage": 6}}, "description": "Range 345 · 6 damage · rapid reload"},
+      {"cost": {"materials": 150}, "stats": {"missile_silo": {"range": 395.0, "fire_seconds": 2.5, "damage": 7}}, "description": "Range 395 · 7 damage · high-rate reload"}
+    ]
+  },
   "storage": {
     "name": "Storage",
     "cost": 25,

@@ -5,9 +5,11 @@ var game: Node2D
 var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/threats.json"))
 var threats: Dictionary = {}
 var projectiles: Array[Dictionary] = []
+var missiles: Array[Dictionary] = []
 var bursts: Array[Dictionary] = []
 var turret_angles: Dictionary = {}
 var turret_cooldowns: Dictionary = {}
+var silo_cooldowns: Dictionary = {}
 var next_id: int = 1
 var spawn_remaining: float = 45.0
 var active: bool = true
@@ -26,9 +28,11 @@ func _set_region() -> void:
 	region_id = next_region
 	threats.clear()
 	projectiles.clear()
+	missiles.clear()
 	bursts.clear()
 	turret_angles.clear()
 	turret_cooldowns.clear()
+	silo_cooldowns.clear()
 	var record: Dictionary = game.fleet.regions.records.get(region_id, {})
 	rng.seed = int(record.get("seed", 1)) ^ 0x5EED7
 	spawn_remaining = _next_spawn_delay()
@@ -40,9 +44,11 @@ func reset_transient() -> void:
 	# Threat positions/projectiles are intentionally not part of v2 saves.
 	threats.clear()
 	projectiles.clear()
+	missiles.clear()
 	bursts.clear()
 	turret_angles.clear()
 	turret_cooldowns.clear()
+	silo_cooldowns.clear()
 	spawn_remaining = _next_spawn_delay()
 
 func spawn_now() -> void:
@@ -62,7 +68,9 @@ func _process(delta: float) -> void:
 			spawn_remaining = _next_spawn_delay()
 	_move_threats(delta)
 	_update_turrets(delta)
+	_update_silos(delta)
 	_update_projectiles(delta)
+	_update_missiles(delta)
 	for burst: Dictionary in bursts:
 		burst.time += delta
 	bursts = bursts.filter(func(item: Dictionary) -> bool: return item.time < 0.45)
@@ -154,6 +162,25 @@ func _closest_threat(origin: Vector2, range: float) -> int:
 			selected = id
 	return selected
 
+func _update_silos(delta: float) -> void:
+	if not game.board.visible: return
+	var station: StationModel = game.board.model
+	var live: Dictionary = {}
+	for point: Vector2 in station.modules:
+		if station.modules[point] != "missile_silo" or not station.is_module_active(point): continue
+		var structure_id: String = station.structure_id_at(point)
+		live[structure_id] = true
+		var origin: Vector2 = game.board.world_to_screen(point)
+		var definition: Dictionary = _silo_stats(station, point)
+		var target_id: int = _closest_threat(origin, float(definition.get("range", 260.0)))
+		var cooldown: float = maxf(0.0, float(silo_cooldowns.get(structure_id, 0.0)) - delta)
+		if target_id != -1 and cooldown <= 0.0:
+			_fire_missile(structure_id, origin, target_id, definition)
+			cooldown = float(definition.get("fire_seconds", 4.0))
+		silo_cooldowns[structure_id] = cooldown
+	for id: Variant in silo_cooldowns.keys():
+		if not live.has(id): silo_cooldowns.erase(id)
+
 func _fire(structure_id: String, origin: Vector2, target_id: int, definition: Dictionary) -> void:
 	if not threats.has(target_id): return
 	var speed: float = maxf(1.0, float(definition.get("projectile_speed", 330.0)))
@@ -183,6 +210,29 @@ func _turret_stats(station: StationModel, point: Vector2) -> Dictionary:
 		base[key] = current[key]
 	return base
 
+func _silo_stats(station: StationModel, point: Vector2) -> Dictionary:
+	var base: Dictionary = station.catalog.get("missile_silo", {}).get("missile_silo", {}).duplicate(true)
+	var current: Dictionary = station.definition_at(point).get("missile_silo", {})
+	for key: String in current:
+		base[key] = current[key]
+	return base
+
+func _fire_missile(structure_id: String, origin: Vector2, target_id: int, definition: Dictionary) -> void:
+	if not threats.has(target_id): return
+	var speed: float = maxf(1.0, float(definition.get("projectile_speed", 150.0)))
+	var muzzle: Vector2 = origin + Vector2(0, -22)
+	var direction: Vector2 = (threats[target_id].position - muzzle).normalized()
+	var distance: float = muzzle.distance_to(threats[target_id].position)
+	missiles.append({
+		"position": muzzle,
+		"velocity": direction * speed,
+		"speed": speed,
+		"time_remaining": maxf(0.08, distance / speed),
+		"target_id": target_id,
+		"silo_id": structure_id,
+		"damage": maxi(1, int(definition.get("damage", 4)))
+	})
+
 func _update_projectiles(delta: float) -> void:
 	var remaining: Array[Dictionary] = []
 	for projectile: Dictionary in projectiles:
@@ -205,6 +255,27 @@ func _update_projectiles(delta: float) -> void:
 		remaining.append(projectile)
 	projectiles = remaining
 
+func _update_missiles(delta: float) -> void:
+	var remaining: Array[Dictionary] = []
+	for missile: Dictionary in missiles:
+		var target_id: int = int(missile.target_id)
+		if target_id < 0 or not threats.has(target_id): continue
+		var target: Vector2 = threats[target_id].position
+		var direction: Vector2 = (target - missile.position).normalized()
+		var speed: float = maxf(1.0, float(missile.get("speed", 150.0)))
+		missile.velocity = direction * speed
+		missile.position += missile.velocity * delta
+		missile.time_remaining = float(missile.get("time_remaining", 0.0)) - delta
+		# Missile arrival is tied to its locked target ID, matching turret
+		# guaranteed-hit behavior while allowing the target to move visually.
+		if float(missile.time_remaining) <= 0.0:
+			missile.position = target
+			threats[target_id].health -= int(missile.get("damage", 4))
+			if threats[target_id].health <= 0: _destroy(target_id)
+			continue
+		remaining.append(missile)
+	missiles = remaining
+
 func _destroy(id: int) -> void:
 	if not threats.has(id): return
 	var threat: Dictionary = threats[id]
@@ -221,9 +292,9 @@ func _destroy(id: int) -> void:
 func _draw() -> void:
 	var station: StationModel = game.board.model
 	if not game.board.visible: return
-	if game.board.inspected_position != Vector2.INF and station.modules.has(game.board.inspected_position) and station.modules[game.board.inspected_position] == "defense_turret":
+	if game.board.inspected_position != Vector2.INF and station.modules.has(game.board.inspected_position) and station.modules[game.board.inspected_position] in ["defense_turret", "missile_silo"]:
 		var point: Vector2 = game.board.world_to_screen(game.board.inspected_position)
-		var definition: Dictionary = _turret_stats(station, game.board.inspected_position)
+		var definition: Dictionary = _turret_stats(station, game.board.inspected_position) if station.modules[game.board.inspected_position] == "defense_turret" else _silo_stats(station, game.board.inspected_position)
 		draw_circle(point, float(definition.get("range", 220.0)), Color(0.94, 0.45, 0.32, 0.08), false, 1.5, true)
 	for point: Vector2 in station.modules:
 		if station.modules[point] != "defense_turret" or not station.is_module_active(point): continue
@@ -237,6 +308,16 @@ func _draw() -> void:
 	for projectile: Dictionary in projectiles:
 		var direction: Vector2 = projectile.velocity.normalized()
 		draw_line(projectile.position - direction * 9.0, projectile.position + direction * 4.0, Color("ff9a70"), 3.0, true)
+	for missile: Dictionary in missiles:
+		var direction: Vector2 = missile.velocity.normalized()
+		var side := Vector2(-direction.y, direction.x)
+		draw_colored_polygon(PackedVector2Array([
+			missile.position + direction * 7.0,
+			missile.position - direction * 6.0 + side * 3.0,
+			missile.position - direction * 6.0 - side * 3.0
+		]), Color("d98c72"))
+		draw_line(missile.position - direction * 7.0, missile.position - direction * 17.0, Color("ffb478", 0.75), 3.0, true)
+		draw_circle(missile.position - direction * 18.0, 2.0, Color("fff1c2", 0.8))
 	for id: int in threats:
 		var threat: Dictionary = threats[id]
 		draw_set_transform(threat.position, threat.angle)

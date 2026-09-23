@@ -103,7 +103,7 @@ func placement_error(world_position: Vector2, kind: String) -> String:
 	if region_context != null and region_context.current_region != locations.station_region(base_id()):
 		return "View this station’s region before building."
 	if not station_id.is_empty() and not locations.outpost_catalog[locations.stations[station_id].kind].buildable_modules.has(kind):
-		return "Outposts support Solar, Storage, Space Dock and Teleport Gate only."
+		return "This module is not available at outposts."
 	if not catalog.has(kind):
 		return "Choose a module first."
 	if not catalog[kind].get("buildable", true):
