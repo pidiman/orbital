@@ -213,7 +213,10 @@ func _update_mining_state(unit: Variant, target: Vector2) -> void:
 			next_state = "FLYING_BACK"
 		elif mining_states.get(unit, "") == "EXTRACTING":
 			next_state = "EXTRACTING"
-		elif points.has(unit) and Vector2(points[unit]).is_equal_approx(target):
+		# Visual movement eases toward the stop point and may never become
+		# bit-for-bit equal. Treat the configured arrival radius as arrival so
+		# extraction can begin and its beam can render.
+		elif points.has(unit) and Vector2(points[unit]).distance_to(target) <= float(settings.get("facing_arrival_distance", 1.0)):
 			next_state = "EXTRACTING"
 		else:
 			next_state = "FLYING_TO"

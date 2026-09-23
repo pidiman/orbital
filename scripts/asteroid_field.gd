@@ -17,6 +17,7 @@ var font: Font = ThemeDB.fallback_font
 const ORE := Color("baa1f5")
 var last_revision: int = -1
 var last_region: String = ""
+var beam_render_state: Dictionary = {}
 
 func _ready() -> void:
 	fleet.completed.connect(_on_completed)
@@ -156,8 +157,14 @@ func _draw() -> void:
 		var mining_definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[unit]] if unit is int and fleet.model.ships.has(unit) else {"color": "e8ad5b"}
 		get_parent().ship_motion.draw_exhaust(self, unit, ship_point, mining_art, 0.55, get_parent().ship_motion.angle_for(unit), Color(mining_definition.get("color", "e8ad5b")))
 		ModuleArt.draw_module(self, ship_point, mining_art, 0.55, 1.0, get_parent().ship_motion.angle_for(unit))
-		# Beam visibility is state-gated: only the stationary extraction phase emits it.
-		if get_parent().ship_motion.mining_state(unit) == "EXTRACTING":
+	# Beam visibility is state-gated: only the stationary extraction phase emits it.
+		var extraction_state: String = get_parent().ship_motion.mining_state(unit)
+		var beam_should_draw: bool = extraction_state == "EXTRACTING"
+		var beam_trace: String = "VISIBLE" if beam_should_draw else "HIDDEN"
+		if beam_render_state.get(unit, "") != beam_trace:
+			beam_render_state[unit] = beam_trace
+			print("Beam render ship %s: state=%s -> beam %s (AsteroidField._draw mining path)" % [str(unit), extraction_state, beam_trace])
+		if beam_should_draw:
 			var beam_color: Color = Color("62e4dc") if fleet.target_resource(job.target) == "xenocrystal" else Color("f0aa55")
 			var beam_direction: Vector2 = target - ship_point
 			if beam_direction.length() > 1.0:
