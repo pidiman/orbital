@@ -98,7 +98,7 @@ Core loop: build station → collect → mine → refine → research → explor
 - Settings are client preferences (not in gameplay save): edge scrolling (off),
   zoom controls (on), ship trajectories (off), music + volume, Show FPS.
 - F9 debug panel (DEBUG_MODE only): region-aware resource grants, asteroid toggle,
-  spawn asteroid now.
+  spawn asteroid now, Xenocrystal tuning (amount, lifetime).
 - Keep UI compact; the player values screen space.
 
 ## Visual conventions

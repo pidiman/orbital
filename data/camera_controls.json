@@ -27,6 +27,12 @@
       "label": "Show FPS",
       "type": "bool",
       "default": true
+    },
+    {
+      "id": "show_defense_radius",
+      "label": "Defense radius",
+      "type": "bool",
+      "default": false
     }
   ],
   "keyboard_zoom_rate": 1.5,

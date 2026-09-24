@@ -1,5 +1,6 @@
 extends Camera2D
 const RegionView = preload("res://scripts/region_view.gd")
+signal view_changed
 # Presentation coordinates only; never writes ship, station, or mission state.
 var game: Node2D
 var ship_id: int = -1
@@ -14,6 +15,7 @@ func reset_view(preserve_zoom: bool = false) -> void:
 	if not preserve_zoom: zoom = Vector2.ONE
 	position = get_viewport_rect().size * 0.5
 	force_update_scroll()
+	view_changed.emit()
 
 func focus_ship(id: int) -> void:
 	# One-shot recenter after a region change, never follow or alter zoom.
@@ -21,6 +23,7 @@ func focus_ship(id: int) -> void:
 	game.ship_motion.advance_visual(0.0)
 	position = ship_point(id)
 	force_update_scroll()
+	view_changed.emit()
 
 func ship_point(id: int) -> Vector2:
 	return game.ship_motion.position_for(id)
@@ -38,6 +41,7 @@ func zoom_view(factor: float, focus_point: Vector2 = Vector2.INF) -> void:
 		var bounds: Rect2 = pan_bounds()
 		position = (position + world_point - get_canvas_transform().affine_inverse() * focus_point).clamp(bounds.position, bounds.end)
 		force_update_scroll()
+	view_changed.emit()
 
 func fit_grid() -> void:
 	ship_id = -1
@@ -47,6 +51,7 @@ func fit_grid() -> void:
 	zoom = Vector2.ONE * minf(area.size.x / grid_size.x, area.size.y / grid_size.y)
 	position = game.board.center + (viewport_size * 0.5 - area.get_center()) / zoom
 	force_update_scroll()
+	view_changed.emit()
 
 func pan_bounds() -> Rect2:
 	var area := Rect2(Vector2.ZERO, get_viewport_rect().size)
@@ -64,3 +69,4 @@ func pan_pixels(offset: Vector2) -> void:
 	var bounds: Rect2 = pan_bounds()
 	position = (position + offset / zoom).clamp(bounds.position, bounds.end)
 	force_update_scroll()
+	view_changed.emit()

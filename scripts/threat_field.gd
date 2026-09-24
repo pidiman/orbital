@@ -342,7 +342,7 @@ func _destroy(id: int) -> void:
 func _draw() -> void:
 	var station: StationModel = game.board.model
 	if not game.board.visible: return
-	if game.board.inspected_position != Vector2.INF and station.modules.has(game.board.inspected_position) and station.modules[game.board.inspected_position] in ["defense_turret", "missile_silo"]:
+	if not game.preferences.values.get("show_defense_radius", false) and game.board.inspected_position != Vector2.INF and station.modules.has(game.board.inspected_position) and station.modules[game.board.inspected_position] in ["defense_turret", "missile_silo"]:
 		var point: Vector2 = game.board.world_to_screen(game.board.inspected_position)
 		var definition: Dictionary = _turret_stats(station, game.board.inspected_position) if station.modules[game.board.inspected_position] == "defense_turret" else _silo_stats(station, game.board.inspected_position)
 		draw_circle(point, float(definition.get("range", 220.0)), Color(0.94, 0.45, 0.32, 0.08), false, 1.5, true)
@@ -363,10 +363,10 @@ func _draw() -> void:
 		draw_set_transform(origin, float(silo_angles.get(id, TURRET_NEUTRAL_ANGLE)))
 		# Rotating upper rack: all three tubes track as one launcher.
 		draw_circle(Vector2.ZERO, 14.0, Color("263b4a"))
-		draw_circle(Vector2.ZERO, 14.0, Color("d97863"), false, 1.8, true)
+		draw_circle(Vector2.ZERO, 14.0, Color("a78aff"), false, 1.8, true)
 		for x in [-10.0, 0.0, 10.0]:
-			draw_line(Vector2(x, 3), Vector2(x, -barrel_length), Color("586a76"), 5.0, true)
-			draw_circle(Vector2(x, -barrel_length), 3.0, Color("e9a070"))
+			draw_line(Vector2(x, 3), Vector2(x, -barrel_length), Color("756c8e"), 5.0, true)
+			draw_circle(Vector2(x, -barrel_length), 3.0, Color("c4aeff"))
 		draw_set_transform(Vector2.ZERO)
 	for projectile: Dictionary in projectiles:
 		var direction: Vector2 = projectile.velocity.normalized()
@@ -378,9 +378,9 @@ func _draw() -> void:
 			missile.position + direction * 7.0,
 			missile.position - direction * 6.0 + side * 3.0,
 			missile.position - direction * 6.0 - side * 3.0
-		]), Color("d98c72"))
-		draw_line(missile.position - direction * 7.0, missile.position - direction * 17.0, Color("ffb478", 0.75), 3.0, true)
-		draw_circle(missile.position - direction * 18.0, 2.0, Color("fff1c2", 0.8))
+		]), Color("a78aff"))
+		draw_line(missile.position - direction * 7.0, missile.position - direction * 17.0, Color("c4aeff", 0.75), 3.0, true)
+		draw_circle(missile.position - direction * 18.0, 2.0, Color("eee6ff", 0.8))
 	for id: int in threats:
 		var threat: Dictionary = threats[id]
 		draw_set_transform(threat.position, threat.angle)

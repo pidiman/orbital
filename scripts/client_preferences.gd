@@ -2,6 +2,7 @@ extends RefCounted
 # Local presentation preferences, entirely separate from OrbitalSaveStore.
 var definitions: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/camera_controls.json"))
 signal music_changed
+signal defense_radius_changed(enabled: bool)
 var music_enabled: bool = true
 var music_volume: float = 0.3
 signal tuning_changed
@@ -38,6 +39,7 @@ func load_preferences() -> void:
 func set_value(id: String, value: Variant) -> Error:
 	if not values.has(id) or typeof(value) != typeof(values[id]): return ERR_INVALID_PARAMETER
 	values[id] = value
+	if id == "show_defense_radius": defense_radius_changed.emit(value)
 	if not enabled: return OK
 	var config := ConfigFile.new()
 	config.load(path) # Preserve unrelated/future preferences.

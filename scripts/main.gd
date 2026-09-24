@@ -18,11 +18,13 @@ const Debris = preload("res://scripts/debris_field.gd")
 const Clock = preload("res://scripts/resource_clock.gd")
 const Asteroids = preload("res://scripts/asteroid_field.gd")
 const Threats = preload("res://scripts/threat_field.gd")
+const DefenseRanges = preload("res://scripts/defense_range_view.gd")
 const Fleet = preload("res://scripts/mining_fleet.gd")
 const HUD = preload("res://scripts/hud.gd")
 var fleet: Fleet
 var asteroids: Node2D
 var threat_field: Node2D
+var defense_ranges: Node2D
 var mineral_count: int = 0
 var model: StationModel
 var board: Node2D
@@ -113,6 +115,11 @@ func _ready() -> void:
 	ship_camera.name = "ShipCamera"
 	ship_camera.game = self
 	add_child(ship_camera)
+	defense_ranges = DefenseRanges.new()
+	defense_ranges.name = "DefenseRangeView"
+	defense_ranges.game = self
+	add_child(defense_ranges)
+	move_child(defense_ranges, board.get_index() + 1)
 	hud = HUD.new()
 	hud.name = "HUD"
 	hud.model = model
@@ -246,6 +253,7 @@ func _update_region_view() -> void:
 	board.grid_radius = (board.model.build_grid_dimensions() - Vector2i.ONE) / 2
 	board.invalidate_placement_cache()
 	board.visible = home or not outpost.is_empty()
+	if is_instance_valid(defense_ranges): defense_ranges.bind_station(board.model)
 	board.set_process_unhandled_input(board.visible)
 	debris.visible = true
 	debris.set_process_unhandled_input(true)
