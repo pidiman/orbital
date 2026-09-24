@@ -47,6 +47,7 @@ func _init(station: StationModel, mining: Fleet, region_supply: Supply) -> void:
 	fleet.outposts.changed.connect(request_autosave)
 	fleet.research.changed.connect(request_autosave)
 	fleet.transport.changed.connect(request_autosave)
+	fleet.auto_mining_changed.connect(request_autosave)
 	supply.collection.changed.connect(request_autosave)
 	model.module_built.connect(request_autosave.unbind(2))
 	model.module_removed.connect(request_autosave.unbind(1))
@@ -106,6 +107,9 @@ func snapshot() -> Dictionary:
 	document.extensions.gate_transport["schema_version"] = 1
 	_merge_fields(document.extensions, "resource_mining", fleet, Fleet.RESOURCE_FIELDS)
 	document.extensions.resource_mining["schema_version"] = 1
+	# Automatic Miner switches are additive. Missing extension/state means off,
+	# which is the migration default for pre-automatic-mining saves.
+	document.extensions["miner_auto"] = {"schema_version": 1, "states": _encode(fleet.auto_mining)}
 	_merge_fields(document.extensions, "floating_resources", supply, Supply.FLOATING_FIELDS)
 	document.extensions.floating_resources["schema_version"] = 1
 	_merge_fields(document.extensions, "material_collection", supply.collection, Collection.FIELDS)
@@ -163,16 +167,31 @@ func _encode(value: Variant) -> Variant:
 	if value is Dictionary:
 		var ordinary: bool = true
 		for key: Variant in value:
-			if not key is String:
+			# Godot's JSON-backed dictionaries often expose field names as
+			# StringName. Treat them exactly like String so nested records (for
+			# example asteroid fields) stay ordinary JSON objects.
+			if not (key is String or key is StringName):
 				ordinary = false
 		if ordinary:
 			var object: Dictionary = {}
-			for key: String in value:
-				object[key] = _encode(value[key])
+			for key: Variant in value:
+				object[str(key)] = _encode(value[key])
 			return object
 		var entries: Array = []
 		for key: Variant in value:
-			var encoded_key: Dictionary = {"type": "position", "value": _encode(key)} if key is Vector2 else {"type": "id", "value": str(key)}
+			var encoded_key: Dictionary
+			if key is Vector2 or key is Vector2i:
+				# New saves use a stable string representation. The decoder still
+				# accepts the old $vector2 payload for backward compatibility.
+				encoded_key = {"type": "position", "value": "%s,%s" % [str(key.x), str(key.y)]}
+			elif key is int:
+				encoded_key = {"type": "id", "value": str(key)}
+			elif key is String or key is StringName:
+				encoded_key = {"type": "string", "value": str(key)}
+			else:
+				# Do not label an opaque key as an integer. It can then be
+				# migrated as a string instead of triggering Unknown map key type.
+				encoded_key = {"type": "string", "value": str(key)}
 			entries.append({"key": encoded_key, "value": _encode(value[key])})
 		return {"$entries": entries}
 	if value is Array:
@@ -182,7 +201,7 @@ func _encode(value: Variant) -> Variant:
 		return items
 	return value
 
-func _decode(value: Variant, depth: int = 0) -> Variant:
+func _decode(value: Variant, depth: int = 0, path: String = "root") -> Variant:
 	if depth > 40:
 		decode_error = "Save nesting exceeds the supported limit."
 		return null
@@ -205,8 +224,8 @@ func _decode(value: Variant, depth: int = 0) -> Variant:
 			if not pair is Array or pair.size() != 2:
 				decode_error = "Invalid world position in save."
 				return null
-			var x: Variant = _decode(pair[0], depth + 1)
-			var y: Variant = _decode(pair[1], depth + 1)
+			var x: Variant = _decode(pair[0], depth + 1, path + ".$vector2.x")
+			var y: Variant = _decode(pair[1], depth + 1, path + ".$vector2.y")
 			if not _number(x) or not _number(y):
 				decode_error = "Invalid world position components."
 				return null
@@ -219,36 +238,74 @@ func _decode(value: Variant, depth: int = 0) -> Variant:
 			var mapping: Dictionary = {}
 			for entry: Variant in entries:
 				if not entry is Dictionary or not entry.get("key") is Dictionary or not entry.has("value"):
-					decode_error = "Invalid map entry in save."
-					return null
+					push_warning("Save decode: skipped malformed map entry at %s" % path)
+					continue
 				var key: Variant
-				if entry.key.get("type") == "position":
-					key = _decode(entry.key.get("value"), depth + 1)
+				var key_type: String = str(entry.key.get("type", ""))
+				var raw_key: Variant = entry.key.get("value")
+				if key_type == "position":
+					key = _decode_position_key(raw_key, depth + 1, path)
 					if not key is Vector2:
-						decode_error = "Invalid module key."
-						return null
-				elif entry.key.get("type") == "id" and entry.key.get("value") is String and entry.key.value.is_valid_int():
-					key = int(entry.key.value)
+						continue
+				elif key_type == "id":
+					if raw_key is String and raw_key.is_valid_int():
+						key = int(raw_key)
+					else:
+						# Older encoders mislabeled StringName fields as id. Preserve
+						# those field names as strings while recording the migration.
+						if raw_key is String or raw_key is StringName:
+							key = str(raw_key)
+							push_warning("Save decode: legacy string key mislabeled as id at %s: %s" % [path, str(raw_key)])
+						else:
+							push_warning("Save decode: skipped unknown map key at %s type=%s value=%s" % [path, key_type, str(raw_key)])
+							continue
+				elif key_type == "string":
+					if raw_key is String or raw_key is StringName:
+						key = str(raw_key)
+					else:
+						push_warning("Save decode: skipped invalid string key at %s type=%s value=%s" % [path, key_type, str(raw_key)])
+						continue
 				else:
-					decode_error = "Unknown map key type."
-					return null
+					push_warning("Save decode: skipped unknown map key at %s type=%s value=%s" % [path, key_type, str(raw_key)])
+					continue
 				if mapping.has(key):
-					decode_error = "Duplicate state key."
-					return null
-				mapping[key] = _decode(entry.value, depth + 1)
+					push_warning("Save decode: skipped duplicate map key at %s: %s" % [path, str(key)])
+					continue
+				mapping[key] = _decode(entry.value, depth + 1, "%s[%s]" % [path, str(key)])
 			return mapping
 		var object: Dictionary = {}
 		for key: String in value:
-			object[key] = _decode(value[key], depth + 1)
+			object[_coerce_json_key(key)] = _decode(value[key], depth + 1, path + "." + key)
 		return object
 	if value is Array:
 		var items: Array = []
 		for item: Variant in value:
-			items.append(_decode(item, depth + 1))
+			items.append(_decode(item, depth + 1, "%s[%d]" % [path, items.size()]))
 		return items
 	if value is float and _integer(value):
 		return int(value)
 	return value
+
+func _decode_position_key(raw_key: Variant, depth: int, path: String) -> Variant:
+	if raw_key is String:
+		var parts: PackedStringArray = raw_key.split(",")
+		if parts.size() == 2 and parts[0].is_valid_float() and parts[1].is_valid_float():
+			return Vector2(float(parts[0]), float(parts[1]))
+	var decoded: Variant = _decode(raw_key, depth, path + ".position")
+	if decoded is Vector2:
+		return decoded
+	push_warning("Save decode: skipped invalid position key at %s: %s" % [path, str(raw_key)])
+	return null
+
+func _coerce_json_key(key: String) -> Variant:
+	# JSON object keys are always strings. Recover the two key forms used by
+	# legacy saves; named region/technology keys remain strings.
+	if key.is_valid_int():
+		return int(key)
+	var parts: PackedStringArray = key.split(",")
+	if parts.size() == 2 and parts[0].is_valid_float() and parts[1].is_valid_float():
+		return Vector2(float(parts[0]), float(parts[1]))
+	return key
 
 # Migration entry point: future breaking changes add one explicit step here.
 func migrate(document: Dictionary) -> Dictionary:
@@ -294,12 +351,12 @@ func restore(document: Variant) -> String:
 		if not state.get(section) is Dictionary:
 			return "Missing save section: " + section
 	decode_error = ""
-	var station_data: Dictionary = _decode_fields(state.station, STATION_FIELDS)
-	var fleet_data: Dictionary = _decode_fields(state.fleet, FLEET_FIELDS)
+	var station_data: Dictionary = _decode_fields(state.station, STATION_FIELDS, "state.station")
+	var fleet_data: Dictionary = _decode_fields(state.fleet, FLEET_FIELDS, "state.fleet")
 	var retired_exploration: bool = state.fleet.has("sectors") or state.fleet.has("survey_jobs")
-	var old_exploration: Variant = _decode(state.fleet.get("sectors", []))
+	var old_exploration: Variant = _decode(state.fleet.get("sectors", []), 0, "state.fleet.sectors")
 	if not old_exploration is Array: return "Invalid retired exploration data."
-	var supply_data: Dictionary = _decode_fields(state.supply, SUPPLY_FIELDS)
+	var supply_data: Dictionary = _decode_fields(state.supply, SUPPLY_FIELDS, "state.supply")
 	supply_data["rng_seed"] = state.supply.get("rng_seed")
 	supply_data["rng_state"] = state.supply.get("rng_state")
 	if not decode_error.is_empty():
@@ -339,7 +396,7 @@ func restore(document: Variant) -> String:
 	if migrated.get("extensions", {}).has("alien_trade"):
 		if extension.get("schema_version") != 1:
 			return "This alien trade extension requires a newer reader."
-		trade_data = _decode_fields(extension, Trade.FIELDS)
+		trade_data = _decode_fields(extension, Trade.FIELDS, "extensions.alien_trade")
 		if not decode_error.is_empty():
 			return decode_error
 		error = _field_types(trade_data, candidate_fleet.diplomacy, Trade.FIELDS)
@@ -353,7 +410,7 @@ func restore(document: Variant) -> String:
 		var region_extension: Variant = migrated.extensions.regions
 		if not region_extension is Dictionary or region_extension.get("schema_version") != 1:
 			return "Unsupported or invalid region extension."
-		region_data = _decode_fields(region_extension, Regions.FIELDS)
+		region_data = _decode_fields(region_extension, Regions.FIELDS, "extensions.regions")
 		if not decode_error.is_empty():
 			return decode_error
 		error = _field_types(region_data, candidate_fleet.regions, Regions.FIELDS)
@@ -398,6 +455,23 @@ func restore(document: Variant) -> String:
 	error = candidate_supply.validate_mining_nodes(resource_data.resource_targets, floating_data, fleet_data)
 	if not error.is_empty(): return error
 	candidate_fleet.resource_targets = resource_data.resource_targets
+	var auto_mining_data: Dictionary = {}
+	var cancelled_legacy_mining: int = 0
+	if migrated.extensions.has("miner_auto"):
+		var auto_extension: Variant = migrated.extensions.miner_auto
+		if not auto_extension is Dictionary or auto_extension.get("schema_version") != 1:
+			return "Invalid automatic mining extension."
+		var saved_states: Variant = auto_extension.get("states", {})
+		if not saved_states is Dictionary:
+			return "Invalid automatic mining state."
+		auto_mining_data = _decode(saved_states, 0, "extensions.miner_auto.states")
+		if decode_error.is_empty() and not auto_mining_data is Dictionary:
+			return "Invalid automatic mining state."
+		if not decode_error.is_empty(): return decode_error
+	for raw_ship_id: Variant in auto_mining_data:
+		if not raw_ship_id is int or not station_data.ships.has(raw_ship_id) or not candidate.ship_catalog[station_data.ships[raw_ship_id]].has("mining") or not auto_mining_data[raw_ship_id] is bool:
+			return "Invalid automatic mining ship state."
+	candidate_fleet.auto_mining = auto_mining_data
 	for unit: Variant in fleet_data.jobs:
 		var capability: Dictionary = candidate.ship_catalog[station_data.ships[unit]].mining if unit is int else candidate.definition_at(unit).mining
 		if str(capability.get("resource", "minerals")) != candidate_fleet.target_resource(int(fleet_data.jobs[unit].target)):
@@ -408,7 +482,7 @@ func restore(document: Variant) -> String:
 		var collection_extension: Variant = migrated.extensions.material_collection
 		if not collection_extension is Dictionary or collection_extension.get("schema_version") != 1:
 			return "Unsupported material collection extension."
-		collection_data = _decode_fields(collection_extension, Collection.FIELDS)
+		collection_data = _decode_fields(collection_extension, Collection.FIELDS, "extensions.material_collection")
 		if not decode_error.is_empty():
 			return decode_error
 		error = _field_types(collection_data, candidate_supply.collection, Collection.FIELDS)
@@ -494,16 +568,36 @@ func restore(document: Variant) -> String:
 		error = LocationValidation.validate_projections(candidate, station_data, research_data, transport_data, collection_data)
 		if not error.is_empty():
 			return error
-		var assignments: Variant = _decode(migrated.extensions.world_locations.get("mining_assignments"))
+		var assignments: Variant = _decode(migrated.extensions.world_locations.get("mining_assignments"), 0, "extensions.world_locations.mining_assignments")
 		if not decode_error.is_empty() or not assignments is Dictionary:
 			return "Invalid canonical mining assignments."
 		error = LocationValidation.validate_assignments(assignments, candidate_fleet, fleet_data.jobs, legacy_outposts)
 		if not error.is_empty():
 			return error
 		candidate_fleet.mining_assignments = assignments
+		if not migrated.extensions.has("miner_auto"):
+			# Manual mining orders predate the automatic toggle. Release their
+			# claims during migration so legacy Miners load genuinely stopped.
+			for unit: Variant in candidate_fleet.jobs.keys():
+				if not unit is int or not station_data.ships.has(unit) or not candidate.ship_catalog[station_data.ships[unit]].has("mining"):
+					continue
+				var legacy_target: int = int(candidate_fleet.jobs[unit].get("target", -1))
+				if candidate_fleet.asteroids.has(legacy_target): candidate_fleet.asteroids[legacy_target].claimed = false
+				candidate_fleet.erase_mining_assignment(unit)
+				cancelled_legacy_mining += 1
+			fleet_data.jobs = candidate_fleet.jobs
 	else:
 		candidate_supply.collection.migrate_job_locations()
 		candidate_fleet.transport.migrate_job_locations()
+		if not migrated.extensions.has("miner_auto"):
+			for unit: Variant in candidate_fleet.jobs.keys():
+				if not unit is int or not station_data.ships.has(unit) or not candidate.ship_catalog[station_data.ships[unit]].has("mining"):
+					continue
+				var legacy_target: int = int(candidate_fleet.jobs[unit].get("target", -1))
+				if candidate_fleet.asteroids.has(legacy_target): candidate_fleet.asteroids[legacy_target].claimed = false
+				candidate_fleet.erase_mining_assignment(unit)
+				cancelled_legacy_mining += 1
+			fleet_data.jobs = candidate_fleet.jobs
 	var repair_data: Dictionary = _extension_fields(migrated.extensions, "repair_ship", candidate_fleet.repairs, Repair.FIELDS)
 	if not decode_error.is_empty(): return decode_error
 	error = candidate_fleet.repairs.validate(repair_data)
@@ -611,6 +705,7 @@ func restore(document: Variant) -> String:
 	model.connectivity_dirty = true
 	model.recalculate()
 	fleet.mining_assignments = candidate_fleet.mining_assignments
+	fleet.auto_mining = candidate_fleet.auto_mining
 	fleet.hauling.jobs = candidate_fleet.hauling.jobs
 	fleet.cargo.routes = candidate_fleet.cargo.routes
 	fleet.repairs.jobs = candidate_fleet.repairs.jobs
@@ -622,6 +717,8 @@ func restore(document: Variant) -> String:
 	supply.rng.seed = int(supply_data.rng_seed)
 	supply.rng.state = int(supply_data.rng_state)
 	migration_notice = "Legacy remote mining orders released; ore preserved. Send Miners through a gate and found a local outpost." if cancelled_remote > 0 else ""
+	if cancelled_legacy_mining > 0:
+		migration_notice += (" " if not migration_notice.is_empty() else "") + "Released %d legacy Miner order(s); Miners load stopped. Start auto-mining from their ship panels." % cancelled_legacy_mining
 	if replaced_modules > 0:
 		migration_notice += " Converted %d legacy Mining Ship modules to Space Docks in place; refunded %d Materials. Module mining jobs released; Ore preserved." % [replaced_modules, replacement_refund]
 	if replaced_docks > 0:
@@ -636,11 +733,11 @@ func restore(document: Variant) -> String:
 	fleet.changed.emit()
 	return ""
 
-func _decode_fields(data: Dictionary, fields: Array[String]) -> Dictionary:
+func _decode_fields(data: Dictionary, fields: Array[String], context: String = "") -> Dictionary:
 	var known: Dictionary = {}
 	for field: String in fields:
 		if data.has(field):
-			known[field] = _decode(data[field])
+			known[field] = _decode(data[field], 0, (context + "." + field) if not context.is_empty() else field)
 	return known
 
 func _field_types(data: Dictionary, target: Object, fields: Array[String]) -> String:
@@ -865,7 +962,7 @@ func _extension_fields(extensions: Dictionary, key: String, target: Object, fiel
 	if not extension is Dictionary or extension.get("schema_version") != 1:
 		decode_error = "Unsupported " + key + " extension."
 		return {}
-	var decoded: Dictionary = _decode_fields(extension, fields)
+	var decoded: Dictionary = _decode_fields(extension, fields, "extensions." + key)
 	if decode_error.is_empty():
 		decode_error = _field_types(decoded, target, fields)
 	return decoded

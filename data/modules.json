@@ -196,7 +196,7 @@
     "power_output": 0,
     "capacity": 0,
     "color": "b9a6f5",
-    "description": "Click an asteroid to send a ship.",
+    "description": "Legacy mining module; Ore extraction is handled by automatic Miner ships.",
     "effect": "8s mission · uses 2 power",
     "mining": {
       "seconds": 8,

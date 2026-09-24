@@ -177,7 +177,7 @@ func _spawn_asteroid(initial: bool = false) -> void:
 	next_home_id += 1
 	var definition: Dictionary = rules.asteroids
 	home_asteroids[next_home_id] = {"position": Vector2(float(definition.initial_x) if initial else float(definition.entry_x), 0.0 if next_home_id % 2 == 1 else 1.0), "speed": rng.randf_range(definition.speed_min, definition.speed_max)}
-	fleet.register_asteroid(next_home_id, int(definition.minerals))
+	fleet.register_asteroid(next_home_id, int(definition.minerals), home_asteroids[next_home_id].position)
 
 func spawn_loot(region_id: String, position: Vector2, resource: String, amount: int) -> int:
 	# Threat rewards enter the same floating-resource pool used by salvage and

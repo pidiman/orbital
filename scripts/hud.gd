@@ -45,7 +45,7 @@ var panel_closes: Dictionary = {}
 var active_menu: String = ""
 var footer: PanelContainer
 var capability_buttons: Dictionary = {}
-const SHIP_ACTIONS: Dictionary = {"hauling": "Assign refinery", "mining": "Assign asteroid", "survey": "Explore regions", "trade": "Trade with contact", "collection": "Deploy locally", "founding": "Found outpost", "gate_building": "Build Teleport Gate", "cargo_shuttle": "Assign shuttle route"}
+const SHIP_ACTIONS: Dictionary = {"hauling": "Assign refinery", "mining": "Start auto miner", "survey": "Explore regions", "trade": "Trade with contact", "collection": "Deploy locally", "founding": "Found outpost", "gate_building": "Build Teleport Gate", "cargo_shuttle": "Assign shuttle route"}
 const Fleet = preload("res://scripts/mining_fleet.gd")
 signal new_game_requested
 signal save_requested
@@ -53,7 +53,6 @@ signal load_requested
 var save_button: Button
 var load_button: Button
 signal tool_selected(kind: String)
-signal ship_assignment_requested(ship_id: int)
 var model: StationModel
 var fleet: Fleet
 var minerals_label: Label
@@ -368,7 +367,7 @@ func choose(kind: String) -> void:
 	if kind == "__demolish__":
 		message("Demolish mode active. Click a placed module to remove it.", true)
 	elif kind.is_empty():
-		message("Click labeled floating resources to collect; violet asteroids dispatch a Miner.")
+		message("Click labeled floating resources to collect; start Miners from their ship commands.")
 	else:
 		message("%s selected. Click a green cell beside the station." % model.catalog[kind].name)
 
@@ -452,7 +451,7 @@ func _process(delta: float) -> void:
 		footer_balance.visible = grid_controls.visible
 	status_time -= delta
 	if status_time <= 0:
-		status_label.text = "Labeled pickups: salvage  ·  Violet asteroids: mine  ·  Inspect a module to upgrade  ·  Ships: fleet commands" if fleet.regions.primary_station_visible() else "Labeled pickups: salvage  ·  Violet: mine  ·  Outposts/Regions: Scout / view region  ·  Outpost construction uses local storage"
+		status_label.text = "Labeled pickups: salvage  ·  Miners: automatic  ·  Inspect a module to upgrade  ·  Ships: fleet commands" if fleet.regions.primary_station_visible() else "Labeled pickups: salvage  ·  Miners: automatic  ·  Outposts/Regions: Scout / view region  ·  Outpost construction uses local storage"
 		if fleet.collection != null and not fleet.collection.waiting_message().is_empty():
 			status_label.text = fleet.collection.waiting_message()
 		if not fleet.docking.waiting_message().is_empty() and fleet.collection.waiting_message().is_empty() and fleet.hauling.waiting_message().is_empty():
@@ -607,6 +606,8 @@ func _refresh_ships() -> void:
 			status = fleet.collection.jobs[ship_id].status
 		elif fleet.jobs.has(ship_id):
 			status = "Mining · %ds" % fleet.jobs[ship_id].remaining
+		elif definition.has("mining") and fleet.auto_mining_enabled(ship_id):
+			status = "Auto mining · seeking"
 		elif fleet.regions.survey_jobs.has(ship_id):
 			status = "Scouting · %ds" % fleet.regions.survey_jobs[ship_id].remaining
 		elif fleet.diplomacy.jobs.has(ship_id):
@@ -619,7 +620,13 @@ func _refresh_ships() -> void:
 		for capability: String in capability_buttons[ship_id]:
 			var button: Button = capability_buttons[ship_id][capability]
 			button.text = "%s #%d · %s" % [definition.name, ship_id, status if not status.is_empty() else str(definition[capability].get("assignment_label", SHIP_ACTIONS[capability]))]
+			if capability == "mining":
+				button.text = "Stop auto miner" if fleet.auto_mining_enabled(ship_id) else "Start auto miner"
 			var work_error: String = fleet.mining_work_error(ship_id) if capability == "mining" else fleet.transport.work_error(ship_id)
+			if capability == "mining" and fleet.auto_mining_enabled(ship_id):
+				# Stopping remains available even if the running Miner is currently
+				# in transit or waiting for a local outpost.
+				work_error = ""
 			if capability == "gate_building":
 				work_error = ""
 				button.visible = not fleet.transport.has_gate(fleet.transport.location(ship_id))
@@ -629,7 +636,8 @@ func _refresh_ships() -> void:
 				button.tooltip_text = fleet.outposts.cost_text(ship_id) + "\n" + fleet.outposts.founding_error(ship_id)
 			elif status.is_empty() and fleet.transport.location(ship_id) != fleet.regions.HOME:
 				button.text += " · " + str(fleet.regions.catalog[fleet.transport.location(ship_id)].name)
-			button.disabled = fleet.unit_busy(ship_id) or not work_error.is_empty()
+			var mining_toggle_available: bool = capability == "mining" and (fleet.auto_mining_enabled(ship_id) or fleet.jobs.has(ship_id))
+			button.disabled = ((fleet.unit_busy(ship_id) and not mining_toggle_available) or not work_error.is_empty())
 			if capability == "hauling" and fleet.hauling.jobs.has(ship_id):
 				button.text = "Stop hauling"
 				button.disabled = false
@@ -700,6 +708,10 @@ func _command_ship(ship_id: int, capability: String = "") -> void:
 		fleet.cargo.cancel(ship_id)
 		message("Cargo Ship route cancelled.")
 		return
+	if capability == "mining":
+		var auto_error: String = fleet.toggle_auto_mining(ship_id)
+		message(("Auto-mining started for %s #%d." if fleet.auto_mining_enabled(ship_id) else "Auto-mining stopped; ship is returning to idle.") % [definition.name, ship_id] if auto_error.is_empty() else auto_error, not auto_error.is_empty(), 8.0)
+		return
 	if not definition.has(capability) or fleet.unit_busy(ship_id):
 		return
 	match capability:
@@ -726,10 +738,6 @@ func _command_ship(ship_id: int, capability: String = "") -> void:
 		"collection":
 			var error: String = fleet.collection.deploy(ship_id)
 			message("Material Ship deployed in its region." if error.is_empty() else error, not error.is_empty())
-		"mining":
-			close_panels()
-			ship_assignment_requested.emit(ship_id)
-			message("%s #%d selected. Click a %s; mining repeats until depleted." % [definition.name, ship_id, definition.mining.get("target_label", "violet Ore asteroid")], false, 8.0)
 		"survey":
 			region_navigation.open_region(fleet.regions.current_region, ship_id)
 			message("Choose an adjacent undiscovered region for this Scout.")

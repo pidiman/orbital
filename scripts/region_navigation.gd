@@ -10,12 +10,9 @@ var title_label: Label
 var detail_label: Label
 var status_label: Label
 var scout_picker: OptionButton
-var miner_picker: OptionButton
 var send_button: Button
 var jump_button: Button
 var close_button: Button
-var target_rows: VBoxContainer
-var target_buttons: Dictionary = {}
 var selected_region: String = "venus"
 var ship_signature: String = ""
 
@@ -88,18 +85,7 @@ func _ready() -> void:
 	send_button.pressed.connect(_survey)
 	jump_button = _button(detail, "Jump")
 	jump_button.pressed.connect(func() -> void: _jump(selected_region))
-	miner_picker = OptionButton.new()
-	miner_picker.custom_minimum_size.y = 32
-	detail.add_child(miner_picker)
-	miner_picker.item_selected.connect(func(_index: int) -> void: refresh())
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size.y = 110
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	detail.add_child(scroll)
-	target_rows = VBoxContainer.new()
-	target_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(target_rows)
-	hud._label(column, "Mining requires a local outpost and Miner. Hauling to Home is not available yet.", 12, hud.MUTED)
+	hud._label(column, "Mining is automatic. Start a Miner or Xeno Miner from its ship command panel; it will seek matching local nodes.", 12, hud.MUTED)
 	refresh()
 	# Keep location persistent; region shortcuts belong inside the Regions menu.
 	location_label.reparent(hud.root)
@@ -154,10 +140,6 @@ func _survey() -> void:
 	hud.message("Scout launched. Region unlocks on arrival." if error.is_empty() else error, not error.is_empty())
 	refresh()
 
-func _mine(asteroid_id: int) -> void:
-	var error: String = fleet.dispatch(asteroid_id, miner_picker.get_selected_id())
-	hud.message("Miner assigned. Minerals go to this region’s local storage." if error.is_empty() else error, not error.is_empty())
-
 func _fill(picker: OptionButton, capability: String) -> void:
 	var previous: int = picker.get_selected_id()
 	picker.clear()
@@ -179,7 +161,6 @@ func refresh() -> void:
 	if str(fleet.model.ships) != ship_signature:
 		ship_signature = str(fleet.model.ships)
 		_fill(scout_picker, "survey")
-		_fill(miner_picker, "mining")
 	for region_id: String in regions.catalog:
 		var state: String = regions.state(region_id)
 		var caption: String = "Here" if region_id == regions.current_region else ("View" if regions.jump_error(region_id).is_empty() else state.capitalize())
@@ -217,15 +198,3 @@ func refresh() -> void:
 	jump_button.disabled = not error.is_empty()
 	jump_button.text = "Jump to " + definition.name
 	jump_button.tooltip_text = error
-	for asteroid_id: int in target_buttons:
-		target_buttons[asteroid_id].visible = record.asteroid_ids.has(asteroid_id)
-	for asteroid_id: int in record.asteroid_ids:
-		if not target_buttons.has(asteroid_id):
-			var new_button: Button = _button(target_rows, "")
-			new_button.pressed.connect(func() -> void: _mine(asteroid_id))
-			target_buttons[asteroid_id] = new_button
-		var rock: Dictionary = fleet.asteroids.get(asteroid_id, {})
-		var button: Button = target_buttons[asteroid_id]
-		button.disabled = rock.is_empty() or bool(rock.get("claimed", false)) or miner_picker.get_selected_id() <= 0 or not fleet.mining_error(miner_picker.get_selected_id(), asteroid_id).is_empty()
-		button.tooltip_text = fleet.mining_error(miner_picker.get_selected_id(), asteroid_id)
-		button.text = "Depleted deposit" if rock.is_empty() else "%s · %d Minerals" % ["Mining" if rock.claimed else "Assign Miner", rock.minerals]

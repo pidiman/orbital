@@ -2,6 +2,7 @@ class_name MiningFleet
 extends RefCounted
 
 signal changed
+signal auto_mining_changed
 signal dispatched(unit: Variant, asteroid_id: int)
 signal completed(unit: Variant, asteroid_id: int, amount: int)
 
@@ -25,6 +26,9 @@ var asteroids: Dictionary = {}
 const RESOURCE_FIELDS: Array[String] = ["resource_targets"]
 # Typed floating-node bindings; asteroids retains the legacy quantity/job projection.
 var resource_targets: Dictionary = {}
+## Per-ship automatic mining switches. Missing entries are intentionally off so
+## saves written before automatic mining remain stopped after migration.
+var auto_mining: Dictionary = {}
 # Canonical mining assignments are keyed by stable, typed actor identity.
 var mining_assignments: Dictionary = {}
 # Legacy primary-station/UI/save adapter. Values reference the canonical job timers.
@@ -63,9 +67,12 @@ func _init(station: StationModel) -> void:
 		changed.emit()
 		model.changed.emit())
 
-func register_asteroid(asteroid_id: int, amount: int) -> void:
+func register_asteroid(asteroid_id: int, amount: int, position: Vector2 = Vector2.INF) -> void:
 	if not asteroids.has(asteroid_id) and amount > 0:
 		asteroids[asteroid_id] = {"minerals": amount, "claimed": false}
+		if position.is_finite(): asteroids[asteroid_id].position = position
+		for ship_id: int in auto_mining:
+			if auto_mining_enabled(ship_id): _assign_auto_miner(ship_id)
 		changed.emit()
 
 func remove_asteroid(asteroid_id: int) -> bool:
@@ -136,6 +143,63 @@ func dispatch(asteroid_id: int, selected_ship: int = -1) -> String:
 		return "Selected Miner is busy." if selected_ship != -1 else "All Mining Ships are busy. Wait for a mission to finish."
 	return "No idle Miner is in this region. Remote mining requires a local outpost and a Miner sent through a gate."
 
+func start_auto_mining(ship_id: int) -> String:
+	if not model.ships.has(ship_id) or not model.ship_catalog[model.ships[ship_id]].has("mining"):
+		return "Select a Miner or Xeno Miner ship."
+	var work_error: String = mining_work_error(ship_id)
+	if not work_error.is_empty(): return work_error
+	if unit_busy(ship_id) and not jobs.has(ship_id):
+		return "This ship is already on a mission."
+	auto_mining[ship_id] = true
+	_assign_auto_miner(ship_id)
+	auto_mining_changed.emit()
+	changed.emit()
+	return ""
+
+func stop_auto_mining(ship_id: int) -> String:
+	if not model.ships.has(ship_id) or not model.ship_catalog[model.ships[ship_id]].has("mining"):
+		return "Select a Miner or Xeno Miner ship."
+	auto_mining[ship_id] = false
+	# A stop releases an active claim cleanly. Any already completed extraction
+	# remains credited; no new extraction is started until the toggle is enabled.
+	if jobs.has(ship_id):
+		_release_mining_assignment(ship_id)
+	auto_mining_changed.emit()
+	changed.emit()
+	return ""
+
+func auto_mining_enabled(ship_id: int) -> bool:
+	return bool(auto_mining.get(ship_id, false))
+
+func toggle_auto_mining(ship_id: int) -> String:
+	return stop_auto_mining(ship_id) if auto_mining_enabled(ship_id) else start_auto_mining(ship_id)
+
+func _assign_auto_miner(ship_id: int) -> void:
+	if not auto_mining_enabled(ship_id) or jobs.has(ship_id) or unit_busy(ship_id): return
+	var resource: String = mining_resource(ship_id)
+	var region: String = model.locations.ship_region(ship_id)
+	var candidates: Array[int] = []
+	for asteroid_id: int in asteroids:
+		if asteroids[asteroid_id].get("claimed", false): continue
+		if asteroid_region(asteroid_id) != region or target_resource(asteroid_id) != resource: continue
+		candidates.append(asteroid_id)
+	if candidates.is_empty(): return
+	# Persistent regional deposits expose positions. Runtime Home deposits use a
+	# deterministic ID fallback; both paths remain stable and distribute claims.
+	var origin: Vector2 = Vector2(model.locations.ships.get(ship_id, {}).get("purchase_position", Vector2.ZERO))
+	var parking: Dictionary = docking.ships.get(ship_id, {}) if docking != null else {}
+	if parking.get("state", "") == "parked" and model.locations.structures.has(parking.get("dock_id", "")):
+		origin = Vector2(model.locations.structures[parking.dock_id].position)
+	candidates.sort_custom(func(a: int, b: int) -> bool:
+		return _auto_target_distance(origin, a) < _auto_target_distance(origin, b))
+	for asteroid_id: int in candidates:
+		if dispatch(asteroid_id, ship_id).is_empty(): return
+
+func _auto_target_distance(origin: Vector2, asteroid_id: int) -> float:
+	var record: Dictionary = asteroids.get(asteroid_id, {})
+	var target: Vector2 = Vector2(record.get("position", discovery_position(asteroid_id)))
+	return origin.distance_squared_to(target)
+
 func tick() -> void:
 	hauling.tick()
 	cargo.tick()
@@ -166,18 +230,19 @@ func tick() -> void:
 		assignment.cargo[resource] -= delivered
 		if resource == "minerals": total_mined += amount
 		completed.emit(unit, int(job.target), amount)
+	# Completion can free an asteroid claim or a ship. Assign the next local
+	# target only after all extraction deliveries for this tick are resolved.
+	for ship_id: int in auto_mining:
+		if auto_mining_enabled(ship_id): _assign_auto_miner(ship_id)
 	changed.emit()
 
 func cancel_unit(unit: Variant) -> void:
 	if unit is Vector2 and hauling != null:
 		for id: int in hauling.jobs.keys():
 			if not model.locations.structures.has(hauling.jobs[id].refinery_id) and hauling.jobs[id].phase == "pickup": hauling.cancel(id)
-	if jobs.has(unit):
-		var target: int = jobs[unit].target
-		if asteroids.has(target):
-			asteroids[target].claimed = false
-		erase_mining_assignment(unit)
+	if jobs.has(unit): _release_mining_assignment(unit)
 	if unit is int:
+		auto_mining.erase(unit)
 		regions.survey_jobs.erase(unit)
 		transport.cancel(unit)
 		diplomacy.cancel(unit)
@@ -269,6 +334,13 @@ func erase_mining_assignment(unit: Variant) -> void:
 		if typeof(mining_assignments[key].legacy_unit) == typeof(unit) and mining_assignments[key].legacy_unit == unit:
 			mining_assignments.erase(key)
 			return
+
+func _release_mining_assignment(unit: Variant) -> void:
+	var assignment: Dictionary = mining_assignment(unit)
+	if not assignment.is_empty():
+		var target: int = int(assignment.job.get("target", -1))
+		if asteroids.has(target): asteroids[target].claimed = false
+	erase_mining_assignment(unit)
 
 func import_mining_jobs(values: Dictionary) -> void:
 	mining_assignments.clear()

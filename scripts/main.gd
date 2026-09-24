@@ -131,7 +131,6 @@ func _ready() -> void:
 	fleet.repairs.notice.connect(hud.message)
 	supply.collection.notice.connect(hud.message)
 	hud.tool_selected.connect(_select_tool)
-	hud.ship_assignment_requested.connect(func(ship_id: int) -> void: asteroids.selected_ship = ship_id)
 	board.module_selected.connect(hud.inspect_module)
 	board.requested_build.connect(_build)
 	board.requested_demolish.connect(_demolish_at)

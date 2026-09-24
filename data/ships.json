@@ -4,13 +4,14 @@
     "cost": 45,
     "power_use": 2,
     "color": "b9a6f5",
-    "description": "Assign an asteroid; repeats until depleted.",
+    "description": "Automatically mines local Ore asteroids until stopped.",
     "effect": "18 minerals / 8s \u00b7 2 power",
     "mining": {
       "seconds": 8,
       "yield": 18,
       "repeat": true,
-      "resource": "minerals"
+      "resource": "minerals",
+      "automatic": true
     },
     "art": "mining_ship",
     "dock_type": "miner",
@@ -107,7 +108,8 @@
       "seconds": 20,
       "yield": 1,
       "repeat": true,
-      "assignment_label": "Assign Xeno node",
+      "automatic": true,
+      "assignment_label": "Start auto miner",
       "target_label": "Xenocrystal node"
     },
     "art": "xeno_mining_ship",

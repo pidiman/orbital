@@ -72,21 +72,9 @@ func _sync_view() -> void:
 	asteroid_count = rocks.size()
 
 func handle_click(point: Vector2) -> bool:
-	for asteroid_id: int in rocks:
-		if (get_canvas_transform().affine_inverse() * point).distance_to(rocks[asteroid_id].point) <= 34.0 * _marker_scale(asteroid_id):
-			var assignment_ship: int = selected_ship
-			if assignment_ship == -1:
-				var highlighted: int = get_parent().hud.selected_ship_id
-				if fleet.model.ships.has(highlighted) and fleet.model.ship_catalog[fleet.model.ships[highlighted]].has("mining"):
-					assignment_ship = highlighted
-			# Dispatch never changes the player's camera framing.
-			get_parent().ship_camera.ship_id = -1
-			var error: String = fleet.dispatch(asteroid_id, assignment_ship)
-			notice.emit("Mining ship dispatched. %s arrive when the timer ends." % fleet.target_resource(asteroid_id).capitalize() if error.is_empty() else error, not error.is_empty())
-			if error.is_empty():
-				selected_ship = -1
-			get_viewport().set_input_as_handled()
-			return true
+	# Ore and Xenocrystal nodes are no longer dispatch controls. Mining is
+	# exclusively driven by the selected ship's Start/Stop auto-miner toggle;
+	# leaving this unhandled preserves normal map click/pan behavior.
 	return false
 
 func _on_completed(unit: Variant, asteroid_id: int, amount: int) -> void:
