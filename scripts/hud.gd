@@ -92,6 +92,18 @@ var floating: Array[Dictionary] = []
 var compact_resources: HBoxContainer
 var resource_bar: PanelContainer
 var resource_status: HFlowContainer
+var status_row: HBoxContainer
+var top_bar: PanelContainer
+var top_bar_content: Control
+var status_capsule: PanelContainer
+var miner_segment: PanelContainer
+var refinery_segment: PanelContainer
+var module_segment: PanelContainer
+var miner_alert: Label
+var refinery_alert: Label
+var module_alert: Label
+var colony_group: HBoxContainer
+var colony_percent: Label
 var panel_fit_pending: bool = false
 var panel: PanelContainer
 var root: Control
@@ -99,6 +111,25 @@ const INK := Color("dfebf2")
 const MUTED := Color("7e95a9")
 const CYAN := Color("72dbcb")
 const GOLD := Color("eebd76")
+
+class StatusArt extends Control:
+	var art_kind: String = "mining_ship"
+	var tint: Color = Color.WHITE
+
+	func _ready() -> void:
+		custom_minimum_size = Vector2(13, 13)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+	func _draw() -> void:
+		ModuleArt.draw_module(self, Vector2(6.5, 6.5), art_kind, 0.30)
+
+func _status_art(kind: String, tint: Color) -> StatusArt:
+	var icon := StatusArt.new()
+	icon.art_kind = kind
+	icon.tint = tint
+	icon.modulate = tint
+	return icon
 
 func _ready() -> void:
 	root = Control.new()
@@ -265,7 +296,7 @@ func _ready() -> void:
 	count_label = _status_indicator(resource_status, 8, MUTED)
 	goal_bar = ProgressBar.new()
 	goal_bar.show_percentage = false
-	goal_bar.custom_minimum_size = Vector2(82, 6)
+	goal_bar.custom_minimum_size = Vector2(110, 5)
 	goal_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	goal_bar.tooltip_text = "Colony growth"
 	goal_bar.add_theme_stylebox_override("background", _style(Color("283848"), Color("283848"), 2))
@@ -345,6 +376,168 @@ func _status_indicator(parent: Node, icon_kind: int, tint: Color) -> Label:
 	var label := _label(group, "", 12, tint)
 	return label
 
+func _status_segment(parent: HBoxContainer, icon_kind: Variant, tint: Color, segment_name: String, widest_text: String) -> PanelContainer:
+	if parent.get_child_count() > 0:
+		var divider := ColorRect.new()
+		divider.custom_minimum_size = Vector2(1, 14)
+		divider.color = Color("304353")
+		divider.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(divider)
+	var segment := PanelContainer.new()
+	segment.name = segment_name
+	segment.custom_minimum_size = Vector2(_status_segment_width(widest_text), 20)
+	segment.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	segment.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	segment.mouse_filter = Control.MOUSE_FILTER_STOP
+	segment.add_theme_stylebox_override("panel", _segment_style(Color("101b29"), segment_name))
+	parent.add_child(segment)
+	var inner := HBoxContainer.new()
+	inner.add_theme_constant_override("separation", 4)
+	inner.alignment = BoxContainer.ALIGNMENT_BEGIN
+	inner.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	segment.add_child(inner)
+	var icon: Control
+	if icon_kind is String:
+		icon = _status_art(str(icon_kind), tint)
+	else:
+		icon = preload("res://scripts/resource_icon.gd").new()
+		icon.kind = int(icon_kind)
+		icon.tint = tint
+		icon.custom_minimum_size = Vector2(13, 13)
+		icon.scale = Vector2(0.93, 0.93)
+	inner.add_child(icon)
+	var body := HBoxContainer.new()
+	body.name = "Body"
+	body.alignment = BoxContainer.ALIGNMENT_BEGIN
+	body.custom_minimum_size.x = _status_body_width(widest_text)
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inner.add_child(body)
+	return segment
+
+func _status_body_width(widest_text: String) -> float:
+	var font := ThemeDB.fallback_font
+	return ceilf(font.get_string_size(widest_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x)
+
+func _status_segment_width(widest_text: String) -> float:
+	var body_width := _status_body_width(widest_text)
+	var font := ThemeDB.fallback_font
+	var alert_width := font.get_string_size("Ⅱ", HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	return ceilf(8.0 + 13.0 + 4.0 + body_width + 4.0 + alert_width + 8.0)
+
+func _segment_alert(segment: PanelContainer) -> Label:
+	var glyph := _label(segment, "", 11, Color("f5c36c"))
+	glyph.name = "Alert"
+	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	glyph.hide()
+	var inner: HBoxContainer = segment.get_child(0)
+	glyph.reparent(inner)
+	return glyph
+
+func _status_body(segment: PanelContainer) -> HBoxContainer:
+	var inner: HBoxContainer = segment.get_child(0)
+	return inner.get_node("Body") as HBoxContainer
+
+func _segment_style(fill: Color, segment_name: String) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = fill
+	style.border_width_left = 0
+	style.border_width_right = 0
+	style.border_width_top = 0
+	style.border_width_bottom = 0
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 0
+	style.content_margin_bottom = 0
+	if segment_name == "Miners":
+		style.corner_radius_top_left = 10
+		style.corner_radius_bottom_left = 10
+	elif segment_name == "Modules":
+		style.corner_radius_top_right = 10
+		style.corner_radius_bottom_right = 10
+	return style
+
+func _set_status_segment(segment: PanelContainer, alert: Label, state: String, glyph: String) -> void:
+	var fill := Color("101b29")
+	var tint := Color("baa1f5") if segment.name == "Miners" else (GOLD if segment.name == "Refineries" else Color("9aa9b5"))
+	if state == "warning":
+		fill = Color("2a1f10")
+		tint = Color("f0bf64")
+	elif state == "damaged":
+		fill = Color("2a1212")
+		tint = Color("ed8b84")
+	alert.add_theme_color_override("font_color", tint)
+	var inner: HBoxContainer = segment.get_child(0)
+	var icon = inner.get_child(0)
+	icon.tint = tint
+	if icon is StatusArt: icon.modulate = tint
+	icon.queue_redraw()
+	var body: HBoxContainer = inner.get_node("Body") as HBoxContainer
+	for child: Node in body.get_children():
+		if child is Label: child.add_theme_color_override("font_color", tint)
+	segment.add_theme_stylebox_override("panel", _segment_style(fill, segment.name))
+	alert.text = glyph
+	alert.visible = not glyph.is_empty()
+
+func _update_status_indicators() -> void:
+	var units: Dictionary = fleet.mining_units()
+	var total_miners := units.size()
+	var idle_miners := fleet.idle_count()
+	var working_miners := maxi(0, total_miners - idle_miners)
+	fleet_label.text = "%d/%d" % [working_miners, total_miners]
+	var miners_warning := total_miners > 0 and working_miners == 0
+	_set_status_segment(miner_segment, miner_alert, "warning" if miners_warning else "", "Ⅱ" if miners_warning else "")
+	fleet_label.tooltip_text = "Miners: %d working of %d total%s" % [working_miners, total_miners, " · all idle" if miners_warning else ""]
+	miner_segment.tooltip_text = fleet_label.tooltip_text
+
+	var refinery_count := 0
+	var running_count := 0
+	var buffer_full_count := 0
+	var paused_count := 0
+	var refinery_details: Array[String] = []
+	for world_position: Vector2 in model.modules:
+		if not model.definition_at(world_position).has("conversion"): continue
+		refinery_count += 1
+		var reason := model.refinery_pause_reason(world_position)
+		if reason.is_empty():
+			running_count += 1
+		else:
+			paused_count += 1
+			if reason.to_lower().contains("buffer"):
+				buffer_full_count += 1
+			refinery_details.append("Refinery #%d: %s" % [refinery_count, reason])
+	var refinery_text := "none" if refinery_count == 0 else ("%d running" % running_count if buffer_full_count == 0 and paused_count == 0 else ("%d buffer full" % buffer_full_count if buffer_full_count > 0 else "%d paused" % paused_count))
+	refinery_label.text = refinery_text
+	var refinery_warning := paused_count > 0
+	_set_status_segment(refinery_segment, refinery_alert, "warning" if refinery_warning else "", "Ⅱ" if refinery_warning else "")
+	refinery_label.tooltip_text = "No refineries" if refinery_count == 0 else "; ".join(refinery_details) if not refinery_details.is_empty() else "%d refineries running" % running_count
+	refinery_segment.tooltip_text = refinery_label.tooltip_text
+
+	var connected_count := 0
+	var damaged_count := 0
+	var disconnected_count := 0
+	for world_position: Vector2 in model.modules:
+		if model.is_module_damaged(world_position): damaged_count += 1
+		if bool(model.connected_modules.get(world_position, false)): connected_count += 1
+		else: disconnected_count += 1
+	count_label.text = "%d" % connected_count
+	var module_state := "damaged" if damaged_count > 0 else ("warning" if disconnected_count > 0 else "")
+	_set_status_segment(module_segment, module_alert, module_state, "!" if damaged_count > 0 else ("•" if disconnected_count > 0 else ""))
+	count_label.tooltip_text = "Modules: %d connected" % connected_count
+	if disconnected_count > 0: count_label.tooltip_text += " · %d disconnected" % disconnected_count
+	if damaged_count > 0: count_label.tooltip_text += " · %d damaged" % damaged_count
+	module_segment.tooltip_text = count_label.tooltip_text
+
+	var module_count := model.modules.size()
+	var level_start := maxi(1, (model.level - 1) * 4 + 1)
+	var next_level := level_start + 4
+	var progress_percent := 100 if model.level <= 0 else clampi(int(round(float(module_count - level_start) / float(maxi(1, next_level - level_start)) * 100.0)), 0, 99)
+	colony_percent.text = "%d%%" % progress_percent
+	goal_bar.max_value = 100
+	goal_bar.value = progress_percent
+	level_label.tooltip_text = "Colony Lv %d · %d%% to Lv %d" % [model.level, progress_percent, model.level + 1]
+	colony_group.tooltip_text = level_label.tooltip_text
+
 func _style(fill: Color, border: Color, radius: int = 8) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill
@@ -390,18 +583,13 @@ func refresh() -> void:
 	tech_label.text = "%s" % fleet.diplomacy.inventory.get("tech", 0)
 	xenocrystal_label.text = "%s" % (fleet.diplomacy.inventory.get("xenocrystal", 0) if build_model.station_id.is_empty() else model.locations.stations[build_model.station_id].inventory.get("xenocrystal", 0))
 	minerals_label.text = "%d" % build_model.minerals
-	fleet_label.text = "%d/%d" % [fleet.idle_count(), fleet.mining_units().size()]
-	var refinery_count: int = model.module_count_with("conversion")
-	refinery_label.text = "%d %s" % [refinery_count, _refinery_status()]
+	_update_status_indicators()
 	materials_label.text = "%d" % build_model.materials
 	materials_label.tooltip_text = "Materials: %d / %d capacity" % [build_model.materials, build_model.capacity]
 	power_label.text = "%+d" % build_model.power_balance()
 	power_label.tooltip_text = "Power: %d generated / %d used" % [build_model.power_output, build_model.power_use]
 	power_detail.text = "%d generated  /  %d used" % [build_model.power_output, build_model.power_use]
 	level_label.text = "Lv %02d" % model.level
-	count_label.text = "%02d" % model.modules.size()
-	goal_bar.max_value = 9
-	goal_bar.value = mini(model.modules.size(), 9)
 	_refresh_ships()
 	_refresh_upgrade()
 	if is_instance_valid(gate_panel) and gate_panel.visible: gate_panel.refresh()
@@ -959,27 +1147,68 @@ func _create_region_navigation() -> void:
 func _setup_menus() -> void:
 	tabs.tabs_visible = false
 	tabs.use_hidden_tabs_for_min_size = false
-	var top_bar := PanelContainer.new()
+	top_bar = PanelContainer.new()
+	top_bar.name = "TopBar"
 	top_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	top_bar.offset_left = 12
 	top_bar.offset_right = -12
 	top_bar.offset_top = 8
-	top_bar.offset_bottom = 56
+	top_bar.offset_bottom = 68
 	top_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_bar.add_theme_stylebox_override("panel", _style(Color("111d2c"), Color("253647")))
 	root.add_child(top_bar)
+	top_bar_content = Control.new()
+	top_bar_content.name = "TopBarContent"
+	top_bar_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_bar.add_child(top_bar_content)
 	title_label.reparent(root)
 	title_label.text = "ORBITAL"
 	title_label.add_theme_font_size_override("font_size", 14)
 	title_label.add_theme_color_override("font_color", CYAN)
-	# Reuse the live readout labels; remove the tall label/value groups.
-	resource_status.reparent(root)
-	resource_status.add_theme_constant_override("h_separation", 10)
-	for label: Label in [fleet_label, refinery_label, level_label, count_label]: label.add_theme_font_size_override("font_size", 11)
-	fleet_label.tooltip_text = "Miners idle / total"
-	refinery_label.tooltip_text = "Refineries and status"
-	level_label.tooltip_text = "Colony level"
-	count_label.tooltip_text = "Connected modules"
+	# Replace the old loose labels with one compact, alertable status row.
+	resource_status.hide()
+	status_row = HBoxContainer.new()
+	status_row.name = "StatusRow"
+	status_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_bar_content.add_child(status_row)
+	status_capsule = PanelContainer.new()
+	status_capsule.name = "StatusCapsule"
+	status_capsule.mouse_filter = Control.MOUSE_FILTER_STOP
+	status_capsule.custom_minimum_size = Vector2(0, 20)
+	status_capsule.clip_contents = true
+	status_capsule.add_theme_stylebox_override("panel", _style(Color("101b29"), Color("304353"), 10))
+	status_row.add_child(status_capsule)
+	var capsule_row := HBoxContainer.new()
+	capsule_row.add_theme_constant_override("separation", 0)
+	status_capsule.add_child(capsule_row)
+	miner_segment = _status_segment(capsule_row, "mining_ship", Color("baa1f5"), "Miners", "10/10")
+	refinery_segment = _status_segment(capsule_row, "refinery", GOLD, "Refineries", "10 buffer full")
+	module_segment = _status_segment(capsule_row, 0, Color("9aa9b5"), "Modules", "999")
+	miner_alert = _segment_alert(miner_segment)
+	refinery_alert = _segment_alert(refinery_segment)
+	module_alert = _segment_alert(module_segment)
+	for label: Label in [fleet_label, refinery_label, count_label]: label.hide()
+	fleet_label = _label(_status_body(miner_segment), "", 12, Color("baa1f5"))
+	refinery_label = _label(_status_body(refinery_segment), "", 12, GOLD)
+	count_label = _label(_status_body(module_segment), "", 12, Color("9aa9b5"))
+	for label: Label in [fleet_label, refinery_label, count_label]:
+		label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	colony_group = HBoxContainer.new()
+	colony_group.name = "ColonyLevel"
+	colony_group.add_theme_constant_override("separation", 6)
+	colony_group.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	colony_group.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	colony_group.mouse_filter = Control.MOUSE_FILTER_STOP
+	status_row.add_child(colony_group)
+	level_label.reparent(colony_group)
+	level_label.add_theme_font_size_override("font_size", 12)
+	level_label.add_theme_color_override("font_color", CYAN)
+	level_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	goal_bar.reparent(colony_group)
+	colony_percent = _label(colony_group, "0%", 11, Color("6da9a8"))
+	colony_percent.autowrap_mode = TextServer.AUTOWRAP_OFF
+	status_row.add_theme_constant_override("separation", 16)
+	status_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	for child: Node in resource_bar.get_children(): child.hide()
 	compact_resources = HBoxContainer.new()
 	compact_resources.add_theme_constant_override("separation", 10)
@@ -1133,9 +1362,12 @@ func _layout_menus() -> void:
 		fps_label.offset_right = -12
 		fps_label.offset_top = 104
 		fps_label.offset_bottom = 122
-	resource_status.position = Vector2(24, 39)
-	resource_status.size = Vector2(viewport_size.x - 48, 16)
-	var tray_top: float = 61.0
+	if is_instance_valid(status_row):
+		status_row.position = Vector2(128, 32)
+		status_row.size = Vector2(viewport_size.x - 152, 22)
+		status_capsule.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		colony_group.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var tray_top: float = 69.0
 	var top: float = 137.0
 	if is_instance_valid(ship_tray):
 		ship_tray.position = Vector2(24, tray_top)
@@ -1480,8 +1712,8 @@ func has_open_panel() -> bool:
 func pointer_over_ui(point: Vector2) -> bool:
 	var viewport_size := get_viewport().get_visible_rect().size
 	if not Rect2(Vector2.ZERO, viewport_size).has_point(point): return true
-	if Rect2(28, 8, viewport_size.x - 56, 48).has_point(point): return true
-	var controls: Array[Control] = [compact_resources, resource_status, ship_tray, station_view_button, region_navigation.location_label, footer]
+	if Rect2(28, 8, viewport_size.x - 56, 60).has_point(point): return true
+	var controls: Array[Control] = [compact_resources, status_row, ship_tray, station_view_button, region_navigation.location_label, footer]
 	for target: PanelContainer in managed_panels: controls.append(target)
 	if is_instance_valid(dev_panel): controls.append(dev_panel)
 	for control: Control in controls:
