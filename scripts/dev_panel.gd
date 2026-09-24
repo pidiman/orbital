@@ -2,6 +2,7 @@ extends PanelContainer
 const Config = preload("res://scripts/dev_config.gd")
 var hud: CanvasLayer
 var buttons: Dictionary = {}
+var tuning_numbers: Dictionary = {}
 var close_button: Button
 var result_label: Label
 
@@ -34,6 +35,25 @@ func _ready() -> void:
 	scroll.add_child(body)
 	var note: Label = hud._label(body, "Development tools. Grants target the viewed station and are included in ordinary saves. Materials respect storage capacity.", 13, hud.MUTED)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hud._label(body, "Xenocrystals", 18, hud.INK)
+	for option: Dictionary in hud.get_parent().preferences.definitions.get("tuning_options", []):
+		var row := HBoxContainer.new()
+		body.add_child(row)
+		var caption: Label = hud._label(row, option.label, 14, hud.MUTED)
+		caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var number := SpinBox.new()
+		number.min_value = option.min
+		number.max_value = option.max
+		number.step = option.step
+		number.value = hud.get_parent().preferences.tuning_value(option)
+		number.custom_minimum_size = Vector2(115, 44)
+		number.value_changed.connect(func(value: float) -> void:
+			if hud.get_parent().preferences.set_tuning(option, value) != OK:
+				hud.message("Could not save local tuning settings."))
+		row.add_child(number)
+		tuning_numbers[option.id] = number
+	var tuning_note: Label = hud._label(body, "Applies to newly spawned nodes.", 13, hud.MUTED)
+	tuning_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var threat_toggle := CheckButton.new()
 	threat_toggle.text = "Asteroid threats"
 	threat_toggle.button_pressed = hud.get_parent().threat_field.active
