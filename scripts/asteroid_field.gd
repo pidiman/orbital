@@ -17,7 +17,6 @@ var font: Font = ThemeDB.fallback_font
 const ORE := Color("baa1f5")
 var last_revision: int = -1
 var last_region: String = ""
-var beam_render_state: Dictionary = {}
 
 func _ready() -> void:
 	fleet.completed.connect(_on_completed)
@@ -118,7 +117,7 @@ func _draw() -> void:
 			ModuleArt.draw_module(self, point, definition.get("art", "scout"), _ship_scale(definition), 1.0, get_parent().ship_motion.angle_for(ship_id), 1, 0, 0, hauling_cargo)
 			if fleet.repairs != null and fleet.repairs.jobs.has(ship_id):
 				var repair_job: Dictionary = fleet.repairs.jobs[ship_id]
-				if fleet.model.locations.structures.has(repair_job.target) and repair_job.phase == "repairing":
+				if fleet.model.locations.structures.has(repair_job.target) and repair_job.phase == "repairing" and get_parent().ship_motion.is_beam_active(ship_id):
 					var repair_target: Vector2 = get_parent().board.world_to_screen(fleet.model.locations.structures[repair_job.target].position)
 					var repair_direction: Vector2 = repair_target - point
 					if repair_direction.length() > 1.0:
@@ -147,13 +146,9 @@ func _draw() -> void:
 		var mining_definition: Dictionary = fleet.model.ship_catalog[fleet.model.ships[unit]] if unit is int and fleet.model.ships.has(unit) else {"color": "e8ad5b"}
 		get_parent().ship_motion.draw_exhaust(self, unit, ship_point, mining_art, 0.55, get_parent().ship_motion.angle_for(unit), Color(mining_definition.get("color", "e8ad5b")))
 		ModuleArt.draw_module(self, ship_point, mining_art, 0.55, 1.0, get_parent().ship_motion.angle_for(unit))
-	# Beam visibility is state-gated: only the stationary extraction phase emits it.
-		var extraction_state: String = get_parent().ship_motion.mining_state(unit)
-		var beam_should_draw: bool = extraction_state == "EXTRACTING"
-		var beam_trace: String = "VISIBLE" if beam_should_draw else "HIDDEN"
-		if beam_render_state.get(unit, "") != beam_trace:
-			beam_render_state[unit] = beam_trace
-			print("Beam render ship %s: state=%s -> beam %s (AsteroidField._draw mining path)" % [str(unit), extraction_state, beam_trace])
+		# ShipMotion is the single source of truth for state plus arrival-gated
+		# extraction visibility.
+		var beam_should_draw: bool = get_parent().ship_motion.is_beam_active(unit)
 		if beam_should_draw:
 			var beam_color: Color = Color("62e4dc") if fleet.target_resource(job.target) == "xenocrystal" else Color("f0aa55")
 			var beam_direction: Vector2 = target - ship_point

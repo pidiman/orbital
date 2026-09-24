@@ -159,7 +159,8 @@ func advance_visual(delta: float) -> void:
 		_update_mining_state(unit, target)
 		var distance_to_target: float = Vector2(points.get(unit, origins.get(unit, target))).distance_to(target)
 		var repairing: bool = fleet.repairs != null and fleet.repairs.jobs.has(unit) and str(fleet.repairs.jobs[unit].get("phase", "")) == "repairing"
-		beam_active[unit] = mining_state(unit) == "EXTRACTING" or repairing
+		var arrived: bool = points.has(unit) and Vector2(points[unit]).distance_to(target) <= float(settings.get("facing_arrival_distance", 1.0))
+		beam_active[unit] = beam_visible_for(mining_state(unit), arrived) or (repairing and arrived)
 		visual_moving[unit] = not mission.is_empty() and distance_to_target > float(settings.facing_arrival_distance)
 		visual_active[unit] = bool(visual_moving[unit]) or bool(beam_active[unit])
 		# Idle ships at their resolved destination have no visual state to update.
@@ -209,14 +210,13 @@ func _update_mining_state(unit: Variant, target: Vector2) -> void:
 	var next_state: String = "IDLE"
 	if mining_jobs.has(unit):
 		var job: Dictionary = mining_jobs[unit]
+		var arrived: bool = points.has(unit) and Vector2(points[unit]).distance_to(target) <= float(settings.get("facing_arrival_distance", 1.0))
 		if returning(job):
 			next_state = "FLYING_BACK"
-		elif mining_states.get(unit, "") == "EXTRACTING":
-			next_state = "EXTRACTING"
 		# Visual movement eases toward the stop point and may never become
 		# bit-for-bit equal. Treat the configured arrival radius as arrival so
 		# extraction can begin and its beam can render.
-		elif points.has(unit) and Vector2(points[unit]).distance_to(target) <= float(settings.get("facing_arrival_distance", 1.0)):
+		elif arrived:
 			next_state = "EXTRACTING"
 		else:
 			next_state = "FLYING_TO"
@@ -225,10 +225,16 @@ func _update_mining_state(unit: Variant, target: Vector2) -> void:
 func _set_mining_state(unit: Variant, next_state: String) -> void:
 	if mining_states.get(unit, "") == next_state: return
 	mining_states[unit] = next_state
-	print("Ship %s: state changed to %s -> beam %s" % [str(unit), next_state, "ON" if next_state == "EXTRACTING" else "OFF"])
+	# A transition invalidates the cached visual state immediately. The next
+	# visual tick recomputes beam visibility from the new state and arrival.
+	beam_active[unit] = false
+	visual_active[unit] = true
 	# Stationary extraction is intentionally outside the movement fast path.
 	# Invalidate the asteroid view explicitly when the beam state changes.
 	if is_instance_valid(game) and is_instance_valid(game.asteroids): game.asteroids.queue_redraw()
+
+static func beam_visible_for(state: String, arrived: bool) -> bool:
+	return arrived and state in ["EXTRACTING", "REPAIRING"]
 
 func mining_state(unit: Variant) -> String:
 	return str(mining_states.get(unit, "IDLE"))
