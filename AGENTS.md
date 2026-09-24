@@ -119,6 +119,7 @@ Core loop: build station → collect → mine → refine → research → explor
 - Before finishing, run:
   - tests/test_model.gd
   - tests/save_key_roundtrip.gd
+  - tests/beam_state_test.gd
   - headless startup (no parser errors)
   - git diff --check
 - Report: root cause (for bugs), what changed, data values chosen, how to test.
